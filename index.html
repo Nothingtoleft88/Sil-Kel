@@ -2,7 +2,8 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- META VIEWPORT DIPERBARUI: Mencegah zoom bawaan browser agar kontrol sentuh JS bekerja maksimal -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Silsilah Keluarga Interaktif</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
@@ -505,7 +506,9 @@
     // --- STATE MANAGEMENT ---
     let treeData;
     let appSettings;
-    let scale = 1;
+    
+    // Tentukan skala awal berdasarkan lebar layar (Lebih kecil jika layar HP)
+    let scale = window.innerWidth < 768 ? 0.6 : 1; 
     let position = { x: 0, y: 0 };
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
@@ -836,8 +839,10 @@
       scale = Math.min(Math.max(0.2, scale + delta), 2);
       renderTree();
     }
+    
     function resetZoom() {
-      scale = 1; position = { x: 0, y: 0 };
+      scale = window.innerWidth < 768 ? 0.6 : 1; 
+      position = { x: 0, y: 0 };
       renderTree();
     }
 
@@ -1419,7 +1424,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${escapeHTML(appSettings.appTitle)}</title>
   
   <script src="https://cdn.tailwindcss.com"></` + `script>
