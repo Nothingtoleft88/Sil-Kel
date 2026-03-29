@@ -5,21 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Silsilah Keluarga Interaktif</title>
   
-  <!-- Tailwind CSS (via CDN untuk styling tanpa build process) -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- FontAwesome (via CDN untuk Ikon) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- JSZip (Untuk fitur Export ke ZIP) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <!-- HTML2Canvas (Untuk Export Gambar PNG) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-  <!-- ========================================== -->
-  <!-- BAGIAN CSS -->
-  <!-- ========================================== -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
   <style id="app-style">
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
     
@@ -78,13 +74,11 @@
 </head>
 <body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
 
-  <!-- Notifikasi Toast -->
   <div id="toast-notification" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-[200] flex items-center">
     <i class="fa-solid fa-circle-check mr-2"></i>
     <span id="toast-message">Tersimpan!</span>
   </div>
 
-  <!-- HALAMAN LOGIN (KODE AKSES) -->
   <div id="login-screen" class="fixed inset-0 bg-slate-800 z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
     <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform">
       <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -98,7 +92,6 @@
     </div>
   </div>
 
-  <!-- HEADER NAVBAR -->
   <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
     <div class="flex items-center space-x-3">
       <div class="bg-blue-600 p-2 rounded-lg text-white shadow-md">
@@ -110,7 +103,6 @@
       </div>
     </div>
     
-    <!-- Search Bar -->
     <div class="hidden md:flex flex-1 max-w-sm mx-6 relative">
       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <i class="fa-solid fa-search text-slate-400 text-sm"></i>
@@ -172,21 +164,16 @@
     </div>
   </header>
 
-  <!-- CANVAS AREA -->
   <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab select-none transition-colors duration-500">
-    <!-- Grid Background -->
     <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
 
-    <!-- Container Transform -->
     <div id="tree-transform" class="absolute transform-gpu transition-transform duration-75 ease-out flex justify-center min-w-full min-h-full items-center">
       <div class="family-tree pb-32 pt-10 px-20"> 
         <ul id="tree-container">
-          <!-- Tree Nodes will be injected here via JS -->
-        </ul>
+          </ul>
       </div>
     </div>
 
-    <!-- Floating Help -->
     <div class="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-3 rounded-xl border border-slate-200 shadow-lg flex items-start max-w-sm pointer-events-none">
       <i class="fa-solid fa-circle-info text-blue-500 mr-3 mt-1 text-lg flex-shrink-0"></i>
       <div class="text-sm text-slate-600">
@@ -200,7 +187,6 @@
     </div>
   </main>
 
-  <!-- MODAL PENGATURAN -->
   <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
       <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
@@ -213,17 +199,6 @@
       </div>
       <div class="p-6 overflow-y-auto space-y-4">
         
-        <div class="flex items-center justify-between p-3 border border-emerald-200 rounded-lg bg-emerald-50 mb-2">
-          <div>
-            <span class="block text-sm font-bold text-emerald-800">Penyimpanan Otomatis (Lokal)</span>
-            <span class="block text-[11px] text-emerald-600">Simpan otomatis ke browser tanpa takut hilang.</span>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="set-autosave" class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-          </label>
-        </div>
-
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Utama Web</label>
           <input type="text" id="set-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
@@ -278,11 +253,9 @@
     </div>
   </div>
 
-  <!-- MODAL EDITOR PROFIL -->
   <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
       
-      <!-- Modal Header -->
       <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
         <h2 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center">
           <i class="fa-solid fa-pen-to-square mr-2 text-blue-600" id="modal-title-icon"></i> <span id="modal-title-text">Edit Profil</span>
@@ -292,10 +265,8 @@
         </button>
       </div>
 
-      <!-- Modal Body / Form -->
       <div class="p-6 overflow-y-auto">
         <form id="family-form" class="space-y-5">
-          <!-- Basic Info -->
           <div class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
@@ -320,14 +291,12 @@
               </div>
             </div>
 
-            <!-- STATUS ANAK (Kandung / Tiri & Dari Pasangan Mana) -->
             <div id="container-childrelations" class="hidden bg-indigo-50 p-3 rounded-lg border border-indigo-200">
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-people-arrows mr-1"></i> Dari Pasangan Mana?</label>
                   <select id="input-linkedspouse" class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
-                    <!-- Diisi otomatis oleh JS -->
-                  </select>
+                    </select>
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-child mr-1"></i> Status Anak</label>
@@ -342,7 +311,6 @@
             </div>
           </div>
 
-          <!-- Detailed Info -->
           <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
             <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Lengkap</h3>
             
@@ -357,7 +325,6 @@
               </div>
             </div>
 
-            <!-- TANGGAL LAHIR & WAFAT -->
             <div class="grid grid-cols-2 gap-4">
               <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
                 <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-2"><i class="fa-solid fa-cake-candles mr-1"></i> Data Kelahiran</label>
@@ -411,7 +378,6 @@
           </div>
         </form>
 
-        <!-- Action Buttons (Add Child/Spouse) -->
         <div id="modal-actions" class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 gap-3 hidden">
           <button type="button" id="btn-add-parent" onclick="openAddModal('parent')" class="col-span-2 bg-amber-50 text-amber-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-amber-100 border border-amber-200 transition shadow-sm flex justify-center items-center">
             <i class="fa-solid fa-arrow-up mr-1.5"></i> Tambah Orang Tua (Jadikan Akar Baru)
@@ -425,7 +391,6 @@
         </div>
       </div>
 
-      <!-- Modal Footer -->
       <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
         <button id="btn-delete" type="button" onclick="handleDelete()" class="text-red-600 hover:text-white bg-white hover:bg-red-600 border border-red-200 hover:border-red-600 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center shadow-sm">
           <i class="fa-solid fa-trash mr-2"></i> Hapus
@@ -438,7 +403,6 @@
     </div>
   </div>
 
-  <!-- MODAL STATISTIK -->
   <div id="stats-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
       <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -474,8 +438,7 @@
         <div class="mt-4 border-t border-slate-200 pt-4">
           <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center"><i class="fa-solid fa-cake-candles text-amber-500 mr-2"></i> Ulang Tahun Bulan Ini</h3>
           <div id="stat-birthdays" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1">
-            <!-- Diisi via JS -->
-          </div>
+            </div>
         </div>
       </div>
       <div class="px-5 py-3 bg-white border-t border-slate-100 text-right">
@@ -484,14 +447,32 @@
     </div>
   </div>
 
-  <!-- ========================================== -->
-  <!-- BAGIAN JAVASCRIPT -->
-  <!-- ========================================== -->
   <script id="app-script">
+
+    // --- KONFIGURASI FIREBASE ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDZ-XP6H_yE-uZBupOgrLrjnHd1CbAEXjA",
+      authDomain: "silsilah-keluarga-9524e.firebaseapp.com",
+      databaseURL: "https://silsilah-keluarga-9524e-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "silsilah-keluarga-9524e",
+      storageBucket: "silsilah-keluarga-9524e.firebasestorage.app",
+      messagingSenderId: "81827361473",
+      appId: "1:81827361473:web:032ad4c2746ed6a08c7d50"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Fungsi menyimpan ke internet
+    function simpanKeFirebase() {
+      db.ref('silsilah_v2').set({
+        tree: treeData,
+        settings: appSettings
+      });
+    }
+
     // --- BEGIN INITIAL DATA ---
-    // Agar bisa demo fitur ulang tahun, mengatur salah satu anggota ulang tahun hari ini
-    const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
-    const bdayYear = parseInt(todayStr.split('-')[0]) - 30; // 30 Tahun lalu
+    const todayStr = new Date().toISOString().split('T')[0]; 
+    const bdayYear = parseInt(todayStr.split('-')[0]) - 30; 
     const demoBday = `${bdayYear}-${todayStr.split('-')[1]}-${todayStr.split('-')[2]}`;
 
     const initialTreeData = {
@@ -525,8 +506,8 @@
     // --- END INITIAL DATA ---
 
     // --- STATE MANAGEMENT ---
-    let treeData = JSON.parse(JSON.stringify(initialTreeData));
-    let appSettings = JSON.parse(JSON.stringify(initialAppSettings));
+    let treeData;
+    let appSettings;
     let scale = 1;
     let position = { x: 0, y: 0 };
     let isDragging = false;
@@ -557,36 +538,35 @@
       }, 3000);
     };
 
-    // --- LOCAL STORAGE LOGIC ---
-    function saveToLocalStorage() {
-      if (!appSettings.autoSave) return;
-      localStorage.setItem('familyTreeData_v2', JSON.stringify(treeData));
-      localStorage.setItem('familySettings_v2', JSON.stringify(appSettings));
-    }
-
-    function loadFromLocalStorage() {
-      const savedData = localStorage.getItem('familyTreeData_v2');
-      const savedSettings = localStorage.getItem('familySettings_v2');
-      if (savedData) {
-        try { treeData = JSON.parse(savedData); } catch(e){}
-      }
-      if (savedSettings) {
-        try { appSettings = { ...initialAppSettings, ...JSON.parse(savedSettings) }; } catch(e){}
-      }
-    }
-
     // --- INISIALISASI & LOGIN LOGIC ---
     function initApp() {
-      loadFromLocalStorage(); 
-      applySettingsToUI();
-      
-      if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
-        loginScreen.classList.remove('hidden');
-        document.getElementById('login-input').focus();
-      } else {
-        loginScreen.classList.add('hidden');
-      }
-      renderTree();
+      // Dengarkan perubahan dari Firebase secara otomatis
+      db.ref('silsilah_v2').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          if (data.tree) treeData = data.tree;
+          if (data.settings) appSettings = { ...initialAppSettings, ...data.settings };
+        } else {
+          // Jika belum ada data sama sekali di brankas Firebase
+          treeData = JSON.parse(JSON.stringify(initialTreeData));
+          appSettings = JSON.parse(JSON.stringify(initialAppSettings));
+          simpanKeFirebase();
+        }
+
+        applySettingsToUI();
+        
+        if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
+          if (document.getElementById('btn-logout').classList.contains('hidden')) {
+             loginScreen.classList.remove('hidden');
+             loginScreen.classList.remove('opacity-0', 'pointer-events-none');
+             document.getElementById('login-input').focus();
+          }
+        } else {
+          loginScreen.classList.add('hidden');
+        }
+
+        renderTree();
+      });
     }
 
     window.attemptLogin = function() {
@@ -651,9 +631,12 @@
       document.getElementById('set-password').value = appSettings.accessCode;
       document.getElementById('set-bg').value = appSettings.bgColor;
       document.getElementById('set-editmode').checked = appSettings.enableEdit;
-      document.getElementById('set-autosave').checked = appSettings.autoSave;
       document.getElementById('set-login-title').value = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('set-login-desc').value = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
+      
+      // Sembunyikan set auto-save lokal karena kita pakai firebase sekarang
+      document.getElementById('set-autosave').parentElement.parentElement.style.display = 'none';
+
       document.getElementById('settings-modal').classList.remove('hidden');
     };
 
@@ -667,16 +650,11 @@
       appSettings.accessCode = document.getElementById('set-password').value;
       appSettings.bgColor = document.getElementById('set-bg').value;
       appSettings.enableEdit = document.getElementById('set-editmode').checked;
-      appSettings.autoSave = document.getElementById('set-autosave').checked;
       appSettings.loginTitle = document.getElementById('set-login-title').value || 'Akses Terbatas';
       appSettings.loginDesc = document.getElementById('set-login-desc').value || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
       
       applySettingsToUI();
-      saveToLocalStorage(); 
-      if(!appSettings.autoSave) {
-          localStorage.removeItem('familyTreeData_v2');
-          localStorage.removeItem('familySettings_v2');
-      }
+      simpanKeFirebase(); 
       closeSettingsModal();
       showToast('Pengaturan berhasil disimpan!');
     };
@@ -727,7 +705,7 @@
 
     // Deteksi Ulang Tahun
     function checkBirthday(birthDate, deathDate) {
-       if (!birthDate || deathDate) return false; // Jangan rayakan jika sudah wafat
+       if (!birthDate || deathDate) return false; 
        const [y, m, d] = birthDate.split('-');
        if (!m || !d) return false;
        const today = new Date();
@@ -768,7 +746,6 @@
 
       const badge = !isSpouse ? `<div class="absolute -top-3 -right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 border border-white">Gen ${level}</div>` : '';
 
-      // Tampilan Tanggal / Tahun Lahir & Umur
       let birthText = person.birthDate ? person.birthDate.split('-')[0] : (person.birthYear || '?');
       let deathText = person.deathDate ? person.deathDate.split('-')[0] : (person.deathYear || 'Sekarang');
       let ageText = '';
@@ -778,7 +755,6 @@
          if (calculatedAge !== '') ageText = ` (${calculatedAge} thn)`;
       }
 
-      // Indikator Anak Kandung Bersama (Dari Pasangan yang Mana)
       let spouseBadge = '';
       if (!isSpouse && person.linkedSpouseId && parentSpouses) {
           const spouse = parentSpouses.find(s => s.id === person.linkedSpouseId);
@@ -787,7 +763,6 @@
           }
       }
 
-      // Child Status Badge
       let statusBadge = '';
       if (!isSpouse && parentId && person.childStatus && person.childStatus !== 'kandung') {
           const statusText = person.childStatus === 'tiri' ? 'Anak Tiri (Bawaan)' : 'Anak Angkat / Adopsi';
@@ -795,13 +770,11 @@
           statusBadge = `<div class="${statusColor} text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border truncate w-full" title="Status: ${statusText}">${statusText}</div>`;
       }
 
-      // Other Partner Badge (Mantan Suami/Istri)
       let otherPartnerBadge = '';
       if (person.otherPartner) {
           otherPartnerBadge = `<div class="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-purple-200 w-full truncate" title="Pernah menikah / Pasangan lain: ${escapeHTML(person.otherPartner)}"><i class="fa-solid fa-ring text-[8px]"></i> Eks: ${escapeHTML(person.otherPartner.split(' ')[0])}</div>`;
       }
 
-      // Ikon Ulang Tahun
       const isBday = checkBirthday(person.birthDate, person.deathDate);
       const bdayIcon = isBday ? `<div class="absolute -top-4 -left-4 text-3xl z-20 animate-bounce filter drop-shadow-md" title="Selamat Ulang Tahun!">🎂</div>` : '';
 
@@ -834,6 +807,7 @@
     }
 
     function buildNodeHTML(node, level, parentSpouses = null) {
+      if (!node) return '';
       let hasChildren = node.children && node.children.length > 0;
       let html = `<li><div class="flex flex-col items-center"><div class="flex items-center justify-center relative">`;
       html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null, parentSpouses);
@@ -858,9 +832,9 @@
     }
 
     function renderTree() {
+      if (!treeData) return;
       treeContainer.innerHTML = buildNodeHTML(treeData, 1);
       transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
-      saveToLocalStorage();
     }
 
     // --- EVENT LISTENERS (PAN, ZOOM, SEARCH) ---
@@ -908,12 +882,14 @@
     window.expandAll = function() {
       setAllCollapse(treeData, false);
       renderTree();
+      simpanKeFirebase();
       showToast('Semua cabang silsilah dibuka!');
     };
     
     window.collapseAll = function() {
       setAllCollapse(treeData, true);
       renderTree();
+      simpanKeFirebase();
       showToast('Semua cabang silsilah ditutup!');
     };
 
@@ -932,6 +908,7 @@
 
     // --- TREE DATA MANIPULATION ---
     function findNodeById(node, id) {
+      if (!node) return null;
       if (node.id === id) return node;
       if (node.children) {
         for (let child of node.children) {
@@ -983,6 +960,7 @@
     window.toggleCollapse = function(nodeId) {
       treeData = updateTreeData(treeData, nodeId, node => ({ ...node, isCollapsed: !node.isCollapsed }));
       renderTree();
+      simpanKeFirebase();
     };
 
     // --- MODAL LOGIC (EDITOR / VIEWER) ---
@@ -1033,7 +1011,7 @@
           if(f === 'otherpartner') key = 'otherPartner';
           if(f === 'childstatus') key = 'childStatus';
           
-          if(key === 'childStatus' && !data[key]) el.value = 'kandung'; // Default
+          if(key === 'childStatus' && !data[key]) el.value = 'kandung';
           else el.value = data[key] || '';
         }
       });
@@ -1052,7 +1030,6 @@
           container.classList.remove('hidden');
           select.disabled = false;
       } else if (parentNode) {
-          // Tetap tampilkan kontainer untuk opsi 'Status Anak' (Anak angkat/bawaan), tapi disable Pasangan
           container.classList.remove('hidden');
           select.disabled = true;
       } else {
@@ -1102,7 +1079,6 @@
       }
       setFormData(person || {});
 
-      // Logic untuk menampilkan dropdown "Status Anak" & "Pasangan Mana"
       if (!spouseId && nodeId !== treeData.id) {
           const parent = findParent(treeData, nodeId);
           populateSpouseDropdown(parent);
@@ -1115,7 +1091,6 @@
       
       const isEditAllowed = appSettings.enableEdit;
       
-      // Menampilkan tombol "Tambah Orang Tua" hanya jika node yang dipilih adalah Root Node
       const btnAddParent = document.getElementById('btn-add-parent');
       if (btnAddParent) {
         if (nodeId === treeData.id && !spouseId) {
@@ -1218,6 +1193,7 @@
       }
       
       closeEditorModal();
+      simpanKeFirebase();
       renderTree();
       showToast('Data berhasil disimpan!');
     };
@@ -1237,6 +1213,7 @@
           treeData = deleteNodeFromTreeData(treeData, selectedNodeId);
         }
         closeEditorModal();
+        simpanKeFirebase();
         renderTree();
         showToast('Data berhasil dihapus!');
       }
@@ -1272,10 +1249,9 @@
       document.getElementById('stat-female').innerText = stats.female;
       document.getElementById('stat-deceased').innerText = stats.deceased + ' orang';
       
-      // Hitung Ulang Tahun Bulan Ini
       const currentMonth = new Date().getMonth() + 1;
       let bdays = getUpcomingBirthdays(treeData, currentMonth);
-      bdays.sort((a, b) => a.date - b.date); // Urutkan berdasarkan tanggal
+      bdays.sort((a, b) => a.date - b.date); 
       
       const bdayContainer = document.getElementById('stat-birthdays');
       if (bdays.length === 0) {
@@ -1354,7 +1330,7 @@
           
           resetZoom();
           applySettingsToUI();
-          saveToLocalStorage();
+          simpanKeFirebase();
           showToast('Data berhasil dimuat!');
         } catch (err) { alert("Format file JSON tidak valid"); }
       };
@@ -1373,7 +1349,7 @@
 
       const bodyClone = document.body.cloneNode(true);
       
-      bodyClone.querySelector('#tree-container').innerHTML = '\n          <!-- Tree Nodes will be injected here via JS -->\n        ';
+      bodyClone.querySelector('#tree-container').innerHTML = '\n          \n        ';
       bodyClone.querySelector('#tree-transform').style.transform = '';
       bodyClone.querySelector('#editor-modal').classList.add('hidden');
       bodyClone.querySelector('#stats-modal').classList.add('hidden');
@@ -1397,23 +1373,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHTML(appSettings.appTitle)}</title>
   
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></` + `script>
   
-  <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- JSZip & HTML2Canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></` + `script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
 
-  <!-- CSS Terpisah -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></` + `script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></` + `script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="${bodyClone.className}">
 ${bodyClone.innerHTML}
   
-  <!-- JS Terpisah -->
   <script src="script.js"></` + `script>
 </body>
 </html>`;
