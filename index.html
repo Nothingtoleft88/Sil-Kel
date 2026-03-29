@@ -301,27 +301,44 @@
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
               <input type="text" id="input-name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso" />
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            
+            <div class="grid grid-cols-3 gap-3">
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Jenis Kelamin *</label>
-                <select id="input-gender" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Gender *</label>
+                <select id="input-gender" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
                   <option value="L">Laki-laki</option>
                   <option value="P">Perempuan</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Keterangan / Posisi</label>
-                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Anak Pertama, Istri ke-2, dll" />
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1" title="Misal: Anak Ke-1, Istri Kedua">Keterangan</label>
+                <input type="text" id="input-notes" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Anak Ke-1, dll" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1" title="Mantan suami/istri atau pasangan lainnya">Pasangan Lain</label>
+                <input type="text" id="input-otherpartner" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Nama mantan..." />
               </div>
             </div>
 
-            <!-- STATUS ANAK (Kandung dari Pasangan Mana) -->
-            <div id="container-linkedspouse" class="hidden bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-              <label class="block text-xs font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-people-arrows mr-1"></i> Dari Pasangan Yang Mana?</label>
-              <select id="input-linkedspouse" class="w-full px-4 py-2.5 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition">
-                <!-- Diisi otomatis oleh JS -->
-              </select>
-              <p class="text-[10px] text-indigo-600 mt-1">Pilih ibu/ayah dari anak ini (berguna jika orang tua memiliki lebih dari 1 pasangan).</p>
+            <!-- STATUS ANAK (Kandung / Tiri & Dari Pasangan Mana) -->
+            <div id="container-childrelations" class="hidden bg-indigo-50 p-3 rounded-lg border border-indigo-200">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-people-arrows mr-1"></i> Dari Pasangan Mana?</label>
+                  <select id="input-linkedspouse" class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <!-- Diisi otomatis oleh JS -->
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-child mr-1"></i> Status Anak</label>
+                  <select id="input-childstatus" class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
+                    <option value="kandung">Anak Kandung</option>
+                    <option value="tiri">Anak Tiri (Bawaan)</option>
+                    <option value="adopsi">Anak Angkat / Adopsi</option>
+                  </select>
+                </div>
+              </div>
+              <p class="text-[9px] text-indigo-600 mt-1.5">Berguna untuk menandai anak bawaan dari suami/istri lain, atau anak adopsi.</p>
             </div>
           </div>
 
@@ -684,7 +701,7 @@
         node.spouses.forEach(spouse => {
           stats.total++;
           spouse.gender === 'L' ? stats.male++ : stats.female++;
-          if (node.deathDate || spouse.deathYear) stats.deceased++;
+          if (spouse.deathDate || spouse.deathYear) stats.deceased++;
         });
       }
       if (node.children) {
@@ -766,8 +783,22 @@
       if (!isSpouse && person.linkedSpouseId && parentSpouses) {
           const spouse = parentSpouses.find(s => s.id === person.linkedSpouseId);
           if (spouse) {
-              spouseBadge = `<div class="bg-indigo-100 text-indigo-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-indigo-200 truncate w-full" title="Anak kandung bersama: ${escapeHTML(spouse.name)}">Anak dari: ${escapeHTML(spouse.name.split(' ')[0])}</div>`;
+              spouseBadge = `<div class="bg-indigo-100 text-indigo-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-indigo-200 truncate w-full" title="Anak bersama: ${escapeHTML(spouse.name)}">Dari: ${escapeHTML(spouse.name.split(' ')[0])}</div>`;
           }
+      }
+
+      // Child Status Badge
+      let statusBadge = '';
+      if (!isSpouse && parentId && person.childStatus && person.childStatus !== 'kandung') {
+          const statusText = person.childStatus === 'tiri' ? 'Anak Tiri (Bawaan)' : 'Anak Angkat / Adopsi';
+          const statusColor = person.childStatus === 'tiri' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-teal-100 text-teal-700 border-teal-200';
+          statusBadge = `<div class="${statusColor} text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border truncate w-full" title="Status: ${statusText}">${statusText}</div>`;
+      }
+
+      // Other Partner Badge (Mantan Suami/Istri)
+      let otherPartnerBadge = '';
+      if (person.otherPartner) {
+          otherPartnerBadge = `<div class="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-purple-200 w-full truncate" title="Pernah menikah / Pasangan lain: ${escapeHTML(person.otherPartner)}"><i class="fa-solid fa-ring text-[8px]"></i> Eks: ${escapeHTML(person.otherPartner.split(' ')[0])}</div>`;
       }
 
       // Ikon Ulang Tahun
@@ -789,6 +820,8 @@
                 ${escapeHTML(birthText)} - ${escapeHTML(deathText)} <span class="text-blue-600 font-bold">${ageText}</span>
               </p>
               ${spouseBadge}
+              ${statusBadge}
+              ${otherPartnerBadge}
               <div class="flex flex-wrap gap-2 mt-1.5 text-gray-500 items-center justify-center text-[11px]">
                 ${extraIcons}
               </div>
@@ -955,7 +988,7 @@
     // --- MODAL LOGIC (EDITOR / VIEWER) ---
     const modal = document.getElementById('editor-modal');
     const formFields = [
-      'name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 
+      'name', 'gender', 'notes', 'otherpartner', 'childstatus', 'photo', 'birthplace', 'blood', 
       'phone', 'occupation', 'address', 'gmap', 'birthdate', 'birthyear', 
       'deathdate', 'deathyear', 'linkedspouse'
     ];
@@ -975,6 +1008,8 @@
           if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
           if(f === 'linkedspouse') key = 'linkedSpouseId';
+          if(f === 'otherpartner') key = 'otherPartner';
+          if(f === 'childstatus') key = 'childStatus';
           data[key] = el.value;
         }
       });
@@ -995,7 +1030,11 @@
           if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
           if(f === 'linkedspouse') key = 'linkedSpouseId';
-          el.value = data[key] || '';
+          if(f === 'otherpartner') key = 'otherPartner';
+          if(f === 'childstatus') key = 'childStatus';
+          
+          if(key === 'childStatus' && !data[key]) el.value = 'kandung'; // Default
+          else el.value = data[key] || '';
         }
       });
       document.getElementById('input-photo-file').value = ''; 
@@ -1003,7 +1042,7 @@
 
     function populateSpouseDropdown(parentNode) {
       const select = document.getElementById('input-linkedspouse');
-      const container = document.getElementById('container-linkedspouse');
+      const container = document.getElementById('container-childrelations');
       select.innerHTML = '<option value="">-- Pilih Pasangan (Ibu/Ayah) --</option>';
       
       if (parentNode && parentNode.spouses && parentNode.spouses.length > 0) {
@@ -1011,6 +1050,11 @@
               select.innerHTML += `<option value="${s.id}">Anak bersama: ${escapeHTML(s.name)}</option>`;
           });
           container.classList.remove('hidden');
+          select.disabled = false;
+      } else if (parentNode) {
+          // Tetap tampilkan kontainer untuk opsi 'Status Anak' (Anak angkat/bawaan), tapi disable Pasangan
+          container.classList.remove('hidden');
+          select.disabled = true;
       } else {
           container.classList.add('hidden');
       }
@@ -1058,13 +1102,15 @@
       }
       setFormData(person || {});
 
-      // Logic untuk menampilkan dropdown "Status Anak"
+      // Logic untuk menampilkan dropdown "Status Anak" & "Pasangan Mana"
       if (!spouseId && nodeId !== treeData.id) {
           const parent = findParent(treeData, nodeId);
           populateSpouseDropdown(parent);
           document.getElementById('input-linkedspouse').value = person.linkedSpouseId || '';
+          document.getElementById('input-childstatus').value = person.childStatus || 'kandung';
+          document.getElementById('container-childrelations').classList.remove('hidden');
       } else {
-          document.getElementById('container-linkedspouse').classList.add('hidden');
+          document.getElementById('container-childrelations').classList.add('hidden');
       }
       
       const isEditAllowed = appSettings.enableEdit;
@@ -1098,7 +1144,8 @@
       });
       document.getElementById('input-gender').disabled = !isEditAllowed;
       document.getElementById('input-blood').disabled = !isEditAllowed;
-      document.getElementById('input-linkedspouse').disabled = !isEditAllowed;
+      document.getElementById('input-linkedspouse').disabled = !isEditAllowed && !document.getElementById('input-linkedspouse').disabled;
+      document.getElementById('input-childstatus').disabled = !isEditAllowed;
 
       modal.classList.remove('hidden');
     };
@@ -1125,8 +1172,9 @@
       if (type === 'child') {
           const parent = findNodeById(treeData, selectedNodeId);
           populateSpouseDropdown(parent);
+          document.getElementById('container-childrelations').classList.remove('hidden');
       } else {
-          document.getElementById('container-linkedspouse').classList.add('hidden');
+          document.getElementById('container-childrelations').classList.add('hidden');
       }
 
       document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = 'block');
@@ -1137,6 +1185,7 @@
       document.getElementById('input-gender').disabled = false;
       document.getElementById('input-blood').disabled = false;
       document.getElementById('input-linkedspouse').disabled = false;
+      document.getElementById('input-childstatus').disabled = false;
     };
 
     window.closeEditorModal = function() {
