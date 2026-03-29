@@ -14,8 +14,11 @@
   <!-- JSZip (Untuk fitur Export ke ZIP) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
+  <!-- HTML2Canvas (Untuk Export Gambar PNG) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
   <!-- ========================================== -->
-  <!-- BAGIAN CSS (Bisa dipindah ke style.css) -->
+  <!-- BAGIAN CSS -->
   <!-- ========================================== -->
   <style id="app-style">
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
@@ -81,9 +84,7 @@
     <span id="toast-message">Tersimpan!</span>
   </div>
 
-  <!-- ========================================== -->
   <!-- HALAMAN LOGIN (KODE AKSES) -->
-  <!-- ========================================== -->
   <div id="login-screen" class="fixed inset-0 bg-slate-800 z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
     <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform">
       <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -96,10 +97,6 @@
       <p id="login-error" class="text-red-500 text-sm font-medium mt-3 hidden">Kode akses salah!</p>
     </div>
   </div>
-
-  <!-- ========================================== -->
-  <!-- BAGIAN HTML (Struktur Antarmuka) -->
-  <!-- ========================================== -->
 
   <!-- HEADER NAVBAR -->
   <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
@@ -125,24 +122,20 @@
     </div>
 
     <div class="flex items-center space-x-2">
-      <!-- Logout -->
       <button id="btn-logout" onclick="logout()" class="hidden flex items-center px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium border border-red-200" title="Keluar">
         <i class="fa-solid fa-right-from-bracket md:mr-2"></i> <span class="hidden md:inline">Keluar</span>
       </button>
 
-      <!-- Pengaturan -->
       <button onclick="openSettingsModal()" class="flex items-center px-3 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-200 transition text-sm font-medium border border-slate-200" title="Pengaturan Aplikasi">
         <i class="fa-solid fa-gear md:mr-2"></i> <span class="hidden md:inline">Setting</span>
       </button>
 
-      <!-- Statistik -->
       <button onclick="openStatsModal()" class="flex items-center px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition text-sm font-medium border border-indigo-200" title="Statistik Keluarga">
         <i class="fa-solid fa-chart-pie md:mr-2"></i> <span class="hidden md:inline">Statistik</span>
       </button>
 
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
 
-      <!-- Navigasi View -->
       <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
         <button onclick="adjustZoom(0.1)" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
         <button onclick="resetZoom()" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600 mx-1" title="Reset View"><i class="fa-solid fa-expand"></i></button>
@@ -151,19 +144,22 @@
       
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
       
-      <!-- Actions -->
       <div id="action-buttons-container" class="flex space-x-2">
+        <button onclick="exportPNG()" class="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium" title="Unduh Gambar PNG">
+          <i class="fa-solid fa-camera md:mr-2"></i> <span class="hidden xl:inline">Gambar</span>
+        </button>
+
         <button onclick="exportJSON()" class="flex items-center px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition text-sm font-medium" title="Simpan Data & Setting ke JSON">
-          <i class="fa-solid fa-download md:mr-2"></i> <span class="hidden md:inline">Simpan</span>
+          <i class="fa-solid fa-download md:mr-2"></i> <span class="hidden lg:inline">Simpan</span>
         </button>
         
         <label class="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer text-sm font-medium" title="Muat Data JSON">
-          <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden md:inline">Muat</span>
+          <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden lg:inline">Muat</span>
           <input type="file" id="import-input" accept=".json" class="hidden" />
         </label>
 
-        <button onclick="exportWebProject()" class="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-sm" title="Export Web untuk Vercel (HTML, CSS, JS terpisah)">
-          <i class="fa-solid fa-file-zipper md:mr-2"></i> <span class="hidden md:inline">Export Web</span>
+        <button onclick="exportWebProject()" class="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-sm" title="Export Web untuk Vercel">
+          <i class="fa-solid fa-file-zipper md:mr-2"></i> <span class="hidden xl:inline">Export Web</span>
         </button>
       </div>
     </div>
@@ -176,7 +172,7 @@
 
     <!-- Container Transform -->
     <div id="tree-transform" class="absolute transform-gpu transition-transform duration-75 ease-out flex justify-center min-w-full min-h-full items-center">
-      <div class="family-tree pb-32 pt-10">
+      <div class="family-tree pb-32 pt-10 px-20"> 
         <ul id="tree-container">
           <!-- Tree Nodes will be injected here via JS -->
         </ul>
@@ -191,16 +187,16 @@
         <ul class="list-disc pl-4 space-y-1 text-xs">
           <li>Lencana kuning menandakan <b>Generasi</b>.</li>
           <li id="help-text-edit">Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.</li>
-          <li>Tarik (Drag) layar untuk menggeser. Scroll untuk Zoom.</li>
+          <li>Ikon 🎂 menandakan orang tersebut <b>Ulang Tahun Hari Ini</b>.</li>
         </ul>
       </div>
     </div>
   </main>
 
-  <!-- MODAL PENGATURAN (SETTINGS) -->
+  <!-- MODAL PENGATURAN -->
   <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
-      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
         <h2 class="text-lg font-bold text-slate-800 flex items-center">
           <i class="fa-solid fa-gear mr-2 text-slate-600"></i> Pengaturan Aplikasi
         </h2>
@@ -210,6 +206,17 @@
       </div>
       <div class="p-6 overflow-y-auto space-y-4">
         
+        <div class="flex items-center justify-between p-3 border border-emerald-200 rounded-lg bg-emerald-50 mb-2">
+          <div>
+            <span class="block text-sm font-bold text-emerald-800">Penyimpanan Otomatis (Lokal)</span>
+            <span class="block text-[11px] text-emerald-600">Simpan otomatis ke browser tanpa takut hilang.</span>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="set-autosave" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+          </label>
+        </div>
+
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Utama Web</label>
           <input type="text" id="set-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
@@ -223,7 +230,6 @@
         <div>
           <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kode Akses / Password</label>
           <input type="text" id="set-password" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Kosongkan jika ingin web publik">
-          <p class="text-[10px] text-slate-400 mt-1">Hanya yang tahu kode ini yang bisa melihat silsilah.</p>
         </div>
 
         <div>
@@ -239,7 +245,7 @@
         <div class="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50 mt-2">
           <div>
             <span class="block text-sm font-bold text-slate-700">Izinkan Mode Edit</span>
-            <span class="block text-xs text-slate-500">Jika dimatikan, web menjadi mode lihat-saja (Read-Only)</span>
+            <span class="block text-[11px] text-slate-500">Jika dimatikan, web menjadi mode lihat-saja (Read-Only)</span>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input type="checkbox" id="set-editmode" class="sr-only peer">
@@ -247,28 +253,15 @@
           </label>
         </div>
 
-        <hr class="my-4 border-slate-200">
-        <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-display mr-1"></i> Tampilan Layar Keamanan</h3>
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Layar Login</label>
-          <input type="text" id="set-login-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Cth: Akses Terbatas">
-        </div>
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pesan / Deskripsi Login</label>
-          <textarea id="set-login-desc" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition resize-none" rows="2" placeholder="Cth: Masukkan kode untuk melihat silsilah..."></textarea>
-        </div>
-
       </div>
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl">
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl shrink-0">
         <button type="button" onclick="closeSettingsModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition">Batal</button>
-        <button type="button" onclick="saveSettings()" class="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-md transition">Terapkan & Simpan</button>
+        <button type="button" onclick="saveSettings()" class="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL EDITOR PROFIL (VIEWER & EDITOR) -->
+  <!-- MODAL EDITOR PROFIL -->
   <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
       
@@ -289,70 +282,98 @@
           <div class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
-              <input type="text" id="input-name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso" />
+              <input type="text" id="input-name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso" />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Jenis Kelamin *</label>
-                <select id="input-gender" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                <select id="input-gender" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
                   <option value="L">Laki-laki</option>
                   <option value="P">Perempuan</option>
                 </select>
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Status / Keterangan</label>
-                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Istri ke-2, Cerai 2010, dll" />
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Keterangan / Posisi</label>
+                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Anak Pertama, Istri ke-2, dll" />
               </div>
+            </div>
+
+            <!-- STATUS ANAK (Bawaan Pasangan) -->
+            <div id="container-linkedspouse" class="hidden bg-purple-50 p-3 rounded-lg border border-purple-200">
+              <label class="block text-xs font-bold text-purple-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-link mr-1"></i> Status Anak (Kandung / Bawaan)</label>
+              <select id="input-linkedspouse" class="w-full px-4 py-2.5 bg-white border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition">
+                <!-- Diisi otomatis oleh JS -->
+              </select>
+              <p class="text-[10px] text-purple-600 mt-1">Pilih jika ini adalah anak bawaan dari pasangan suami/istri sebelumnya.</p>
             </div>
           </div>
 
           <!-- Detailed Info -->
           <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Detail</h3>
-            <div class="edit-only-field">
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-image mr-1"></i> URL Foto (Opsional)</label>
-              <input type="url" id="input-photo" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://contoh.com/foto.jpg" />
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Lengkap</h3>
+            
+            <div class="edit-only-field bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center"><i class="fa-solid fa-image mr-1"></i> Foto Profil</label>
+              <div class="flex gap-2 mb-2">
+                <label class="cursor-pointer bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-200 transition text-center whitespace-nowrap">
+                  <i class="fa-solid fa-upload mr-1"></i> Upload
+                  <input type="file" id="input-photo-file" accept="image/*" class="hidden">
+                </label>
+                <input type="url" id="input-photo" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg outline-none text-xs transition" placeholder="Atau paste URL Foto" />
+              </div>
             </div>
+
+            <!-- TANGGAL LAHIR & WAFAT (UPDATE BARU) -->
             <div class="grid grid-cols-2 gap-4">
+              <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-2"><i class="fa-solid fa-cake-candles mr-1"></i> Data Kelahiran</label>
+                <label class="block text-[10px] text-slate-500 mb-1">Tanggal Lahir (Lengkap)</label>
+                <input type="date" id="input-birthdate" class="w-full px-3 py-2 mb-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" />
+                <label class="block text-[10px] text-slate-500 mb-1">Hanya Tahun (Jika lupa tanggal)</label>
+                <input type="number" id="input-birthyear" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="YYYY" />
+              </div>
+              <div class="bg-slate-100 p-3 rounded-lg border border-slate-200">
+                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2"><i class="fa-solid fa-cross mr-1"></i> Data Wafat</label>
+                <label class="block text-[10px] text-slate-500 mb-1">Tanggal Wafat (Lengkap)</label>
+                <input type="date" id="input-deathdate" class="w-full px-3 py-2 mb-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" />
+                <label class="block text-[10px] text-slate-500 mb-1">Hanya Tahun</label>
+                <input type="number" id="input-deathyear" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="YYYY" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-2">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tempat Lahir</label>
-                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Nama Kota" />
+                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="Nama Kota" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Golongan Darah</label>
-                <select id="input-blood" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+                <select id="input-blood" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition">
                   <option value="">- Pilih -</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option>
                 </select>
               </div>
             </div>
+
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-phone mr-1"></i> No. HP / WA</label>
-                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="0812xxxxxx" />
+                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="0812xxxxxx" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pekerjaan</label>
-                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="PNS, Dokter..." />
+                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="PNS, Dokter..." />
               </div>
             </div>
+
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-house mr-1"></i> Alamat Lengkap</label>
-              <textarea id="input-address" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition resize-none" placeholder="Cth: Jl. Raya Mawar No. 10..." rows="2"></textarea>
+              <textarea id="input-address" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition resize-none" placeholder="Cth: Jl. Raya Mawar No. 10..." rows="2"></textarea>
             </div>
             <div class="edit-only-field">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-map-location-dot mr-1"></i> URL Google Maps</label>
-              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://maps.google.com/?q=..." />
+              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="https://maps.google.com/?q=..." />
             </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tahun Lahir</label>
-                <input type="number" id="input-birthyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY" />
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex justify-between">Tahun Wafat <span class="font-normal text-[10px] text-slate-400 normal-case ml-1">(Kosong = Hidup)</span></label>
-                <input type="number" id="input-deathyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY" />
-              </div>
-            </div>
+
           </div>
         </form>
 
@@ -374,7 +395,7 @@
         </button>
         <div class="flex gap-3 ml-auto">
           <button type="button" id="btn-cancel" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
-          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-500/30 transition">Simpan</button>
+          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan</button>
         </div>
       </div>
     </div>
@@ -383,7 +404,6 @@
   <!-- MODAL STATISTIK -->
   <div id="stats-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-      <!-- (Sama seperti versi sebelumnya) -->
       <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
         <h2 class="text-lg font-bold text-slate-800 flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600"></i> Statistik Keluarga</h2>
         <button onclick="closeStatsModal()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -421,38 +441,39 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- BAGIAN JAVASCRIPT (Bisa dipindah ke script.js) -->
+  <!-- BAGIAN JAVASCRIPT -->
   <!-- ========================================== -->
   <script id="app-script">
     // --- BEGIN INITIAL DATA ---
+    // Agar bisa demo fitur ulang tahun, mengatur salah satu anggota ulang tahun hari ini
+    const todayStr = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    const bdayYear = parseInt(todayStr.split('-')[0]) - 30; // 30 Tahun lalu
+    const demoBday = `${bdayYear}-${todayStr.split('-')[1]}-${todayStr.split('-')[2]}`;
+
     const initialTreeData = {
-      id: 'root-1', name: 'Budi Santoso', gender: 'L', birthYear: '1945', deathYear: '', notes: 'Kakek Buyut', photoUrl: '', birthPlace: 'Surabaya', gmapUrl: 'https://maps.google.com/?q=-7.250445,112.768845', address: 'Jl. Merdeka No. 45, Surabaya Timur', phone: '081234567890', bloodType: 'O', occupation: 'Pensiunan PNS', isCollapsed: false,
-      spouses: [{ id: 'spouse-1', name: 'Siti Aminah', gender: 'P', birthYear: '1948', deathYear: '2015', photoUrl: '', birthPlace: 'Malang', gmapUrl: '', address: '', phone: '', bloodType: 'A', occupation: 'Ibu Rumah Tangga', notes: 'Istri Pertama' }],
+      id: 'root-1', name: 'Budi Santoso', gender: 'L', birthYear: '1945', birthDate: '', deathYear: '', notes: 'Kakek Buyut', photoUrl: '', birthPlace: 'Surabaya', gmapUrl: '', address: 'Jl. Merdeka No. 45', phone: '081234567890', bloodType: 'O', occupation: 'Pensiunan PNS', isCollapsed: false,
+      spouses: [{ id: 'spouse-1', name: 'Siti Aminah', gender: 'P', birthYear: '1948', deathYear: '2015', photoUrl: '', birthPlace: 'Malang' }],
       children: [
         {
-          id: 'child-1', name: 'Agus Santoso', gender: 'L', birthYear: '1968', deathYear: '', notes: 'Anak Pertama', phone: '081199998888', isCollapsed: false,
+          id: 'child-1', name: 'Agus Santoso', gender: 'L', birthYear: '1968', isCollapsed: false,
           spouses: [
             { id: 'spouse-2', name: 'Ratna Ningrum', gender: 'P', birthYear: '1970', notes: 'Cerai thn 2000' },
             { id: 'spouse-2b', name: 'Linda Kusuma', gender: 'P', birthYear: '1975', notes: 'Istri Kedua' }
           ],
           children: [
-            { id: 'grandchild-1', name: 'Dewi Lestari', gender: 'P', birthYear: '1992', occupation: 'Dokter', phone: '081211112222', spouses: [], children: [] },
-            { id: 'grandchild-2', name: 'Bima Saputra', gender: 'L', birthYear: '1995', occupation: 'Insinyur', spouses: [], children: [] }
+            { id: 'grandchild-1', name: 'Dewi Lestari', gender: 'P', birthDate: demoBday, occupation: 'Dokter', spouses: [], children: [] },
+            { id: 'grandchild-2', name: 'Bima Saputra', gender: 'L', birthYear: '1995', linkedSpouseId: 'spouse-2b', occupation: 'Insinyur', notes: 'Anak dari istri kedua', spouses: [], children: [] }
           ]
-        },
-        {
-          id: 'child-2', name: 'Sri Wahyuni', gender: 'P', birthYear: '1972', notes: 'Anak Kedua',
-          spouses: [{ id: 'spouse-3', name: 'Hendra Wijaya', gender: 'L', birthYear: '1970' }],
-          children: [{ id: 'grandchild-3', name: 'Rina Wijaya', gender: 'P', birthYear: '1998', spouses: [], children: [] }]
         }
       ]
     };
 
     const initialAppSettings = {
-      accessCode: '12345', // Default: 12345. Kosongkan jika ingin tanpa login
+      autoSave: true, 
+      accessCode: '12345', 
       appTitle: 'Silsilah Keluarga',
       appSubtitle: 'Visualisasi & Manajemen Pro',
-      enableEdit: true, // Jika false, mode menjadi read-only
+      enableEdit: true, 
       bgColor: 'bg-slate-100',
       loginTitle: 'Akses Terbatas',
       loginDesc: 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.'
@@ -468,7 +489,7 @@
     let dragStart = { x: 0, y: 0 };
     let searchQuery = '';
     
-    let modalMode = 'edit'; // edit, editSpouse, addChild, addSpouse
+    let modalMode = 'edit'; 
     let selectedNodeId = null;
     let selectedSpouseId = null;
 
@@ -492,10 +513,29 @@
       }, 3000);
     };
 
+    // --- LOCAL STORAGE LOGIC ---
+    function saveToLocalStorage() {
+      if (!appSettings.autoSave) return;
+      localStorage.setItem('familyTreeData_v2', JSON.stringify(treeData));
+      localStorage.setItem('familySettings_v2', JSON.stringify(appSettings));
+    }
+
+    function loadFromLocalStorage() {
+      const savedData = localStorage.getItem('familyTreeData_v2');
+      const savedSettings = localStorage.getItem('familySettings_v2');
+      if (savedData) {
+        try { treeData = JSON.parse(savedData); } catch(e){}
+      }
+      if (savedSettings) {
+        try { appSettings = { ...initialAppSettings, ...JSON.parse(savedSettings) }; } catch(e){}
+      }
+    }
+
     // --- INISIALISASI & LOGIN LOGIC ---
     function initApp() {
+      loadFromLocalStorage(); 
       applySettingsToUI();
-      // Cek apakah butuh login
+      
       if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
         loginScreen.classList.remove('hidden');
         document.getElementById('login-input').focus();
@@ -532,20 +572,16 @@
 
     // --- PENGATURAN (SETTINGS) LOGIC ---
     function applySettingsToUI() {
-      // Terapkan Judul
       document.getElementById('app-main-title').innerText = appSettings.appTitle;
       document.getElementById('app-sub-title').innerText = appSettings.appSubtitle;
       document.title = appSettings.appTitle;
 
-      // Terapkan Teks Login
       document.getElementById('login-title-text').innerText = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('login-desc-text').innerText = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
 
-      // Terapkan Warna Latar
       mainArea.classList.remove('bg-slate-100', 'bg-amber-50', 'bg-blue-50', 'bg-emerald-50');
       mainArea.classList.add(appSettings.bgColor);
 
-      // Terapkan Tombol Logout
       if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
         if (loginScreen.classList.contains('hidden') || loginScreen.classList.contains('opacity-0')) {
           document.getElementById('btn-logout').classList.remove('hidden');
@@ -554,7 +590,6 @@
         document.getElementById('btn-logout').classList.add('hidden');
       }
 
-      // Terapkan Mode Edit ke UI Utama (Tombol Import dkk)
       const actionContainer = document.getElementById('action-buttons-container');
       const helpText = document.getElementById('help-text-edit');
       if (!appSettings.enableEdit) {
@@ -572,6 +607,7 @@
       document.getElementById('set-password').value = appSettings.accessCode;
       document.getElementById('set-bg').value = appSettings.bgColor;
       document.getElementById('set-editmode').checked = appSettings.enableEdit;
+      document.getElementById('set-autosave').checked = appSettings.autoSave;
       document.getElementById('set-login-title').value = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('set-login-desc').value = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
       document.getElementById('settings-modal').classList.remove('hidden');
@@ -587,10 +623,16 @@
       appSettings.accessCode = document.getElementById('set-password').value;
       appSettings.bgColor = document.getElementById('set-bg').value;
       appSettings.enableEdit = document.getElementById('set-editmode').checked;
+      appSettings.autoSave = document.getElementById('set-autosave').checked;
       appSettings.loginTitle = document.getElementById('set-login-title').value || 'Akses Terbatas';
       appSettings.loginDesc = document.getElementById('set-login-desc').value || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
       
       applySettingsToUI();
+      saveToLocalStorage(); 
+      if(!appSettings.autoSave) {
+          localStorage.removeItem('familyTreeData_v2');
+          localStorage.removeItem('familySettings_v2');
+      }
       closeSettingsModal();
       showToast('Pengaturan berhasil disimpan!');
     };
@@ -609,13 +651,13 @@
       if (currentDepth > stats.maxDepth) stats.maxDepth = currentDepth;
       stats.total++;
       node.gender === 'L' ? stats.male++ : stats.female++;
-      if (node.deathYear) stats.deceased++;
+      if (node.deathDate || node.deathYear) stats.deceased++;
 
       if (node.spouses && node.spouses.length > 0) {
         node.spouses.forEach(spouse => {
           stats.total++;
           spouse.gender === 'L' ? stats.male++ : stats.female++;
-          if (spouse.deathYear) stats.deceased++;
+          if (spouse.deathDate || spouse.deathYear) stats.deceased++;
         });
       }
       if (node.children) {
@@ -624,12 +666,36 @@
       return stats;
     }
 
+    // Perhitungan Umur Otomatis
+    function getAge(birthDate, deathDate) {
+       if (!birthDate) return '';
+       const [y, m, d] = birthDate.split('-');
+       if (!y || !m || !d) return '';
+       const birth = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+       const end = deathDate ? new Date(deathDate.split('-')[0], deathDate.split('-')[1]-1, deathDate.split('-')[2]) : new Date();
+       
+       let age = end.getFullYear() - birth.getFullYear();
+       if (end.getMonth() < birth.getMonth() || (end.getMonth() === birth.getMonth() && end.getDate() < birth.getDate())) {
+           age--;
+       }
+       return age >= 0 ? age : 0;
+    }
+
+    // Deteksi Ulang Tahun
+    function checkBirthday(birthDate, deathDate) {
+       if (!birthDate || deathDate) return false; // Jangan rayakan jika sudah wafat
+       const [y, m, d] = birthDate.split('-');
+       if (!m || !d) return false;
+       const today = new Date();
+       return today.getDate() === parseInt(d) && today.getMonth() === (parseInt(m) - 1);
+    }
+
     // --- RENDER LOGIC ---
-    function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId) {
+    function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId, parentSpouses = null) {
       const isMale = person.gender === 'L';
       const bgColor = isMale ? 'bg-blue-50 border-blue-200' : 'bg-pink-50 border-pink-200';
       const headerColor = isMale ? 'bg-blue-500' : 'bg-pink-500';
-      const isDeceased = !!person.deathYear;
+      const isDeceased = !!person.deathDate || !!person.deathYear;
       
       const isHighlighted = searchQuery && person.name.toLowerCase().includes(searchQuery.toLowerCase());
       const highlightStyle = isHighlighted ? 'ring-4 ring-yellow-400 shadow-xl scale-105 z-10' : '';
@@ -637,6 +703,7 @@
 
       const clickAction = isSpouse ? `handleNodeClick('${parentId}', '${person.id}')` : `handleNodeClick('${person.id}', null)`;
 
+      // Ikon-ikon
       let extraIcons = '';
       if (person.phone) extraIcons += `<a href="tel:${escapeHTML(person.phone)}" onclick="event.stopPropagation()" class="text-emerald-600 hover:text-emerald-800 transition-colors pointer-events-auto" title="Telepon: ${escapeHTML(person.phone)}"><i class="fa-solid fa-phone"></i></a>`;
       if (person.occupation) extraIcons += `<i class="fa-solid fa-briefcase" title="Pekerjaan: ${escapeHTML(person.occupation)}"></i>`;
@@ -650,26 +717,51 @@
         : `<i class="fa-solid fa-user text-2xl"></i>`;
 
       const expandBtn = (!isSpouse && hasChildren) ? `
-        <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20">
+        <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20" data-html2canvas-ignore>
           <i class="fa-solid fa-chevron-${isCollapsed ? 'down' : 'up'} text-xs"></i>
         </button>
       ` : '';
 
       const badge = !isSpouse ? `<div class="absolute -top-3 -right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 border border-white">Gen ${level}</div>` : '';
 
+      // Tampilan Tanggal / Tahun Lahir & Umur
+      let birthText = person.birthDate ? person.birthDate.split('-')[0] : (person.birthYear || '?');
+      let deathText = person.deathDate ? person.deathDate.split('-')[0] : (person.deathYear || 'Sekarang');
+      let ageText = '';
+      
+      if (person.birthDate) {
+         const calculatedAge = getAge(person.birthDate, person.deathDate);
+         if (calculatedAge !== '') ageText = ` (${calculatedAge} thn)`;
+      }
+
+      // Indikator Anak Bawaan
+      let stepChildBadge = '';
+      if (!isSpouse && person.linkedSpouseId && parentSpouses) {
+          const spouse = parentSpouses.find(s => s.id === person.linkedSpouseId);
+          if (spouse) {
+              stepChildBadge = `<div class="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-purple-200 truncate w-full" title="Anak bawaan: ${escapeHTML(spouse.name)}">Bawaan: ${escapeHTML(spouse.name.split(' ')[0])}</div>`;
+          }
+      }
+
+      // Ikon Ulang Tahun
+      const isBday = checkBirthday(person.birthDate, person.deathDate);
+      const bdayIcon = isBday ? `<div class="absolute -top-4 -left-4 text-3xl z-20 animate-bounce filter drop-shadow-md" title="Selamat Ulang Tahun!">🎂</div>` : '';
+
       return `
         <div class="relative flex flex-col items-center">
           <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] border-2 rounded-xl shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${bgColor} ${deadStyle} ${highlightStyle}">
             ${badge}
+            ${bdayIcon}
             <div class="h-2 w-full rounded-t-lg ${headerColor}"></div>
             <div class="p-3 flex flex-col items-center text-center">
               <div class="w-14 h-14 rounded-full flex items-center justify-center mb-2 text-white shadow-inner overflow-hidden border-2 border-white ${headerColor}">
                 ${avatar}
               </div>
               <h3 class="font-bold text-gray-800 text-sm leading-tight mb-0.5">${escapeHTML(person.name) || 'Tanpa Nama'}</h3>
-              <p class="text-[11px] text-gray-600 font-medium bg-white/60 px-2 py-0.5 rounded-full mb-1 border border-black/5">
-                ${escapeHTML(person.birthYear) || '?'} - ${escapeHTML(person.deathYear) || 'Sekarang'}
+              <p class="text-[11px] text-gray-600 font-medium bg-white/60 px-2 py-0.5 rounded-full mb-1 border border-black/5 whitespace-nowrap">
+                ${escapeHTML(birthText)} - ${escapeHTML(deathText)} <span class="text-blue-600 font-bold">${ageText}</span>
               </p>
+              ${stepChildBadge}
               <div class="flex flex-wrap gap-2 mt-1.5 text-gray-500 items-center justify-center text-[11px]">
                 ${extraIcons}
               </div>
@@ -681,10 +773,10 @@
       `;
     }
 
-    function buildNodeHTML(node, level) {
+    function buildNodeHTML(node, level, parentSpouses = null) {
       let hasChildren = node.children && node.children.length > 0;
       let html = `<li><div class="flex flex-col items-center"><div class="flex items-center justify-center relative">`;
-      html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null);
+      html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null, parentSpouses);
 
       if (node.spouses && node.spouses.length > 0) {
         node.spouses.forEach(spouse => {
@@ -697,7 +789,7 @@
       if (hasChildren && !node.isCollapsed) {
         html += `<ul>`;
         node.children.forEach(child => {
-          html += buildNodeHTML(child, level + 1);
+          html += buildNodeHTML(child, level + 1, node.spouses);
         });
         html += `</ul>`;
       }
@@ -708,6 +800,7 @@
     function renderTree() {
       treeContainer.innerHTML = buildNodeHTML(treeData, 1);
       transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
+      saveToLocalStorage();
     }
 
     // --- EVENT LISTENERS (PAN, ZOOM, SEARCH) ---
@@ -768,6 +861,16 @@
       return null;
     }
 
+    function findParent(node, childId) {
+      if (!node.children) return null;
+      for (let child of node.children) {
+          if (child.id === childId) return node;
+          let found = findParent(child, childId);
+          if (found) return found;
+      }
+      return null;
+    }
+
     function updateTreeData(node, id, updatedData) {
       if (node.id === id) {
         return typeof updatedData === 'function' ? updatedData(node) : { ...node, ...updatedData };
@@ -803,7 +906,11 @@
 
     // --- MODAL LOGIC (EDITOR / VIEWER) ---
     const modal = document.getElementById('editor-modal');
-    const formFields = ['name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 'phone', 'occupation', 'address', 'gmap', 'birthyear', 'deathyear'];
+    const formFields = [
+      'name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 
+      'phone', 'occupation', 'address', 'gmap', 'birthdate', 'birthyear', 
+      'deathdate', 'deathyear', 'linkedspouse'
+    ];
 
     function getFormData() {
       let data = {};
@@ -815,8 +922,11 @@
           if(f === 'birthplace') key = 'birthPlace';
           if(f === 'blood') key = 'bloodType';
           if(f === 'gmap') key = 'gmapUrl';
+          if(f === 'birthdate') key = 'birthDate';
           if(f === 'birthyear') key = 'birthYear';
+          if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
+          if(f === 'linkedspouse') key = 'linkedSpouseId';
           data[key] = el.value;
         }
       });
@@ -832,12 +942,62 @@
           if(f === 'birthplace') key = 'birthPlace';
           if(f === 'blood') key = 'bloodType';
           if(f === 'gmap') key = 'gmapUrl';
+          if(f === 'birthdate') key = 'birthDate';
           if(f === 'birthyear') key = 'birthYear';
+          if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
+          if(f === 'linkedspouse') key = 'linkedSpouseId';
           el.value = data[key] || '';
         }
       });
+      document.getElementById('input-photo-file').value = ''; 
     }
+
+    function populateSpouseDropdown(parentNode) {
+      const select = document.getElementById('input-linkedspouse');
+      const container = document.getElementById('container-linkedspouse');
+      select.innerHTML = '<option value="">Anak Bersama / Kandung</option>';
+      
+      if (parentNode && parentNode.spouses && parentNode.spouses.length > 0) {
+          parentNode.spouses.forEach(s => {
+              select.innerHTML += `<option value="${s.id}">Anak bawaan: ${escapeHTML(s.name)}</option>`;
+          });
+          container.classList.remove('hidden');
+      } else {
+          container.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('input-photo-file').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          const MAX_WIDTH = 300;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height = height * (MAX_WIDTH / width);
+            width = MAX_WIDTH;
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          document.getElementById('input-photo').value = canvas.toDataURL('image/jpeg', 0.8);
+          showToast('Foto berhasil dimuat!');
+        }
+        img.src = event.target.result;
+      }
+      reader.readAsDataURL(file);
+    });
 
     window.handleNodeClick = function(nodeId, spouseId) {
       selectedNodeId = nodeId;
@@ -849,8 +1009,16 @@
         person = person.spouses.find(s => s.id === spouseId);
       }
       setFormData(person || {});
+
+      // Logic untuk menampilkan dropdown "Status Anak"
+      if (!spouseId && nodeId !== treeData.id) {
+          const parent = findParent(treeData, nodeId);
+          populateSpouseDropdown(parent);
+          document.getElementById('input-linkedspouse').value = person.linkedSpouseId || '';
+      } else {
+          document.getElementById('container-linkedspouse').classList.add('hidden');
+      }
       
-      // Mengatur UI Modal Berdasarkan Edit Mode
       const isEditAllowed = appSettings.enableEdit;
       
       document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
@@ -861,10 +1029,8 @@
       document.getElementById('btn-save').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-cancel').innerText = isEditAllowed ? 'Batal' : 'Tutup';
 
-      // Sembunyikan field yang khusus untuk edit (URL Foto & URL Map) jika dilarang edit
       document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = isEditAllowed ? 'block' : 'none');
 
-      // Set input status readonly / disabled
       formFields.forEach(f => {
         const el = document.getElementById(`input-${f}`);
         if (el) {
@@ -874,6 +1040,7 @@
       });
       document.getElementById('input-gender').disabled = !isEditAllowed;
       document.getElementById('input-blood').disabled = !isEditAllowed;
+      document.getElementById('input-linkedspouse').disabled = !isEditAllowed;
 
       modal.classList.remove('hidden');
     };
@@ -889,7 +1056,13 @@
       document.getElementById('modal-actions').style.display = 'none';
       document.getElementById('btn-delete').style.display = 'none';
       
-      // Ensure fields are editable
+      if (type === 'child') {
+          const parent = findNodeById(treeData, selectedNodeId);
+          populateSpouseDropdown(parent);
+      } else {
+          document.getElementById('container-linkedspouse').classList.add('hidden');
+      }
+
       document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = 'block');
       formFields.forEach(f => {
         const el = document.getElementById(`input-${f}`);
@@ -897,6 +1070,7 @@
       });
       document.getElementById('input-gender').disabled = false;
       document.getElementById('input-blood').disabled = false;
+      document.getElementById('input-linkedspouse').disabled = false;
     };
 
     window.closeEditorModal = function() {
@@ -963,8 +1137,35 @@
     };
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
 
+    window.exportPNG = function() {
+      if (typeof html2canvas === 'undefined') {
+        alert("Library untuk Export belum termuat.");
+        return;
+      }
+      
+      showToast('Menyiapkan gambar resolusi tinggi...');
+      const container = document.getElementById('tree-transform');
+      const originalTransform = container.style.transform;
+      
+      container.style.transform = 'translate(0, 0) scale(1)';
+      
+      setTimeout(() => {
+        html2canvas(document.querySelector('.family-tree'), {
+          backgroundColor: '#f8fafc',
+          scale: 2 
+        }).then(canvas => {
+          const link = document.createElement('a');
+          link.download = `Silsilah_Keluarga_${new Date().getTime()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          
+          container.style.transform = originalTransform;
+          showToast('Gambar berhasil diunduh!');
+        });
+      }, 500); 
+    };
+
     window.exportJSON = function() {
-      // Modifikasi Ekspor agar ikut menyimpan appSettings
       const exportObject = {
         version: "2.0",
         settings: appSettings,
@@ -985,12 +1186,10 @@
         try {
           const json = JSON.parse(event.target.result);
           
-          // Deteksi Format V2 (baru dengan settings)
           if (json.version === "2.0" && json.tree && json.settings) {
             treeData = json.tree;
             appSettings = json.settings;
           } 
-          // Format Lama (Hanya data node pertama)
           else if (json && json.id && json.name) {
             treeData = json;
           } else {
@@ -999,11 +1198,12 @@
           
           resetZoom();
           applySettingsToUI();
+          saveToLocalStorage();
           showToast('Data berhasil dimuat!');
         } catch (err) { alert("Format file JSON tidak valid"); }
       };
       reader.readAsText(file);
-      e.target.value = ''; // Reset input
+      e.target.value = ''; 
     });
 
     window.exportWebProject = function() {
@@ -1012,9 +1212,9 @@
         return;
       }
 
+      showToast('Memproses file export web...');
       const zip = new JSZip();
 
-      // 1. Generate index.html (Bersihkan UI/DOM Mutated state)
       const bodyClone = document.body.cloneNode(true);
       
       bodyClone.querySelector('#tree-container').innerHTML = '\n          <!-- Tree Nodes will be injected here via JS -->\n        ';
@@ -1025,14 +1225,12 @@
       bodyClone.querySelector('#clear-search').style.display = 'none';
       bodyClone.querySelector('#search-input').value = '';
       
-      // Pastikan Halaman Login kembali jika mode password diaktifkan
       if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
           bodyClone.querySelector('#login-screen').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
       } else {
           bodyClone.querySelector('#login-screen').classList.add('hidden');
       }
       
-      // Hapus semua script bawaan untuk diganti ke file external
       const scripts = bodyClone.querySelectorAll('script');
       scripts.forEach(s => s.remove());
       
@@ -1048,6 +1246,10 @@
   
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- JSZip & HTML2Canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></` + `script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
 
   <!-- CSS Terpisah -->
   <link rel="stylesheet" href="style.css">
@@ -1060,10 +1262,7 @@ ${bodyClone.innerHTML}
 </body>
 </html>`;
 
-      // 2. Generate style.css
       const cssContent = document.getElementById('app-style').textContent;
-
-      // 3. Generate script.js (Menggabungkan Tree Data & Settings saat ini)
       let jsContent = document.getElementById('app-script').textContent;
       
       const newTreeStr = JSON.stringify(treeData, null, 2);
@@ -1074,12 +1273,10 @@ ${bodyClone.innerHTML}
         `// --- BEGIN INITIAL DATA ---\n    const initialTreeData = ${newTreeStr};\n\n    const initialAppSettings = ${newSetStr};\n    // --- END INITIAL DATA ---`
       );
 
-      // Tambahkan file ke dalam ZIP
       zip.file("index.html", htmlContent);
       zip.file("style.css", cssContent);
       zip.file("script.js", jsContent);
 
-      // Mulai proses compress ZIP dan unduh
       zip.generateAsync({type:"blob"}).then(function(content) {
         const url = URL.createObjectURL(content);
         const a = document.createElement("a");
