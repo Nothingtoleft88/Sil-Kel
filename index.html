@@ -143,6 +143,13 @@
       </div>
       
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
+
+      <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
+        <button onclick="expandAll()" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600" title="Buka Semua Cabang"><i class="fa-solid fa-folder-open"></i></button>
+        <button onclick="collapseAll()" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600 mx-1" title="Tutup Semua Cabang"><i class="fa-solid fa-folder"></i></button>
+      </div>
+
+      <div class="w-px h-6 bg-slate-300 mx-1"></div>
       
       <div id="action-buttons-container" class="flex space-x-2">
         <button onclick="exportPNG()" class="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium" title="Unduh Gambar PNG">
@@ -240,6 +247,16 @@
             <option value="bg-emerald-50">Hijau Daun (Nature)</option>
             <option value="bg-amber-50">Kuning Hangat (Warm)</option>
           </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Form Login</label>
+          <input type="text" id="set-login-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Akses Terbatas">
+        </div>
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Deskripsi Form Login</label>
+          <input type="text" id="set-login-desc" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Silakan masukkan kode akses...">
         </div>
 
         <div class="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50 mt-2">
@@ -379,6 +396,9 @@
 
         <!-- Action Buttons (Add Child/Spouse) -->
         <div id="modal-actions" class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 gap-3 hidden">
+          <button type="button" id="btn-add-parent" onclick="openAddModal('parent')" class="col-span-2 bg-amber-50 text-amber-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-amber-100 border border-amber-200 transition shadow-sm flex justify-center items-center">
+            <i class="fa-solid fa-arrow-up mr-1.5"></i> Tambah Orang Tua (Jadikan Akar Baru)
+          </button>
           <button type="button" onclick="openAddModal('child')" class="bg-green-50 text-green-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-green-100 border border-green-200 transition shadow-sm flex justify-center items-center">
             <i class="fa-solid fa-plus mr-1.5"></i> Tambah Anak
           </button>
@@ -432,6 +452,13 @@
         <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center text-sm">
           <span class="text-slate-600">Telah Wafat</span>
           <span id="stat-deceased" class="font-bold text-slate-800">0 orang</span>
+        </div>
+        
+        <div class="mt-4 border-t border-slate-200 pt-4">
+          <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center"><i class="fa-solid fa-cake-candles text-amber-500 mr-2"></i> Ulang Tahun Bulan Ini</h3>
+          <div id="stat-birthdays" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1">
+            <!-- Diisi via JS -->
+          </div>
         </div>
       </div>
       <div class="px-5 py-3 bg-white border-t border-slate-100 text-right">
@@ -657,7 +684,7 @@
         node.spouses.forEach(spouse => {
           stats.total++;
           spouse.gender === 'L' ? stats.male++ : stats.female++;
-          if (spouse.deathDate || spouse.deathYear) stats.deceased++;
+          if (node.deathDate || spouse.deathYear) stats.deceased++;
         });
       }
       if (node.children) {
@@ -835,6 +862,27 @@
       isDragging = false;
       mainArea.classList.remove('cursor-grabbing');
     });
+
+    // --- FITUR BUKA/TUTUP SEMUA CABANG ---
+    function setAllCollapse(node, state) {
+      if (!node) return;
+      node.isCollapsed = state;
+      if (node.children) {
+        node.children.forEach(c => setAllCollapse(c, state));
+      }
+    }
+    
+    window.expandAll = function() {
+      setAllCollapse(treeData, false);
+      renderTree();
+      showToast('Semua cabang silsilah dibuka!');
+    };
+    
+    window.collapseAll = function() {
+      setAllCollapse(treeData, true);
+      renderTree();
+      showToast('Semua cabang silsilah ditutup!');
+    };
 
     searchInput.addEventListener('input', (e) => {
       searchQuery = e.target.value;
@@ -1021,6 +1069,16 @@
       
       const isEditAllowed = appSettings.enableEdit;
       
+      // Menampilkan tombol "Tambah Orang Tua" hanya jika node yang dipilih adalah Root Node
+      const btnAddParent = document.getElementById('btn-add-parent');
+      if (btnAddParent) {
+        if (nodeId === treeData.id && !spouseId) {
+          btnAddParent.style.display = 'flex';
+        } else {
+          btnAddParent.style.display = 'none';
+        }
+      }
+      
       document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
       document.getElementById('modal-title-icon').className = isEditAllowed ? 'fa-solid fa-pen-to-square mr-2 text-blue-600' : 'fa-solid fa-address-card mr-2 text-blue-600';
       
@@ -1047,11 +1105,19 @@
 
     window.openAddModal = function(type) {
       if (!appSettings.enableEdit) return;
-      modalMode = type === 'child' ? 'addChild' : 'addSpouse';
-      setFormData({ gender: type === 'child' ? 'L' : 'P' });
       
-      document.getElementById('modal-title-text').innerText = `Tambah ${type==='child'?'Anak':'Pasangan'}`;
-      document.getElementById('modal-title-icon').className = `fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600`;
+      if (type === 'parent') {
+        modalMode = 'addParent';
+        setFormData({ gender: 'L' });
+        document.getElementById('modal-title-text').innerText = 'Tambah Orang Tua (Akar Baru)';
+        document.getElementById('modal-title-icon').className = 'fa-solid fa-arrow-up mr-2 text-amber-600';
+      } else {
+        modalMode = type === 'child' ? 'addChild' : 'addSpouse';
+        setFormData({ gender: type === 'child' ? 'L' : 'P' });
+        
+        document.getElementById('modal-title-text').innerText = `Tambah ${type==='child'?'Anak':'Pasangan'}`;
+        document.getElementById('modal-title-icon').className = `fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600`;
+      }
       
       document.getElementById('modal-actions').style.display = 'none';
       document.getElementById('btn-delete').style.display = 'none';
@@ -1089,6 +1155,9 @@
         treeData = updateTreeData(treeData, selectedNodeId, node => ({
           ...node, spouses: node.spouses.map(s => s.id === selectedSpouseId ? { ...s, ...newData } : s)
         }));
+      } else if (modalMode === 'addParent') {
+        const newParent = { ...newData, id: generateId(), children: [treeData], spouses: [], isCollapsed: false };
+        treeData = newParent;
       } else if (modalMode === 'addChild') {
         const newChild = { ...newData, id: generateId(), children: [], spouses: [], isCollapsed: false };
         treeData = addChildToTreeData(treeData, selectedNodeId, newChild);
@@ -1126,6 +1195,26 @@
 
     // --- STATS & EXPORT/IMPORT ---
     const statsModal = document.getElementById('stats-modal');
+    
+    function getUpcomingBirthdays(node, currentMonth, list = []) {
+      if (!node) return list;
+      
+      const checkBday = (person) => {
+        if (person.birthDate && !person.deathDate && !person.deathYear) {
+          const [y, m, d] = person.birthDate.split('-');
+          if (parseInt(m) === currentMonth) {
+            list.push({ name: person.name, date: parseInt(d), dateStr: person.birthDate });
+          }
+        }
+      };
+      
+      checkBday(node);
+      if (node.spouses) node.spouses.forEach(s => checkBday(s));
+      if (node.children) node.children.forEach(c => getUpcomingBirthdays(c, currentMonth, list));
+      
+      return list;
+    }
+
     window.openStatsModal = function() {
       const stats = calculateStats(treeData);
       document.getElementById('stat-total').innerText = stats.total;
@@ -1133,6 +1222,24 @@
       document.getElementById('stat-male').innerText = stats.male;
       document.getElementById('stat-female').innerText = stats.female;
       document.getElementById('stat-deceased').innerText = stats.deceased + ' orang';
+      
+      // Hitung Ulang Tahun Bulan Ini
+      const currentMonth = new Date().getMonth() + 1;
+      let bdays = getUpcomingBirthdays(treeData, currentMonth);
+      bdays.sort((a, b) => a.date - b.date); // Urutkan berdasarkan tanggal
+      
+      const bdayContainer = document.getElementById('stat-birthdays');
+      if (bdays.length === 0) {
+        bdayContainer.innerHTML = '<p class="text-slate-500 italic text-center py-2">Tidak ada yang berulang tahun bulan ini.</p>';
+      } else {
+        bdayContainer.innerHTML = bdays.map(b => `
+          <div class="flex justify-between items-center bg-amber-50 p-2 rounded border border-amber-100">
+            <span class="font-medium text-amber-900">${escapeHTML(b.name)}</span>
+            <span class="bg-amber-200 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">Tgl ${b.date}</span>
+          </div>
+        `).join('');
+      }
+      
       statsModal.classList.remove('hidden');
     };
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
