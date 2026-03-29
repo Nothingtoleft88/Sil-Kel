@@ -75,6 +75,28 @@
 </head>
 <body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
 
+  <!-- Notifikasi Toast -->
+  <div id="toast-notification" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-[200] flex items-center">
+    <i class="fa-solid fa-circle-check mr-2"></i>
+    <span id="toast-message">Tersimpan!</span>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- HALAMAN LOGIN (KODE AKSES) -->
+  <!-- ========================================== -->
+  <div id="login-screen" class="fixed inset-0 bg-slate-800 z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform">
+      <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <h2 id="login-title-text" class="text-2xl font-bold text-slate-800 mb-2">Akses Terbatas</h2>
+      <p id="login-desc-text" class="text-sm text-slate-500 mb-6">Silakan masukkan kode akses untuk melihat data silsilah keluarga.</p>
+      <input type="password" id="login-input" class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mb-4 text-center tracking-widest text-xl font-mono" placeholder="••••••••">
+      <button onclick="attemptLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md">Buka Akses</button>
+      <p id="login-error" class="text-red-500 text-sm font-medium mt-3 hidden">Kode akses salah!</p>
+    </div>
+  </div>
+
   <!-- ========================================== -->
   <!-- BAGIAN HTML (Struktur Antarmuka) -->
   <!-- ========================================== -->
@@ -86,29 +108,41 @@
         <i class="fa-solid fa-users text-xl"></i>
       </div>
       <div>
-        <h1 class="text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
-        <p class="text-[11px] text-slate-500 font-medium">Visualisasi & Manajemen Pro</p>
+        <h1 id="app-main-title" class="text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
+        <p id="app-sub-title" class="text-[11px] text-slate-500 font-medium">Visualisasi & Manajemen Pro</p>
       </div>
     </div>
     
     <!-- Search Bar -->
-    <div class="hidden md:flex flex-1 max-w-sm mx-8 relative">
+    <div class="hidden md:flex flex-1 max-w-sm mx-6 relative">
       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <i class="fa-solid fa-search text-slate-400 text-sm"></i>
       </div>
-      <input type="text" id="search-input" placeholder="Cari nama anggota..." class="block w-full pl-10 pr-8 py-2 border border-slate-300 rounded-full text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50">
+      <input type="text" id="search-input" placeholder="Cari nama anggota..." class="block w-full pl-10 pr-8 py-2 border border-slate-300 rounded-full text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50 transition">
       <button id="clear-search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
 
     <div class="flex items-center space-x-2">
+      <!-- Logout -->
+      <button id="btn-logout" onclick="logout()" class="hidden flex items-center px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-200 transition text-sm font-medium border border-red-200" title="Keluar">
+        <i class="fa-solid fa-right-from-bracket md:mr-2"></i> <span class="hidden md:inline">Keluar</span>
+      </button>
+
+      <!-- Pengaturan -->
+      <button onclick="openSettingsModal()" class="flex items-center px-3 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-200 transition text-sm font-medium border border-slate-200" title="Pengaturan Aplikasi">
+        <i class="fa-solid fa-gear md:mr-2"></i> <span class="hidden md:inline">Setting</span>
+      </button>
+
+      <!-- Statistik -->
       <button onclick="openStatsModal()" class="flex items-center px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition text-sm font-medium border border-indigo-200" title="Statistik Keluarga">
         <i class="fa-solid fa-chart-pie md:mr-2"></i> <span class="hidden md:inline">Statistik</span>
       </button>
 
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
 
+      <!-- Navigasi View -->
       <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
         <button onclick="adjustZoom(0.1)" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
         <button onclick="resetZoom()" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600 mx-1" title="Reset View"><i class="fa-solid fa-expand"></i></button>
@@ -117,25 +151,26 @@
       
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
       
-      <button onclick="exportJSON()" class="flex items-center px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition text-sm font-medium" title="Simpan ke JSON">
-        <i class="fa-solid fa-download md:mr-2"></i> <span class="hidden md:inline">Simpan</span>
-      </button>
-      
-      <label class="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer text-sm font-medium" title="Muat dari JSON">
-        <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden md:inline">Muat</span>
-        <input type="file" id="import-input" accept=".json" class="hidden" />
-      </label>
+      <!-- Actions -->
+      <div id="action-buttons-container" class="flex space-x-2">
+        <button onclick="exportJSON()" class="flex items-center px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition text-sm font-medium" title="Simpan Data & Setting ke JSON">
+          <i class="fa-solid fa-download md:mr-2"></i> <span class="hidden md:inline">Simpan</span>
+        </button>
+        
+        <label class="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer text-sm font-medium" title="Muat Data JSON">
+          <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden md:inline">Muat</span>
+          <input type="file" id="import-input" accept=".json" class="hidden" />
+        </label>
 
-      <div class="w-px h-6 bg-slate-300 mx-1"></div>
-      
-      <button onclick="exportWebProject()" class="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-sm" title="Export Web (HTML, CSS, JS terpisah)">
-        <i class="fa-solid fa-file-zipper md:mr-2"></i> <span class="hidden md:inline">Export Web</span>
-      </button>
+        <button onclick="exportWebProject()" class="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-sm" title="Export Web untuk Vercel (HTML, CSS, JS terpisah)">
+          <i class="fa-solid fa-file-zipper md:mr-2"></i> <span class="hidden md:inline">Export Web</span>
+        </button>
+      </div>
     </div>
   </header>
 
   <!-- CANVAS AREA -->
-  <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab select-none">
+  <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab select-none transition-colors duration-500">
     <!-- Grid Background -->
     <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
 
@@ -155,21 +190,92 @@
         <p class="font-semibold text-slate-800 mb-1">Panduan:</p>
         <ul class="list-disc pl-4 space-y-1 text-xs">
           <li>Lencana kuning menandakan <b>Generasi</b>.</li>
-          <li>Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.</li>
+          <li id="help-text-edit">Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.</li>
           <li>Tarik (Drag) layar untuk menggeser. Scroll untuk Zoom.</li>
         </ul>
       </div>
     </div>
   </main>
 
-  <!-- MODAL EDITOR PROFIL -->
+  <!-- MODAL PENGATURAN (SETTINGS) -->
+  <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+          <i class="fa-solid fa-gear mr-2 text-slate-600"></i> Pengaturan Aplikasi
+        </h2>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-4">
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Utama Web</label>
+          <input type="text" id="set-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+        </div>
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Subjudul Web</label>
+          <input type="text" id="set-subtitle" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kode Akses / Password</label>
+          <input type="text" id="set-password" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Kosongkan jika ingin web publik">
+          <p class="text-[10px] text-slate-400 mt-1">Hanya yang tahu kode ini yang bisa melihat silsilah.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Warna Latar Kanvas</label>
+          <select id="set-bg" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+            <option value="bg-slate-100">Bawaan (Abu-abu Lembut)</option>
+            <option value="bg-blue-50">Biru Laut (Ocean)</option>
+            <option value="bg-emerald-50">Hijau Daun (Nature)</option>
+            <option value="bg-amber-50">Kuning Hangat (Warm)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50 mt-2">
+          <div>
+            <span class="block text-sm font-bold text-slate-700">Izinkan Mode Edit</span>
+            <span class="block text-xs text-slate-500">Jika dimatikan, web menjadi mode lihat-saja (Read-Only)</span>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="set-editmode" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          </label>
+        </div>
+
+        <hr class="my-4 border-slate-200">
+        <h3 class="text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-display mr-1"></i> Tampilan Layar Keamanan</h3>
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Layar Login</label>
+          <input type="text" id="set-login-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Cth: Akses Terbatas">
+        </div>
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Pesan / Deskripsi Login</label>
+          <textarea id="set-login-desc" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition resize-none" rows="2" placeholder="Cth: Masukkan kode untuk melihat silsilah..."></textarea>
+        </div>
+
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl">
+        <button type="button" onclick="closeSettingsModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition">Batal</button>
+        <button type="button" onclick="saveSettings()" class="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-md transition">Terapkan & Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITOR PROFIL (VIEWER & EDITOR) -->
   <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
       
       <!-- Modal Header -->
       <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
         <h2 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center">
-          <i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i> Edit Profil
+          <i class="fa-solid fa-pen-to-square mr-2 text-blue-600" id="modal-title-icon"></i> <span id="modal-title-text">Edit Profil</span>
         </h2>
         <button onclick="closeEditorModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
           <i class="fa-solid fa-xmark text-lg"></i>
@@ -203,7 +309,7 @@
           <!-- Detailed Info -->
           <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
             <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Detail</h3>
-            <div>
+            <div class="edit-only-field">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-image mr-1"></i> URL Foto (Opsional)</label>
               <input type="url" id="input-photo" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://contoh.com/foto.jpg" />
             </div>
@@ -233,7 +339,7 @@
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-house mr-1"></i> Alamat Lengkap</label>
               <textarea id="input-address" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition resize-none" placeholder="Cth: Jl. Raya Mawar No. 10..." rows="2"></textarea>
             </div>
-            <div>
+            <div class="edit-only-field">
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-map-location-dot mr-1"></i> URL Google Maps</label>
               <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://maps.google.com/?q=..." />
             </div>
@@ -267,8 +373,8 @@
           <i class="fa-solid fa-trash mr-2"></i> Hapus
         </button>
         <div class="flex gap-3 ml-auto">
-          <button type="button" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
-          <button type="button" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-500/30 transition">Simpan</button>
+          <button type="button" id="btn-cancel" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
+          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-500/30 transition">Simpan</button>
         </div>
       </div>
     </div>
@@ -277,6 +383,7 @@
   <!-- MODAL STATISTIK -->
   <div id="stats-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <!-- (Sama seperti versi sebelumnya) -->
       <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
         <h2 class="text-lg font-bold text-slate-800 flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600"></i> Statistik Keluarga</h2>
         <button onclick="closeStatsModal()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -317,7 +424,6 @@
   <!-- BAGIAN JAVASCRIPT (Bisa dipindah ke script.js) -->
   <!-- ========================================== -->
   <script id="app-script">
-    // --- 1. INITIAL DATA ---
     // --- BEGIN INITIAL DATA ---
     const initialTreeData = {
       id: 'root-1', name: 'Budi Santoso', gender: 'L', birthYear: '1945', deathYear: '', notes: 'Kakek Buyut', photoUrl: '', birthPlace: 'Surabaya', gmapUrl: 'https://maps.google.com/?q=-7.250445,112.768845', address: 'Jl. Merdeka No. 45, Surabaya Timur', phone: '081234567890', bloodType: 'O', occupation: 'Pensiunan PNS', isCollapsed: false,
@@ -341,10 +447,21 @@
         }
       ]
     };
+
+    const initialAppSettings = {
+      accessCode: '12345', // Default: 12345. Kosongkan jika ingin tanpa login
+      appTitle: 'Silsilah Keluarga',
+      appSubtitle: 'Visualisasi & Manajemen Pro',
+      enableEdit: true, // Jika false, mode menjadi read-only
+      bgColor: 'bg-slate-100',
+      loginTitle: 'Akses Terbatas',
+      loginDesc: 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.'
+    };
     // --- END INITIAL DATA ---
 
-    // --- 2. STATE MANAGEMENT ---
+    // --- STATE MANAGEMENT ---
     let treeData = JSON.parse(JSON.stringify(initialTreeData));
+    let appSettings = JSON.parse(JSON.stringify(initialAppSettings));
     let scale = 1;
     let position = { x: 0, y: 0 };
     let isDragging = false;
@@ -361,10 +478,125 @@
     const mainArea = document.getElementById('main-area');
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
+    const loginScreen = document.getElementById('login-screen');
 
-    // --- 3. HELPER FUNCTIONS ---
+    // --- TOAST NOTIFICATION LOGIC ---
+    let toastTimeout;
+    window.showToast = function(message) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').innerText = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    };
+
+    // --- INISIALISASI & LOGIN LOGIC ---
+    function initApp() {
+      applySettingsToUI();
+      // Cek apakah butuh login
+      if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
+        loginScreen.classList.remove('hidden');
+        document.getElementById('login-input').focus();
+      } else {
+        loginScreen.classList.add('hidden');
+      }
+      renderTree();
+    }
+
+    window.attemptLogin = function() {
+      const input = document.getElementById('login-input').value;
+      const errorMsg = document.getElementById('login-error');
+      if (input === appSettings.accessCode) {
+        loginScreen.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => loginScreen.classList.add('hidden'), 300);
+        document.getElementById('btn-logout').classList.remove('hidden');
+        showToast('Berhasil masuk!');
+      } else {
+        errorMsg.classList.remove('hidden');
+        setTimeout(() => errorMsg.classList.add('hidden'), 3000);
+      }
+    };
+
+    window.logout = function() {
+      document.getElementById('login-input').value = '';
+      loginScreen.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+      document.getElementById('btn-logout').classList.add('hidden');
+      showToast('Anda telah keluar.');
+    };
+
+    document.getElementById('login-input').addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') attemptLogin();
+    });
+
+    // --- PENGATURAN (SETTINGS) LOGIC ---
+    function applySettingsToUI() {
+      // Terapkan Judul
+      document.getElementById('app-main-title').innerText = appSettings.appTitle;
+      document.getElementById('app-sub-title').innerText = appSettings.appSubtitle;
+      document.title = appSettings.appTitle;
+
+      // Terapkan Teks Login
+      document.getElementById('login-title-text').innerText = appSettings.loginTitle || 'Akses Terbatas';
+      document.getElementById('login-desc-text').innerText = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
+
+      // Terapkan Warna Latar
+      mainArea.classList.remove('bg-slate-100', 'bg-amber-50', 'bg-blue-50', 'bg-emerald-50');
+      mainArea.classList.add(appSettings.bgColor);
+
+      // Terapkan Tombol Logout
+      if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
+        if (loginScreen.classList.contains('hidden') || loginScreen.classList.contains('opacity-0')) {
+          document.getElementById('btn-logout').classList.remove('hidden');
+        }
+      } else {
+        document.getElementById('btn-logout').classList.add('hidden');
+      }
+
+      // Terapkan Mode Edit ke UI Utama (Tombol Import dkk)
+      const actionContainer = document.getElementById('action-buttons-container');
+      const helpText = document.getElementById('help-text-edit');
+      if (!appSettings.enableEdit) {
+        actionContainer.style.display = 'none';
+        helpText.innerHTML = 'Klik kartu untuk melihat <b>Detail Profil</b>.';
+      } else {
+        actionContainer.style.display = 'flex';
+        helpText.innerHTML = 'Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.';
+      }
+    }
+
+    window.openSettingsModal = function() {
+      document.getElementById('set-title').value = appSettings.appTitle;
+      document.getElementById('set-subtitle').value = appSettings.appSubtitle;
+      document.getElementById('set-password').value = appSettings.accessCode;
+      document.getElementById('set-bg').value = appSettings.bgColor;
+      document.getElementById('set-editmode').checked = appSettings.enableEdit;
+      document.getElementById('set-login-title').value = appSettings.loginTitle || 'Akses Terbatas';
+      document.getElementById('set-login-desc').value = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
+      document.getElementById('settings-modal').classList.remove('hidden');
+    };
+
+    window.closeSettingsModal = function() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    };
+
+    window.saveSettings = function() {
+      appSettings.appTitle = document.getElementById('set-title').value || 'Silsilah Keluarga';
+      appSettings.appSubtitle = document.getElementById('set-subtitle').value;
+      appSettings.accessCode = document.getElementById('set-password').value;
+      appSettings.bgColor = document.getElementById('set-bg').value;
+      appSettings.enableEdit = document.getElementById('set-editmode').checked;
+      appSettings.loginTitle = document.getElementById('set-login-title').value || 'Akses Terbatas';
+      appSettings.loginDesc = document.getElementById('set-login-desc').value || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
+      
+      applySettingsToUI();
+      closeSettingsModal();
+      showToast('Pengaturan berhasil disimpan!');
+    };
+
+    // --- HELPER FUNCTIONS ---
     const generateId = () => Math.random().toString(36).substr(2, 9);
-    
     const escapeHTML = (str) => {
       if (!str) return '';
       return str.toString().replace(/[&<>'"]/g, tag => ({
@@ -392,7 +624,7 @@
       return stats;
     }
 
-    // --- 4. RENDER LOGIC ---
+    // --- RENDER LOGIC ---
     function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId) {
       const isMale = person.gender === 'L';
       const bgColor = isMale ? 'bg-blue-50 border-blue-200' : 'bg-pink-50 border-pink-200';
@@ -451,7 +683,6 @@
 
     function buildNodeHTML(node, level) {
       let hasChildren = node.children && node.children.length > 0;
-      
       let html = `<li><div class="flex flex-col items-center"><div class="flex items-center justify-center relative">`;
       html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null);
 
@@ -463,7 +694,6 @@
       }
 
       html += `</div></div>`;
-
       if (hasChildren && !node.isCollapsed) {
         html += `<ul>`;
         node.children.forEach(child => {
@@ -480,7 +710,7 @@
       transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
     }
 
-    // --- 5. EVENT LISTENERS (PAN, ZOOM, SEARCH) ---
+    // --- EVENT LISTENERS (PAN, ZOOM, SEARCH) ---
     function adjustZoom(delta) {
       scale = Math.min(Math.max(0.2, scale + delta), 2);
       renderTree();
@@ -526,7 +756,7 @@
       renderTree();
     });
 
-    // --- 6. TREE DATA MANIPULATION ---
+    // --- TREE DATA MANIPULATION ---
     function findNodeById(node, id) {
       if (node.id === id) return node;
       if (node.children) {
@@ -571,7 +801,7 @@
       renderTree();
     };
 
-    // --- 7. MODAL LOGIC ---
+    // --- MODAL LOGIC (EDITOR / VIEWER) ---
     const modal = document.getElementById('editor-modal');
     const formFields = ['name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 'phone', 'occupation', 'address', 'gmap', 'birthyear', 'deathyear'];
 
@@ -618,23 +848,55 @@
       if (spouseId && person && person.spouses) {
         person = person.spouses.find(s => s.id === spouseId);
       }
-      
       setFormData(person || {});
       
-      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i> Edit Profil`;
-      document.getElementById('modal-actions').style.display = (modalMode === 'edit') ? 'grid' : 'none';
-      document.getElementById('btn-delete').style.display = 'flex';
+      // Mengatur UI Modal Berdasarkan Edit Mode
+      const isEditAllowed = appSettings.enableEdit;
       
+      document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
+      document.getElementById('modal-title-icon').className = isEditAllowed ? 'fa-solid fa-pen-to-square mr-2 text-blue-600' : 'fa-solid fa-address-card mr-2 text-blue-600';
+      
+      document.getElementById('modal-actions').style.display = (modalMode === 'edit' && isEditAllowed) ? 'grid' : 'none';
+      document.getElementById('btn-delete').style.display = isEditAllowed ? 'flex' : 'none';
+      document.getElementById('btn-save').style.display = isEditAllowed ? 'block' : 'none';
+      document.getElementById('btn-cancel').innerText = isEditAllowed ? 'Batal' : 'Tutup';
+
+      // Sembunyikan field yang khusus untuk edit (URL Foto & URL Map) jika dilarang edit
+      document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = isEditAllowed ? 'block' : 'none');
+
+      // Set input status readonly / disabled
+      formFields.forEach(f => {
+        const el = document.getElementById(`input-${f}`);
+        if (el) {
+           if (!isEditAllowed) el.setAttribute('readonly', true);
+           else el.removeAttribute('readonly');
+        }
+      });
+      document.getElementById('input-gender').disabled = !isEditAllowed;
+      document.getElementById('input-blood').disabled = !isEditAllowed;
+
       modal.classList.remove('hidden');
     };
 
     window.openAddModal = function(type) {
+      if (!appSettings.enableEdit) return;
       modalMode = type === 'child' ? 'addChild' : 'addSpouse';
       setFormData({ gender: type === 'child' ? 'L' : 'P' });
       
-      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600"></i> Tambah ${type==='child'?'Anak':'Pasangan'}`;
+      document.getElementById('modal-title-text').innerText = `Tambah ${type==='child'?'Anak':'Pasangan'}`;
+      document.getElementById('modal-title-icon').className = `fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600`;
+      
       document.getElementById('modal-actions').style.display = 'none';
       document.getElementById('btn-delete').style.display = 'none';
+      
+      // Ensure fields are editable
+      document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = 'block');
+      formFields.forEach(f => {
+        const el = document.getElementById(`input-${f}`);
+        if (el) el.removeAttribute('readonly');
+      });
+      document.getElementById('input-gender').disabled = false;
+      document.getElementById('input-blood').disabled = false;
     };
 
     window.closeEditorModal = function() {
@@ -642,6 +904,7 @@
     };
 
     window.handleSave = function() {
+      if(!appSettings.enableEdit) return;
       if(!document.getElementById('input-name').value) { alert('Nama tidak boleh kosong!'); return; }
       
       const newData = getFormData();
@@ -664,9 +927,11 @@
       
       closeEditorModal();
       renderTree();
+      showToast('Data berhasil disimpan!');
     };
 
     window.handleDelete = function() {
+      if(!appSettings.enableEdit) return;
       if (treeData.id === selectedNodeId && modalMode === 'edit') {
         alert("Tidak bisa menghapus akar utama silsilah."); return;
       }
@@ -681,10 +946,11 @@
         }
         closeEditorModal();
         renderTree();
+        showToast('Data berhasil dihapus!');
       }
     };
 
-    // --- 8. STATS & EXPORT/IMPORT ---
+    // --- STATS & EXPORT/IMPORT ---
     const statsModal = document.getElementById('stats-modal');
     window.openStatsModal = function() {
       const stats = calculateStats(treeData);
@@ -698,10 +964,17 @@
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
 
     window.exportJSON = function() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(treeData, null, 2));
+      // Modifikasi Ekspor agar ikut menyimpan appSettings
+      const exportObject = {
+        version: "2.0",
+        settings: appSettings,
+        tree: treeData
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
       const dl = document.createElement('a');
       dl.setAttribute("href", dataStr); dl.setAttribute("download", "silsilah_keluarga_lengkap.json");
       document.body.appendChild(dl); dl.click(); dl.remove();
+      showToast('Data JSON berhasil disimpan!');
     };
 
     document.getElementById('import-input').addEventListener('change', function(e) {
@@ -711,9 +984,22 @@
       reader.onload = function(event) {
         try {
           const json = JSON.parse(event.target.result);
-          if (json && json.id && json.name) {
-            treeData = json; resetZoom();
+          
+          // Deteksi Format V2 (baru dengan settings)
+          if (json.version === "2.0" && json.tree && json.settings) {
+            treeData = json.tree;
+            appSettings = json.settings;
+          } 
+          // Format Lama (Hanya data node pertama)
+          else if (json && json.id && json.name) {
+            treeData = json;
+          } else {
+            throw new Error("Format Tidak Dikenal");
           }
+          
+          resetZoom();
+          applySettingsToUI();
+          showToast('Data berhasil dimuat!');
         } catch (err) { alert("Format file JSON tidak valid"); }
       };
       reader.readAsText(file);
@@ -735,8 +1021,16 @@
       bodyClone.querySelector('#tree-transform').style.transform = '';
       bodyClone.querySelector('#editor-modal').classList.add('hidden');
       bodyClone.querySelector('#stats-modal').classList.add('hidden');
+      bodyClone.querySelector('#settings-modal').classList.add('hidden');
       bodyClone.querySelector('#clear-search').style.display = 'none';
       bodyClone.querySelector('#search-input').value = '';
+      
+      // Pastikan Halaman Login kembali jika mode password diaktifkan
+      if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
+          bodyClone.querySelector('#login-screen').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+      } else {
+          bodyClone.querySelector('#login-screen').classList.add('hidden');
+      }
       
       // Hapus semua script bawaan untuk diganti ke file external
       const scripts = bodyClone.querySelectorAll('script');
@@ -747,7 +1041,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Silsilah Keluarga Interaktif</title>
+  <title>${escapeHTML(appSettings.appTitle)}</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></` + `script>
@@ -769,13 +1063,15 @@ ${bodyClone.innerHTML}
       // 2. Generate style.css
       const cssContent = document.getElementById('app-style').textContent;
 
-      // 3. Generate script.js (Menggabungkan Tree Data saat ini)
+      // 3. Generate script.js (Menggabungkan Tree Data & Settings saat ini)
       let jsContent = document.getElementById('app-script').textContent;
       
-      const newTreeDataStr = JSON.stringify(treeData, null, 2);
+      const newTreeStr = JSON.stringify(treeData, null, 2);
+      const newSetStr = JSON.stringify(appSettings, null, 2);
+      
       jsContent = jsContent.replace(
         /\/\/ --- BEGIN INITIAL DATA ---[\s\S]*?\/\/ --- END INITIAL DATA ---/,
-        `// --- BEGIN INITIAL DATA ---\n    const initialTreeData = ${newTreeDataStr};\n    // --- END INITIAL DATA ---`
+        `// --- BEGIN INITIAL DATA ---\n    const initialTreeData = ${newTreeStr};\n\n    const initialAppSettings = ${newSetStr};\n    // --- END INITIAL DATA ---`
       );
 
       // Tambahkan file ke dalam ZIP
@@ -793,11 +1089,12 @@ ${bodyClone.innerHTML}
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        showToast('Proyek Web berhasil diekspor!');
       });
     };
 
-    // --- INITIAL RENDER ---
-    renderTree();
+    // --- MULAI APLIKASI ---
+    initApp();
   </script>
 </body>
 </html>
