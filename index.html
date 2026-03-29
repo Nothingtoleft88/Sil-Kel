@@ -5,17 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Silsilah Keluarga Interaktif</title>
   
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS (via CDN untuk styling tanpa build process) -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- FontAwesome -->
+  <!-- FontAwesome (via CDN untuk Ikon) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- JSZip (Untuk fitur Export ke ZIP) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <!-- CSS Terpisah -->
-  <link rel="stylesheet" href="style.css">
+  <!-- ========================================== -->
+  <!-- BAGIAN CSS (Bisa dipindah ke style.css) -->
+  <!-- ========================================== -->
+  <style id="app-style">
+    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    
+    /* CSS untuk Garis Pohon Silsilah */
+    .family-tree ul {
+      display: flex;
+      padding-top: 40px;
+      position: relative;
+      justify-content: center;
+      margin: 0;
+    }
+    .family-tree li {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      list-style-type: none;
+      position: relative;
+      padding: 40px 15px 0 15px;
+    }
+    .family-tree li::before, .family-tree li::after {
+      content: ''; position: absolute; top: 0; right: 50%;
+      border-top: 2px solid #94a3b8; width: 50%; height: 40px;
+    }
+    .family-tree li::after {
+      right: auto; left: 50%; border-left: 2px solid #94a3b8;
+    }
+    .family-tree li:only-child::after, .family-tree li:only-child::before {
+      display: none;
+    }
+    .family-tree li:only-child { padding-top: 0; }
+    .family-tree li:first-child::before, .family-tree li:last-child::after {
+      border: 0 none;
+    }
+    .family-tree li:last-child::before {
+      border-right: 2px solid #94a3b8; border-radius: 0 8px 0 0;
+    }
+    .family-tree li:first-child::after {
+      border-radius: 8px 0 0 0;
+    }
+    .family-tree ul::before {
+      content: ''; position: absolute; top: 0; left: 50%;
+      border-left: 2px solid #94a3b8; width: 0; height: 40px;
+      transform: translateX(-1px);
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    .cursor-grab { cursor: grab; }
+    .cursor-grabbing { cursor: grabbing !important; }
+  </style>
 </head>
 <body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
-
 
   <!-- ========================================== -->
   <!-- BAGIAN HTML (Struktur Antarmuka) -->
@@ -29,7 +87,7 @@
       </div>
       <div>
         <h1 class="text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
-        <p class="text-[11px] text-slate-500 font-medium">Visualisasi &amp; Manajemen Pro</p>
+        <p class="text-[11px] text-slate-500 font-medium">Visualisasi & Manajemen Pro</p>
       </div>
     </div>
     
@@ -39,7 +97,7 @@
         <i class="fa-solid fa-search text-slate-400 text-sm"></i>
       </div>
       <input type="text" id="search-input" placeholder="Cari nama anggota..." class="block w-full pl-10 pr-8 py-2 border border-slate-300 rounded-full text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50">
-      <button id="clear-search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" style="display: none;">
+      <button id="clear-search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
@@ -65,7 +123,7 @@
       
       <label class="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer text-sm font-medium" title="Muat dari JSON">
         <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden md:inline">Muat</span>
-        <input type="file" id="import-input" accept=".json" class="hidden">
+        <input type="file" id="import-input" accept=".json" class="hidden" />
       </label>
 
       <div class="w-px h-6 bg-slate-300 mx-1"></div>
@@ -82,7 +140,7 @@
     <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
 
     <!-- Container Transform -->
-    <div id="tree-transform" class="absolute transform-gpu transition-transform duration-75 ease-out flex justify-center min-w-full min-h-full items-center" style="">
+    <div id="tree-transform" class="absolute transform-gpu transition-transform duration-75 ease-out flex justify-center min-w-full min-h-full items-center">
       <div class="family-tree pb-32 pt-10">
         <ul id="tree-container">
           <!-- Tree Nodes will be injected here via JS -->
@@ -125,7 +183,7 @@
           <div class="space-y-4">
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
-              <input type="text" id="input-name" required="" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso">
+              <input type="text" id="input-name" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso" />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -137,7 +195,7 @@
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Status / Keterangan</label>
-                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Istri ke-2, Cerai 2010, dll">
+                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Istri ke-2, Cerai 2010, dll" />
               </div>
             </div>
           </div>
@@ -147,12 +205,12 @@
             <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Detail</h3>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-image mr-1"></i> URL Foto (Opsional)</label>
-              <input type="url" id="input-photo" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://contoh.com/foto.jpg">
+              <input type="url" id="input-photo" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://contoh.com/foto.jpg" />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tempat Lahir</label>
-                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Nama Kota">
+                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Nama Kota" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Golongan Darah</label>
@@ -164,11 +222,11 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-phone mr-1"></i> No. HP / WA</label>
-                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="0812xxxxxx">
+                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="0812xxxxxx" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pekerjaan</label>
-                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="PNS, Dokter...">
+                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="PNS, Dokter..." />
               </div>
             </div>
             <div>
@@ -177,16 +235,16 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-map-location-dot mr-1"></i> URL Google Maps</label>
-              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://maps.google.com/?q=...">
+              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://maps.google.com/?q=..." />
             </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tahun Lahir</label>
-                <input type="number" id="input-birthyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY">
+                <input type="number" id="input-birthyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex justify-between">Tahun Wafat <span class="font-normal text-[10px] text-slate-400 normal-case ml-1">(Kosong = Hidup)</span></label>
-                <input type="number" id="input-deathyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY">
+                <input type="number" id="input-deathyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY" />
               </div>
             </div>
           </div>
@@ -258,11 +316,488 @@
   <!-- ========================================== -->
   <!-- BAGIAN JAVASCRIPT (Bisa dipindah ke script.js) -->
   <!-- ========================================== -->
+  <script id="app-script">
+    // --- 1. INITIAL DATA ---
+    // --- BEGIN INITIAL DATA ---
+    const initialTreeData = {
+      id: 'root-1', name: 'Budi Santoso', gender: 'L', birthYear: '1945', deathYear: '', notes: 'Kakek Buyut', photoUrl: '', birthPlace: 'Surabaya', gmapUrl: 'https://maps.google.com/?q=-7.250445,112.768845', address: 'Jl. Merdeka No. 45, Surabaya Timur', phone: '081234567890', bloodType: 'O', occupation: 'Pensiunan PNS', isCollapsed: false,
+      spouses: [{ id: 'spouse-1', name: 'Siti Aminah', gender: 'P', birthYear: '1948', deathYear: '2015', photoUrl: '', birthPlace: 'Malang', gmapUrl: '', address: '', phone: '', bloodType: 'A', occupation: 'Ibu Rumah Tangga', notes: 'Istri Pertama' }],
+      children: [
+        {
+          id: 'child-1', name: 'Agus Santoso', gender: 'L', birthYear: '1968', deathYear: '', notes: 'Anak Pertama', phone: '081199998888', isCollapsed: false,
+          spouses: [
+            { id: 'spouse-2', name: 'Ratna Ningrum', gender: 'P', birthYear: '1970', notes: 'Cerai thn 2000' },
+            { id: 'spouse-2b', name: 'Linda Kusuma', gender: 'P', birthYear: '1975', notes: 'Istri Kedua' }
+          ],
+          children: [
+            { id: 'grandchild-1', name: 'Dewi Lestari', gender: 'P', birthYear: '1992', occupation: 'Dokter', phone: '081211112222', spouses: [], children: [] },
+            { id: 'grandchild-2', name: 'Bima Saputra', gender: 'L', birthYear: '1995', occupation: 'Insinyur', spouses: [], children: [] }
+          ]
+        },
+        {
+          id: 'child-2', name: 'Sri Wahyuni', gender: 'P', birthYear: '1972', notes: 'Anak Kedua',
+          spouses: [{ id: 'spouse-3', name: 'Hendra Wijaya', gender: 'L', birthYear: '1970' }],
+          children: [{ id: 'grandchild-3', name: 'Rina Wijaya', gender: 'P', birthYear: '1998', spouses: [], children: [] }]
+        }
+      ]
+    };
+    // --- END INITIAL DATA ---
+
+    // --- 2. STATE MANAGEMENT ---
+    let treeData = JSON.parse(JSON.stringify(initialTreeData));
+    let scale = 1;
+    let position = { x: 0, y: 0 };
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+    let searchQuery = '';
+    
+    let modalMode = 'edit'; // edit, editSpouse, addChild, addSpouse
+    let selectedNodeId = null;
+    let selectedSpouseId = null;
+
+    // DOM Elements
+    const treeContainer = document.getElementById('tree-container');
+    const transformDiv = document.getElementById('tree-transform');
+    const mainArea = document.getElementById('main-area');
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search');
+
+    // --- 3. HELPER FUNCTIONS ---
+    const generateId = () => Math.random().toString(36).substr(2, 9);
+    
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return str.toString().replace(/[&<>'"]/g, tag => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag] || tag));
+    };
+
+    function calculateStats(node, currentDepth = 1, stats = { total: 0, male: 0, female: 0, deceased: 0, maxDepth: 1 }) {
+      if (!node) return stats;
+      if (currentDepth > stats.maxDepth) stats.maxDepth = currentDepth;
+      stats.total++;
+      node.gender === 'L' ? stats.male++ : stats.female++;
+      if (node.deathYear) stats.deceased++;
+
+      if (node.spouses && node.spouses.length > 0) {
+        node.spouses.forEach(spouse => {
+          stats.total++;
+          spouse.gender === 'L' ? stats.male++ : stats.female++;
+          if (spouse.deathYear) stats.deceased++;
+        });
+      }
+      if (node.children) {
+        node.children.forEach(child => calculateStats(child, currentDepth + 1, stats));
+      }
+      return stats;
+    }
+
+    // --- 4. RENDER LOGIC ---
+    function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId) {
+      const isMale = person.gender === 'L';
+      const bgColor = isMale ? 'bg-blue-50 border-blue-200' : 'bg-pink-50 border-pink-200';
+      const headerColor = isMale ? 'bg-blue-500' : 'bg-pink-500';
+      const isDeceased = !!person.deathYear;
+      
+      const isHighlighted = searchQuery && person.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const highlightStyle = isHighlighted ? 'ring-4 ring-yellow-400 shadow-xl scale-105 z-10' : '';
+      const deadStyle = isDeceased ? 'opacity-85 grayscale-[40%]' : '';
+
+      const clickAction = isSpouse ? `handleNodeClick('${parentId}', '${person.id}')` : `handleNodeClick('${person.id}', null)`;
+
+      let extraIcons = '';
+      if (person.phone) extraIcons += `<a href="tel:${escapeHTML(person.phone)}" onclick="event.stopPropagation()" class="text-emerald-600 hover:text-emerald-800 transition-colors pointer-events-auto" title="Telepon: ${escapeHTML(person.phone)}"><i class="fa-solid fa-phone"></i></a>`;
+      if (person.occupation) extraIcons += `<i class="fa-solid fa-briefcase" title="Pekerjaan: ${escapeHTML(person.occupation)}"></i>`;
+      if (person.address) extraIcons += `<i class="fa-solid fa-house" title="Alamat: ${escapeHTML(person.address)}"></i>`;
+      if (person.birthPlace && !person.gmapUrl) extraIcons += `<i class="fa-solid fa-location-dot" title="Tempat: ${escapeHTML(person.birthPlace)}"></i>`;
+      if (person.gmapUrl) extraIcons += `<a href="${escapeHTML(person.gmapUrl)}" target="_blank" onclick="event.stopPropagation()" class="text-blue-600 hover:text-blue-800 transition-colors pointer-events-auto" title="Buka di GMap"><i class="fa-solid fa-map"></i></a>`;
+      if (person.bloodType) extraIcons += `<i class="fa-solid fa-droplet" title="Gol. Darah: ${escapeHTML(person.bloodType)}"></i>`;
+
+      const avatar = person.photoUrl 
+        ? `<img src="${escapeHTML(person.photoUrl)}" class="w-full h-full object-cover">`
+        : `<i class="fa-solid fa-user text-2xl"></i>`;
+
+      const expandBtn = (!isSpouse && hasChildren) ? `
+        <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20">
+          <i class="fa-solid fa-chevron-${isCollapsed ? 'down' : 'up'} text-xs"></i>
+        </button>
+      ` : '';
+
+      const badge = !isSpouse ? `<div class="absolute -top-3 -right-3 bg-amber-400 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 border border-white">Gen ${level}</div>` : '';
+
+      return `
+        <div class="relative flex flex-col items-center">
+          <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] border-2 rounded-xl shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${bgColor} ${deadStyle} ${highlightStyle}">
+            ${badge}
+            <div class="h-2 w-full rounded-t-lg ${headerColor}"></div>
+            <div class="p-3 flex flex-col items-center text-center">
+              <div class="w-14 h-14 rounded-full flex items-center justify-center mb-2 text-white shadow-inner overflow-hidden border-2 border-white ${headerColor}">
+                ${avatar}
+              </div>
+              <h3 class="font-bold text-gray-800 text-sm leading-tight mb-0.5">${escapeHTML(person.name) || 'Tanpa Nama'}</h3>
+              <p class="text-[11px] text-gray-600 font-medium bg-white/60 px-2 py-0.5 rounded-full mb-1 border border-black/5">
+                ${escapeHTML(person.birthYear) || '?'} - ${escapeHTML(person.deathYear) || 'Sekarang'}
+              </p>
+              <div class="flex flex-wrap gap-2 mt-1.5 text-gray-500 items-center justify-center text-[11px]">
+                ${extraIcons}
+              </div>
+              ${person.notes ? `<p class="text-[10px] text-gray-500 mt-2 italic border-t border-gray-200/60 pt-1.5 w-full truncate px-1">${escapeHTML(person.notes)}</p>` : ''}
+            </div>
+          </div>
+          ${expandBtn}
+        </div>
+      `;
+    }
+
+    function buildNodeHTML(node, level) {
+      let hasChildren = node.children && node.children.length > 0;
+      
+      let html = `<li><div class="flex flex-col items-center"><div class="flex items-center justify-center relative">`;
+      html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null);
+
+      if (node.spouses && node.spouses.length > 0) {
+        node.spouses.forEach(spouse => {
+          html += `<div class="w-8 h-[2px] bg-slate-400"></div>`;
+          html += buildPersonCard(spouse, true, false, false, level, node.id);
+        });
+      }
+
+      html += `</div></div>`;
+
+      if (hasChildren && !node.isCollapsed) {
+        html += `<ul>`;
+        node.children.forEach(child => {
+          html += buildNodeHTML(child, level + 1);
+        });
+        html += `</ul>`;
+      }
+      html += `</li>`;
+      return html;
+    }
+
+    function renderTree() {
+      treeContainer.innerHTML = buildNodeHTML(treeData, 1);
+      transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
+    }
+
+    // --- 5. EVENT LISTENERS (PAN, ZOOM, SEARCH) ---
+    function adjustZoom(delta) {
+      scale = Math.min(Math.max(0.2, scale + delta), 2);
+      renderTree();
+    }
+    function resetZoom() {
+      scale = 1; position = { x: 0, y: 0 };
+      renderTree();
+    }
+
+    mainArea.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      adjustZoom(e.deltaY * -0.001);
+    }, { passive: false });
+
+    mainArea.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a')) return;
+      isDragging = true;
+      dragStart = { x: e.clientX - position.x, y: e.clientY - position.y };
+      mainArea.classList.add('cursor-grabbing');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      position = { x: e.clientX - dragStart.x, y: e.clientY - dragStart.y };
+      transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+      mainArea.classList.remove('cursor-grabbing');
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      clearSearchBtn.style.display = searchQuery ? 'flex' : 'none';
+      renderTree();
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.style.display = 'none';
+      renderTree();
+    });
+
+    // --- 6. TREE DATA MANIPULATION ---
+    function findNodeById(node, id) {
+      if (node.id === id) return node;
+      if (node.children) {
+        for (let child of node.children) {
+          let found = findNodeById(child, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function updateTreeData(node, id, updatedData) {
+      if (node.id === id) {
+        return typeof updatedData === 'function' ? updatedData(node) : { ...node, ...updatedData };
+      }
+      if (node.children) {
+        return { ...node, children: node.children.map(child => updateTreeData(child, id, updatedData)) };
+      }
+      return node;
+    }
+
+    function addChildToTreeData(node, parentId, newChild) {
+      if (node.id === parentId) {
+        return { ...node, isCollapsed: false, children: [...(node.children || []), newChild] };
+      }
+      if (node.children) {
+        return { ...node, children: node.children.map(child => addChildToTreeData(child, parentId, newChild)) };
+      }
+      return node;
+    }
+
+    function deleteNodeFromTreeData(node, idToDelete) {
+      if (!node.children) return node;
+      return { 
+        ...node, 
+        children: node.children.filter(c => c.id !== idToDelete).map(c => deleteNodeFromTreeData(c, idToDelete)) 
+      };
+    }
+
+    window.toggleCollapse = function(nodeId) {
+      treeData = updateTreeData(treeData, nodeId, node => ({ ...node, isCollapsed: !node.isCollapsed }));
+      renderTree();
+    };
+
+    // --- 7. MODAL LOGIC ---
+    const modal = document.getElementById('editor-modal');
+    const formFields = ['name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 'phone', 'occupation', 'address', 'gmap', 'birthyear', 'deathyear'];
+
+    function getFormData() {
+      let data = {};
+      formFields.forEach(f => {
+        const el = document.getElementById(`input-${f}`);
+        if(el) {
+          let key = f;
+          if(f === 'photo') key = 'photoUrl';
+          if(f === 'birthplace') key = 'birthPlace';
+          if(f === 'blood') key = 'bloodType';
+          if(f === 'gmap') key = 'gmapUrl';
+          if(f === 'birthyear') key = 'birthYear';
+          if(f === 'deathyear') key = 'deathYear';
+          data[key] = el.value;
+        }
+      });
+      return data;
+    }
+
+    function setFormData(data) {
+      formFields.forEach(f => {
+        const el = document.getElementById(`input-${f}`);
+        if(el) {
+          let key = f;
+          if(f === 'photo') key = 'photoUrl';
+          if(f === 'birthplace') key = 'birthPlace';
+          if(f === 'blood') key = 'bloodType';
+          if(f === 'gmap') key = 'gmapUrl';
+          if(f === 'birthyear') key = 'birthYear';
+          if(f === 'deathyear') key = 'deathYear';
+          el.value = data[key] || '';
+        }
+      });
+    }
+
+    window.handleNodeClick = function(nodeId, spouseId) {
+      selectedNodeId = nodeId;
+      selectedSpouseId = spouseId;
+      modalMode = spouseId ? 'editSpouse' : 'edit';
+      
+      let person = findNodeById(treeData, nodeId);
+      if (spouseId && person && person.spouses) {
+        person = person.spouses.find(s => s.id === spouseId);
+      }
+      
+      setFormData(person || {});
+      
+      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i> Edit Profil`;
+      document.getElementById('modal-actions').style.display = (modalMode === 'edit') ? 'grid' : 'none';
+      document.getElementById('btn-delete').style.display = 'flex';
+      
+      modal.classList.remove('hidden');
+    };
+
+    window.openAddModal = function(type) {
+      modalMode = type === 'child' ? 'addChild' : 'addSpouse';
+      setFormData({ gender: type === 'child' ? 'L' : 'P' });
+      
+      document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600"></i> Tambah ${type==='child'?'Anak':'Pasangan'}`;
+      document.getElementById('modal-actions').style.display = 'none';
+      document.getElementById('btn-delete').style.display = 'none';
+    };
+
+    window.closeEditorModal = function() {
+      modal.classList.add('hidden');
+    };
+
+    window.handleSave = function() {
+      if(!document.getElementById('input-name').value) { alert('Nama tidak boleh kosong!'); return; }
+      
+      const newData = getFormData();
+      
+      if (modalMode === 'edit') {
+        treeData = updateTreeData(treeData, selectedNodeId, newData);
+      } else if (modalMode === 'editSpouse') {
+        treeData = updateTreeData(treeData, selectedNodeId, node => ({
+          ...node, spouses: node.spouses.map(s => s.id === selectedSpouseId ? { ...s, ...newData } : s)
+        }));
+      } else if (modalMode === 'addChild') {
+        const newChild = { ...newData, id: generateId(), children: [], spouses: [], isCollapsed: false };
+        treeData = addChildToTreeData(treeData, selectedNodeId, newChild);
+      } else if (modalMode === 'addSpouse') {
+        const newSpouse = { ...newData, id: generateId() };
+        treeData = updateTreeData(treeData, selectedNodeId, node => ({
+          ...node, spouses: [...(node.spouses || []), newSpouse]
+        }));
+      }
+      
+      closeEditorModal();
+      renderTree();
+    };
+
+    window.handleDelete = function() {
+      if (treeData.id === selectedNodeId && modalMode === 'edit') {
+        alert("Tidak bisa menghapus akar utama silsilah."); return;
+      }
+      
+      if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
+        if (modalMode === 'editSpouse') {
+          treeData = updateTreeData(treeData, selectedNodeId, node => ({
+            ...node, spouses: node.spouses.filter(s => s.id !== selectedSpouseId)
+          }));
+        } else {
+          treeData = deleteNodeFromTreeData(treeData, selectedNodeId);
+        }
+        closeEditorModal();
+        renderTree();
+      }
+    };
+
+    // --- 8. STATS & EXPORT/IMPORT ---
+    const statsModal = document.getElementById('stats-modal');
+    window.openStatsModal = function() {
+      const stats = calculateStats(treeData);
+      document.getElementById('stat-total').innerText = stats.total;
+      document.getElementById('stat-depth').innerText = stats.maxDepth + ' Generasi';
+      document.getElementById('stat-male').innerText = stats.male;
+      document.getElementById('stat-female').innerText = stats.female;
+      document.getElementById('stat-deceased').innerText = stats.deceased + ' orang';
+      statsModal.classList.remove('hidden');
+    };
+    window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
+
+    window.exportJSON = function() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(treeData, null, 2));
+      const dl = document.createElement('a');
+      dl.setAttribute("href", dataStr); dl.setAttribute("download", "silsilah_keluarga_lengkap.json");
+      document.body.appendChild(dl); dl.click(); dl.remove();
+    };
+
+    document.getElementById('import-input').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const json = JSON.parse(event.target.result);
+          if (json && json.id && json.name) {
+            treeData = json; resetZoom();
+          }
+        } catch (err) { alert("Format file JSON tidak valid"); }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset input
+    });
+
+    window.exportWebProject = function() {
+      if (typeof JSZip === 'undefined') {
+        alert("Library JSZip belum dimuat, harap tunggu sebentar atau periksa koneksi internet Anda.");
+        return;
+      }
+
+      const zip = new JSZip();
+
+      // 1. Generate index.html (Bersihkan UI/DOM Mutated state)
+      const bodyClone = document.body.cloneNode(true);
+      
+      bodyClone.querySelector('#tree-container').innerHTML = '\n          <!-- Tree Nodes will be injected here via JS -->\n        ';
+      bodyClone.querySelector('#tree-transform').style.transform = '';
+      bodyClone.querySelector('#editor-modal').classList.add('hidden');
+      bodyClone.querySelector('#stats-modal').classList.add('hidden');
+      bodyClone.querySelector('#clear-search').style.display = 'none';
+      bodyClone.querySelector('#search-input').value = '';
+      
+      // Hapus semua script bawaan untuk diganti ke file external
+      const scripts = bodyClone.querySelectorAll('script');
+      scripts.forEach(s => s.remove());
+      
+      const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silsilah Keluarga Interaktif</title>
   
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></` + `script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-
+  <!-- CSS Terpisah -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="${bodyClone.className}">
+${bodyClone.innerHTML}
   
   <!-- JS Terpisah -->
-  <script src="script.js"></script>
+  <script src="script.js"></` + `script>
+</body>
+</html>`;
+
+      // 2. Generate style.css
+      const cssContent = document.getElementById('app-style').textContent;
+
+      // 3. Generate script.js (Menggabungkan Tree Data saat ini)
+      let jsContent = document.getElementById('app-script').textContent;
+      
+      const newTreeDataStr = JSON.stringify(treeData, null, 2);
+      jsContent = jsContent.replace(
+        /\/\/ --- BEGIN INITIAL DATA ---[\s\S]*?\/\/ --- END INITIAL DATA ---/,
+        `// --- BEGIN INITIAL DATA ---\n    const initialTreeData = ${newTreeDataStr};\n    // --- END INITIAL DATA ---`
+      );
+
+      // Tambahkan file ke dalam ZIP
+      zip.file("index.html", htmlContent);
+      zip.file("style.css", cssContent);
+      zip.file("script.js", jsContent);
+
+      // Mulai proses compress ZIP dan unduh
+      zip.generateAsync({type:"blob"}).then(function(content) {
+        const url = URL.createObjectURL(content);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "Proyek_Silsilah_Keluarga_Web.zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    };
+
+    // --- INITIAL RENDER ---
+    renderTree();
+  </script>
 </body>
 </html>
