@@ -855,33 +855,59 @@
     });
 
     window.addEventListener('mouseup', () => {
-      // --- TAMBAHAN KONTROL SENTUH UNTUK HP (MOBILE TOUCH) ---
+      // --- KONTROL SENTUH & PINCH-TO-ZOOM UNTUK HP (MOBILE TOUCH) ---
+    let initialDistance = 0;
+    let initialScale = 1;
+
     mainArea.addEventListener('touchstart', (e) => {
-      // Abaikan jika yang disentuh adalah tombol atau kartu profil
+      // Jangan cegah sentuhan jika menekan tombol, form, atau kartu profil
       if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a') || e.target.closest('input')) return;
       
       if (e.touches.length === 1) {
+        // Mode Geser (1 Jari)
         isDragging = true;
         dragStart = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
         mainArea.classList.add('cursor-grabbing');
+      } else if (e.touches.length === 2) {
+        // Mode Zoom (2 Jari)
+        isDragging = false; 
+        initialDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialScale = scale;
       }
     }, { passive: false });
 
     mainArea.addEventListener('touchmove', (e) => {
-      if (!isDragging) return;
-      if (e.touches.length === 1) {
-        e.preventDefault(); // Mencegah layar HP ikut ketarik (refresh/scroll)
+      // Wajib: Mencegah layar HP ketarik/refresh bawaan browser
+      if (e.cancelable) e.preventDefault(); 
+      
+      if (isDragging && e.touches.length === 1) {
+        // Eksekusi Geser
         position = { x: e.touches[0].clientX - dragStart.x, y: e.touches[0].clientY - dragStart.y };
+        transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
+      } else if (e.touches.length === 2) {
+        // Eksekusi Zoom
+        const currentDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const distanceRatio = currentDistance / initialDistance;
+        scale = Math.min(Math.max(0.2, initialScale * distanceRatio), 2); // Batas zoom 0.2x sampai 2x
         transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
       }
     }, { passive: false });
 
-    mainArea.addEventListener('touchend', () => {
+    mainArea.addEventListener('touchend', (e) => {
       isDragging = false;
       mainArea.classList.remove('cursor-grabbing');
-    });
-      isDragging = false;
-      mainArea.classList.remove('cursor-grabbing');
+      
+      // Jika tadinya zoom (2 jari) lalu sisa 1 jari, kembalikan ke mode geser agar mulus
+      if (e.touches.length === 1) {
+        isDragging = true;
+        dragStart = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
+      }
     });
 
     // --- FITUR BUKA/TUTUP SEMUA CABANG ---
