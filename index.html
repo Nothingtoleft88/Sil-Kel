@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silsilah Keluarga Interaktif</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- CSS Terpisah -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
+
+
+  <!-- ========================================== -->
+  <!-- BAGIAN HTML (Struktur Antarmuka) -->
+  <!-- ========================================== -->
+
+  <!-- HEADER NAVBAR -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm z-10">
+    <div class="flex items-center space-x-3">
+      <div class="bg-blue-600 p-2 rounded-lg text-white shadow-md">
+        <i class="fa-solid fa-users text-xl"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
+        <p class="text-[11px] text-slate-500 font-medium">Visualisasi &amp; Manajemen Pro</p>
+      </div>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="hidden md:flex flex-1 max-w-sm mx-8 relative">
+      <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <i class="fa-solid fa-search text-slate-400 text-sm"></i>
+      </div>
+      <input type="text" id="search-input" placeholder="Cari nama anggota..." class="block w-full pl-10 pr-8 py-2 border border-slate-300 rounded-full text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-slate-50">
+      <button id="clear-search" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" style="display: none;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="flex items-center space-x-2">
+      <button onclick="openStatsModal()" class="flex items-center px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition text-sm font-medium border border-indigo-200" title="Statistik Keluarga">
+        <i class="fa-solid fa-chart-pie md:mr-2"></i> <span class="hidden md:inline">Statistik</span>
+      </button>
+
+      <div class="w-px h-6 bg-slate-300 mx-1"></div>
+
+      <div class="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
+        <button onclick="adjustZoom(0.1)" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+        <button onclick="resetZoom()" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600 mx-1" title="Reset View"><i class="fa-solid fa-expand"></i></button>
+        <button onclick="adjustZoom(-0.1)" class="p-1.5 hover:bg-white rounded shadow-sm text-slate-600" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+      </div>
+      
+      <div class="w-px h-6 bg-slate-300 mx-1"></div>
+      
+      <button onclick="exportJSON()" class="flex items-center px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition text-sm font-medium" title="Simpan ke JSON">
+        <i class="fa-solid fa-download md:mr-2"></i> <span class="hidden md:inline">Simpan</span>
+      </button>
+      
+      <label class="flex items-center px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition cursor-pointer text-sm font-medium" title="Muat dari JSON">
+        <i class="fa-solid fa-upload md:mr-2"></i> <span class="hidden md:inline">Muat</span>
+        <input type="file" id="import-input" accept=".json" class="hidden">
+      </label>
+
+      <div class="w-px h-6 bg-slate-300 mx-1"></div>
+      
+      <button onclick="exportWebProject()" class="flex items-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium shadow-sm" title="Export Web (HTML, CSS, JS terpisah)">
+        <i class="fa-solid fa-file-zipper md:mr-2"></i> <span class="hidden md:inline">Export Web</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- CANVAS AREA -->
+  <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab select-none">
+    <!-- Grid Background -->
+    <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
+
+    <!-- Container Transform -->
+    <div id="tree-transform" class="absolute transform-gpu transition-transform duration-75 ease-out flex justify-center min-w-full min-h-full items-center" style="">
+      <div class="family-tree pb-32 pt-10">
+        <ul id="tree-container">
+          <!-- Tree Nodes will be injected here via JS -->
+        </ul>
+      </div>
+    </div>
+
+    <!-- Floating Help -->
+    <div class="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-3 rounded-xl border border-slate-200 shadow-lg flex items-start max-w-sm pointer-events-none">
+      <i class="fa-solid fa-circle-info text-blue-500 mr-3 mt-1 text-lg flex-shrink-0"></i>
+      <div class="text-sm text-slate-600">
+        <p class="font-semibold text-slate-800 mb-1">Panduan:</p>
+        <ul class="list-disc pl-4 space-y-1 text-xs">
+          <li>Lencana kuning menandakan <b>Generasi</b>.</li>
+          <li>Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.</li>
+          <li>Tarik (Drag) layar untuk menggeser. Scroll untuk Zoom.</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL EDITOR PROFIL -->
+  <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center">
+          <i class="fa-solid fa-pen-to-square mr-2 text-blue-600"></i> Edit Profil
+        </h2>
+        <button onclick="closeEditorModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body / Form -->
+      <div class="p-6 overflow-y-auto">
+        <form id="family-form" class="space-y-5">
+          <!-- Basic Info -->
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
+              <input type="text" id="input-name" required="" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Jenis Kelamin *</label>
+                <select id="input-gender" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Status / Keterangan</label>
+                <input type="text" id="input-notes" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="Istri ke-2, Cerai 2010, dll">
+              </div>
+            </div>
+          </div>
+
+          <!-- Detailed Info -->
+          <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Detail</h3>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-image mr-1"></i> URL Foto (Opsional)</label>
+              <input type="url" id="input-photo" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://contoh.com/foto.jpg">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tempat Lahir</label>
+                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Nama Kota">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Golongan Darah</label>
+                <select id="input-blood" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+                  <option value="">- Pilih -</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-phone mr-1"></i> No. HP / WA</label>
+                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="0812xxxxxx">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pekerjaan</label>
+                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="PNS, Dokter...">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-house mr-1"></i> Alamat Lengkap</label>
+              <textarea id="input-address" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition resize-none" placeholder="Cth: Jl. Raya Mawar No. 10..." rows="2"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-map-location-dot mr-1"></i> URL Google Maps</label>
+              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="https://maps.google.com/?q=...">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tahun Lahir</label>
+                <input type="number" id="input-birthyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex justify-between">Tahun Wafat <span class="font-normal text-[10px] text-slate-400 normal-case ml-1">(Kosong = Hidup)</span></label>
+                <input type="number" id="input-deathyear" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="YYYY">
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <!-- Action Buttons (Add Child/Spouse) -->
+        <div id="modal-actions" class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 gap-3 hidden">
+          <button type="button" onclick="openAddModal('child')" class="bg-green-50 text-green-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-green-100 border border-green-200 transition shadow-sm flex justify-center items-center">
+            <i class="fa-solid fa-plus mr-1.5"></i> Tambah Anak
+          </button>
+          <button type="button" onclick="openAddModal('spouse')" class="bg-purple-50 text-purple-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-purple-100 border border-purple-200 transition shadow-sm flex justify-center items-center">
+            <i class="fa-solid fa-plus mr-1.5"></i> Tambah Pasangan
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+        <button id="btn-delete" type="button" onclick="handleDelete()" class="text-red-600 hover:text-white bg-white hover:bg-red-600 border border-red-200 hover:border-red-600 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center shadow-sm">
+          <i class="fa-solid fa-trash mr-2"></i> Hapus
+        </button>
+        <div class="flex gap-3 ml-auto">
+          <button type="button" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
+          <button type="button" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-500/30 transition">Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL STATISTIK -->
+  <div id="stats-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600"></i> Statistik Keluarga</h2>
+        <button onclick="closeStatsModal()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-6 bg-slate-50 space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+          <span class="text-slate-600 font-medium">Total Anggota</span>
+          <span id="stat-total" class="text-2xl font-bold text-blue-600">0</span>
+        </div>
+        <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
+          <div class="flex items-center text-amber-800 font-medium">
+            <i class="fa-solid fa-layer-group mr-2"></i> Kedalaman
+          </div>
+          <span id="stat-depth" class="text-lg font-bold text-amber-700">0 Generasi</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-sm text-center">
+            <span class="block text-slate-500 text-xs font-semibold mb-1 uppercase tracking-wider">Laki-Laki</span>
+            <span id="stat-male" class="text-xl font-bold text-slate-800">0</span>
+          </div>
+          <div class="bg-white p-4 rounded-xl border border-pink-100 shadow-sm text-center">
+            <span class="block text-slate-500 text-xs font-semibold mb-1 uppercase tracking-wider">Perempuan</span>
+            <span id="stat-female" class="text-xl font-bold text-slate-800">0</span>
+          </div>
+        </div>
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center text-sm">
+          <span class="text-slate-600">Telah Wafat</span>
+          <span id="stat-deceased" class="font-bold text-slate-800">0 orang</span>
+        </div>
+      </div>
+      <div class="px-5 py-3 bg-white border-t border-slate-100 text-right">
+        <button onclick="closeStatsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- BAGIAN JAVASCRIPT (Bisa dipindah ke script.js) -->
+  <!-- ========================================== -->
+  
+
+
+  
+  <!-- JS Terpisah -->
+  <script src="script.js"></script>
+</body>
+</html>
