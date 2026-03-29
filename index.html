@@ -634,9 +634,6 @@
       document.getElementById('set-login-title').value = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('set-login-desc').value = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
       
-      // Sembunyikan set auto-save lokal karena kita pakai firebase sekarang
-      document.getElementById('set-autosave').parentElement.parentElement.style.display = 'none';
-
       document.getElementById('settings-modal').classList.remove('hidden');
     };
 
