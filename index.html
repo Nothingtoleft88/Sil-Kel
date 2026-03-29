@@ -855,7 +855,11 @@
     });
 
     window.addEventListener('mouseup', () => {
-      // --- TAMBAHAN KONTROL SENTUH UNTUK HP (MOBILE TOUCH) ---
+      isDragging = false;
+      mainArea.classList.remove('cursor-grabbing');
+    });
+
+    // --- TAMBAHAN KONTROL SENTUH UNTUK HP (MOBILE TOUCH) ---
     mainArea.addEventListener('touchstart', (e) => {
       // Abaikan jika yang disentuh adalah tombol atau kartu profil
       if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a') || e.target.closest('input')) return;
