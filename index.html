@@ -166,6 +166,26 @@
 
     .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; }
 
+    /* ========================================== */
+    /* CSS KHUSUS PENGAMAN UNTUK EXPORT GAMBAR PNG */
+    /* ========================================== */
+    body.export-active #tree-transform {
+      will-change: auto !important;
+      transform-style: flat !important;
+      transform: translate(0,0) scale(1) !important;
+    }
+    body.export-active .family-tree * {
+      transition: none !important;
+      animation: none !important;
+    }
+    body.export-active .cursor-pointer {
+      transform: none !important; 
+    }
+    body.export-active .bg-white\/60 {
+      backdrop-filter: none !important; 
+      background-color: rgba(255, 255, 255, 0.95) !important;
+    }
+
     @media print {
       header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, #custom-confirm-modal, #export-modal, .zoom-controls, .action-buttons { 
         display: none !important; 
@@ -240,7 +260,7 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 id="app-main-title" class="text-lg md:text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
-            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-indigo-200 shadow-sm">v2.9</span>
+            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-indigo-200 shadow-sm">v3.2</span>
           </div>
           <div class="flex items-center text-[10px] md:text-[11px] text-slate-500 font-medium mt-0.5 whitespace-nowrap">
             <span id="app-sub-title">Visualisasi & Manajemen Pro</span>
@@ -454,6 +474,7 @@
     </div>
   </div>
 
+  <!-- MODAL EDITOR PROFIL -->
   <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
       
@@ -467,6 +488,7 @@
       </div>
 
       <div class="p-6 overflow-y-auto">
+        <!-- TOMBOL AKSI CEPAT -->
         <div id="quick-actions-panel" class="mb-6 pb-6 border-b border-slate-200 hidden">
            <h3 class="text-xs font-bold text-slate-400 mb-3 text-center uppercase tracking-widest">Aksi Cepat Relasi</h3>
            <div class="flex flex-col gap-2">
@@ -667,7 +689,6 @@
   </div>
 
   <script id="app-script">
-    // Daftar warna untuk masing-masing cabang pasangan (Visualisasi Keluarga Campuran)
     const branchColors = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#0ea5e9', '#f43f5e', '#06b6d4'];
 
     const firebaseConfig = {
@@ -964,6 +985,37 @@
        return today.getDate() === parseInt(d) && today.getMonth() === (parseInt(m) - 1);
     }
 
+    function getZodiac(birthDate) {
+        if (!birthDate) return '';
+        const [y, mStr, dStr] = birthDate.split('-');
+        if (!mStr || !dStr) return '';
+        const m = parseInt(mStr);
+        const d = parseInt(dStr);
+        if ((m == 3 && d >= 21) || (m == 4 && d <= 19)) return 'Aries';
+        if ((m == 4 && d >= 20) || (m == 5 && d <= 20)) return 'Taurus';
+        if ((m == 5 && d >= 21) || (m == 6 && d <= 20)) return 'Gemini';
+        if ((m == 6 && d >= 21) || (m == 7 && d <= 22)) return 'Cancer';
+        if ((m == 7 && d >= 23) || (m == 8 && d <= 22)) return 'Leo';
+        if ((m == 8 && d >= 23) || (m == 9 && d <= 22)) return 'Virgo';
+        if ((m == 9 && d >= 23) || (m == 10 && d <= 22)) return 'Libra';
+        if ((m == 10 && d >= 23) || (m == 11 && d <= 21)) return 'Scorpio';
+        if ((m == 11 && d >= 22) || (m == 12 && d <= 21)) return 'Sagitarius';
+        if ((m == 12 && d >= 22) || (m == 1 && d <= 19)) return 'Capricorn';
+        if ((m == 1 && d >= 20) || (m == 2 && d <= 18)) return 'Aquarius';
+        if ((m == 2 && d >= 19) || (m == 3 && d <= 20)) return 'Pisces';
+        return '';
+    }
+
+    function getShio(birthDate, birthYear) {
+        let y = 0;
+        if (birthDate) y = parseInt(birthDate.split('-')[0]);
+        else if (birthYear) y = parseInt(birthYear);
+        
+        if (!y) return '';
+        const shioArr = ['Monyet', 'Ayam', 'Anjing', 'Babi', 'Tikus', 'Kerbau', 'Macan', 'Kelinci', 'Naga', 'Ular', 'Kuda', 'Kambing'];
+        return shioArr[((y % 12) + 12) % 12];
+    }
+
     // --- RENDER LOGIC ---
     function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId, parentSpouses = null, spouseColorMap = {}) {
       const isMale = person.gender === 'L';
@@ -1008,7 +1060,7 @@
       if (person.biography && person.biography.trim() !== '') extraIcons += `<i class="fa-solid fa-book-open text-amber-600" title="Ada catatan Biografi"></i>`;
 
       const avatar = person.photoUrl 
-        ? `<img src="${escapeHTML(person.photoUrl)}" class="w-full h-full object-cover">`
+        ? `<img src="${escapeHTML(person.photoUrl)}" class="w-full h-full object-cover" crossorigin="anonymous">`
         : `<i class="fa-solid fa-user text-2xl ${theme === 'minimalist' ? 'text-slate-400' : ''}"></i>`;
 
       const expandBtn = (!isSpouse && hasChildren) ? `
@@ -1026,6 +1078,17 @@
       if (person.birthDate) {
          const calculatedAge = getAge(person.birthDate, person.deathDate);
          if (calculatedAge !== '') ageText = ` (${calculatedAge} thn)`;
+      }
+
+      let zodiac = getZodiac(person.birthDate);
+      let shio = getShio(person.birthDate, person.birthYear);
+      
+      let astrologiHtml = '';
+      if (zodiac || shio) {
+         astrologiHtml += `<div class="flex flex-wrap justify-center gap-1 mt-1 w-full max-w-full">`;
+         if (zodiac) astrologiHtml += `<span class="bg-indigo-100/70 border border-indigo-200 text-indigo-800 text-[8px] px-1.5 py-0.5 rounded shadow-sm" title="Zodiak"><i class="fa-solid fa-star mr-0.5"></i>${zodiac}</span>`;
+         if (shio) astrologiHtml += `<span class="bg-rose-100/70 border border-rose-200 text-rose-800 text-[8px] px-1.5 py-0.5 rounded shadow-sm" title="Shio Tiongkok"><i class="fa-solid fa-dragon mr-0.5"></i>${shio}</span>`;
+         astrologiHtml += `</div>`;
       }
 
       let spouseBadge = '';
@@ -1066,6 +1129,7 @@
               <p class="text-[11px] text-gray-600 font-medium ${theme==='classic' ? 'bg-transparent' : 'bg-white/60 px-2 rounded-full border border-black/5'} py-0.5 mb-1 whitespace-nowrap">
                 ${escapeHTML(birthText)} - ${escapeHTML(deathText)} <span class="${theme==='classic' ? 'text-amber-700' : 'text-blue-600'} font-bold">${ageText}</span>
               </p>
+              ${astrologiHtml}
               ${spouseBadge}
               ${statusBadge}
               ${otherPartnerBadge}
@@ -1816,8 +1880,6 @@
       
       const treeElement = document.querySelector('.family-tree');
       
-      // MENGGUNAKAN TEKNIK CLONE TERPISAH: Agar DOM 3D aslinya tidak difoto
-      // Ini menjamin gambar tidak akan punya efek bayangan ganda atau teks bergeser
       const printContainer = document.createElement('div');
       printContainer.style.position = 'absolute';
       printContainer.style.top = '0';
@@ -1830,10 +1892,8 @@
       
       const clonedTree = treeElement.cloneNode(true);
       
-      // Bersihkan tombol yang tidak perlu ada di foto
       clonedTree.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.remove());
       
-      // Matikan seluruh efek transisi dan hover yang membuat gambar HTML2Canvas blur
       clonedTree.querySelectorAll('*').forEach(el => {
           el.style.transition = 'none';
           el.style.animation = 'none';
@@ -1842,7 +1902,6 @@
       printContainer.appendChild(clonedTree);
       document.body.appendChild(printContainer);
       
-      // Beri sedikit jeda agar DOM browser sempat menyusun pohon clone
       setTimeout(() => {
         html2canvas(printContainer, {
           backgroundColor: '#f8fafc',
@@ -1851,7 +1910,6 @@
           allowTaint: true,
           logging: false
         }).then(canvas => {
-          // Bersihkan file clone dari document
           document.body.removeChild(printContainer);
           
           if (format === 'png') {
@@ -1867,7 +1925,6 @@
               }
               const { jsPDF } = window.jspdf;
               
-              // Buat PDF dengan rasio kertas custom mengikuti ukuran gambar silsilah
               const pdfOrientation = canvas.width > canvas.height ? 'l' : 'p';
               let pdf = new jsPDF({
                   orientation: pdfOrientation,
