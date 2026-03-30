@@ -5,13 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Silsilah Keluarga Interaktif</title>
   
+  <!-- CSS Framework & Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
+  <!-- Export Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -164,7 +167,7 @@
     .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; }
 
     @media print {
-      header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, #custom-confirm-modal, .zoom-controls, .action-buttons { 
+      header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, #custom-confirm-modal, #export-modal, .zoom-controls, .action-buttons { 
         display: none !important; 
       }
       body, main, html { 
@@ -235,10 +238,9 @@
           <i class="fa-solid fa-users text-xl"></i>
         </div>
         <div>
-          <!-- PERBAIKAN: Judul, Versi dan by charisna dipisah -->
           <div class="flex items-center gap-2">
             <h1 id="app-main-title" class="text-lg md:text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
-            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-indigo-200 shadow-sm">v2.8</span>
+            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-indigo-200 shadow-sm">v2.9</span>
           </div>
           <div class="flex items-center text-[10px] md:text-[11px] text-slate-500 font-medium mt-0.5 whitespace-nowrap">
             <span id="app-sub-title">Visualisasi & Manajemen Pro</span>
@@ -293,8 +295,8 @@
           <i class="fa-solid fa-file-code"></i>
         </button>
 
-        <button onclick="exportPNG()" class="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium" title="Unduh Gambar PNG">
-          <i class="fa-solid fa-camera"></i>
+        <button onclick="openExportModal()" class="flex items-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium shadow-sm" title="Unduh Bagan Silsilah (PNG / PDF)">
+          <i class="fa-solid fa-camera"></i> <span class="hidden xl:inline ml-2">Unduh</span>
         </button>
 
         <button onclick="exportJSON()" class="flex items-center px-3 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition text-sm font-medium" title="Simpan JSON">
@@ -331,6 +333,49 @@
       </div>
     </div>
   </main>
+
+  <!-- MODAL EXPORT (Pilihan Format Unduh) -->
+  <div id="export-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col transform scale-100 transition-transform">
+      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center">
+          <i class="fa-solid fa-download mr-2 text-blue-600"></i> Unduh Bagan
+        </h2>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <p class="text-sm text-slate-600 mb-4 text-center">Pilih format unduhan untuk menyimpan silsilah keluarga Anda:</p>
+        
+        <button onclick="executeExport('png')" class="w-full flex items-center justify-between px-4 py-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition group">
+          <div class="flex items-center">
+            <div class="w-12 h-12 bg-blue-600 text-white rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-image text-xl"></i>
+            </div>
+            <div class="text-left">
+              <div class="font-bold text-blue-900">Gambar (PNG)</div>
+              <div class="text-[11px] text-blue-600 mt-0.5">Resolusi Tinggi (Solid)</div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-blue-400"></i>
+        </button>
+        
+        <button onclick="executeExport('pdf')" class="w-full flex items-center justify-between px-4 py-4 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition group">
+          <div class="flex items-center">
+            <div class="w-12 h-12 bg-red-600 text-white rounded-lg flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+              <i class="fa-solid fa-file-pdf text-xl"></i>
+            </div>
+            <div class="text-left">
+              <div class="font-bold text-red-900">Dokumen (PDF)</div>
+              <div class="text-[11px] text-red-600 mt-0.5">Satu Halaman Skala Besar</div>
+            </div>
+          </div>
+          <i class="fa-solid fa-chevron-right text-red-400"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL PENGATURAN -->
   <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -422,7 +467,6 @@
       </div>
 
       <div class="p-6 overflow-y-auto">
-        <!-- TOMBOL AKSI CEPAT (Teal Menu Style) -->
         <div id="quick-actions-panel" class="mb-6 pb-6 border-b border-slate-200 hidden">
            <h3 class="text-xs font-bold text-slate-400 mb-3 text-center uppercase tracking-widest">Aksi Cepat Relasi</h3>
            <div class="flex flex-col gap-2">
@@ -1752,33 +1796,95 @@
     };
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
 
-    window.exportPNG = function() {
+    // --- FITUR EXPORT PNG & PDF TINGKAT LANJUT (ANTI BERANTAKAN) ---
+    window.openExportModal = function() {
+       document.getElementById('export-modal').classList.remove('hidden');
+    };
+    window.closeExportModal = function() {
+       document.getElementById('export-modal').classList.add('hidden');
+    };
+
+    window.executeExport = function(format) {
+      closeExportModal();
+      
       if (typeof html2canvas === 'undefined') {
         showToast("Sistem render gagal dimuat.", true);
         return;
       }
       
-      showToast('Menyiapkan gambar resolusi tinggi...');
-      const container = document.getElementById('tree-transform');
-      const originalTransform = container.style.transform;
+      showToast('Menyiapkan dokumen ' + format.toUpperCase() + ' (Harap tunggu)...', false);
       
-      container.classList.remove('smooth-transform');
-      container.style.transform = 'translate(0, 0) scale(1)';
+      const treeElement = document.querySelector('.family-tree');
       
+      // MENGGUNAKAN TEKNIK CLONE TERPISAH: Agar DOM 3D aslinya tidak difoto
+      // Ini menjamin gambar tidak akan punya efek bayangan ganda atau teks bergeser
+      const printContainer = document.createElement('div');
+      printContainer.style.position = 'absolute';
+      printContainer.style.top = '0';
+      printContainer.style.left = '0';
+      printContainer.style.width = 'max-content';
+      printContainer.style.height = 'max-content';
+      printContainer.style.backgroundColor = '#f8fafc';
+      printContainer.style.padding = '80px';
+      printContainer.style.zIndex = '-9999';
+      
+      const clonedTree = treeElement.cloneNode(true);
+      
+      // Bersihkan tombol yang tidak perlu ada di foto
+      clonedTree.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.remove());
+      
+      // Matikan seluruh efek transisi dan hover yang membuat gambar HTML2Canvas blur
+      clonedTree.querySelectorAll('*').forEach(el => {
+          el.style.transition = 'none';
+          el.style.animation = 'none';
+      });
+
+      printContainer.appendChild(clonedTree);
+      document.body.appendChild(printContainer);
+      
+      // Beri sedikit jeda agar DOM browser sempat menyusun pohon clone
       setTimeout(() => {
-        html2canvas(document.querySelector('.family-tree'), {
+        html2canvas(printContainer, {
           backgroundColor: '#f8fafc',
-          scale: 2 
+          scale: 2, 
+          useCORS: true, 
+          allowTaint: true,
+          logging: false
         }).then(canvas => {
-          const link = document.createElement('a');
-          link.download = `Silsilah_Keluarga_${new Date().getTime()}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
+          // Bersihkan file clone dari document
+          document.body.removeChild(printContainer);
           
-          container.style.transform = originalTransform;
-          showToast('Gambar berhasil diunduh!');
+          if (format === 'png') {
+              const link = document.createElement('a');
+              link.download = `Silsilah_Keluarga_${new Date().getTime()}.png`;
+              link.href = canvas.toDataURL('image/png');
+              link.click();
+              showToast('Gambar PNG berhasil diunduh!');
+          } else if (format === 'pdf') {
+              if (typeof window.jspdf === 'undefined') {
+                  showToast('Library PDF gagal dimuat', true);
+                  return;
+              }
+              const { jsPDF } = window.jspdf;
+              
+              // Buat PDF dengan rasio kertas custom mengikuti ukuran gambar silsilah
+              const pdfOrientation = canvas.width > canvas.height ? 'l' : 'p';
+              let pdf = new jsPDF({
+                  orientation: pdfOrientation,
+                  unit: 'px',
+                  format: [canvas.width, canvas.height]
+              });
+              
+              pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, canvas.width, canvas.height);
+              pdf.save(`Silsilah_Keluarga_${new Date().getTime()}.pdf`);
+              showToast('Dokumen PDF berhasil diunduh!');
+          }
+        }).catch(err => {
+          console.error("html2canvas error:", err);
+          document.body.removeChild(printContainer);
+          showToast('Gagal merender gambar.', true);
         });
-      }, 500); 
+      }, 800); 
     };
 
     window.exportJSON = function() {
@@ -1833,12 +1939,13 @@
 
       const bodyClone = document.body.cloneNode(true);
       
-      bodyClone.querySelector('#tree-container').innerHTML = '\n          \n        ';
+      bodyClone.querySelector('#tree-container').innerHTML = '\n          <!-- Tree Nodes will be injected here via JS -->\n        ';
       bodyClone.querySelector('#tree-transform').style.transform = '';
       bodyClone.querySelector('#editor-modal').classList.add('hidden');
       bodyClone.querySelector('#stats-modal').classList.add('hidden');
       bodyClone.querySelector('#settings-modal').classList.add('hidden');
       bodyClone.querySelector('#custom-confirm-modal').classList.add('hidden');
+      bodyClone.querySelector('#export-modal').classList.add('hidden');
       bodyClone.querySelector('#map-wrapper').classList.add('hidden');
       bodyClone.querySelector('#clear-search').style.display = 'none';
       bodyClone.querySelector('#search-input').value = '';
@@ -1863,6 +1970,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></` + `script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></` + `script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></` + `script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></` + `script>
 
