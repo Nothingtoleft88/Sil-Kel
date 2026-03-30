@@ -39,8 +39,9 @@
       left: 50%;
       transform: translateX(-50%);
       color: #94a3b8;
-      font-size: 10px;
+      font-size: 12px;
       z-index: 0;
+      pointer-events: none; 
     }
 
     .family-tree li {
@@ -53,13 +54,16 @@
       padding: 40px 15px 0 15px;
       transition: all 0.3s ease;
     }
+    
+    /* Penebalan Garis menjadi 4px dan Radius 16px */
     .family-tree li::before, .family-tree li::after {
       content: ''; position: absolute; top: 0; right: 50%;
-      border-top: 2px solid #94a3b8; width: 50%; height: 40px;
+      border-top: 4px solid #94a3b8; width: 50%; height: 40px;
       z-index: 0;
+      pointer-events: none;
     }
     .family-tree li::after {
-      right: auto; left: 50%; border-left: 2px solid #94a3b8;
+      right: auto; left: 50%; border-left: 4px solid #94a3b8;
     }
     .family-tree li:only-child::after, .family-tree li:only-child::before {
       display: none;
@@ -69,16 +73,17 @@
       border: 0 none;
     }
     .family-tree li:last-child::before {
-      border-right: 2px solid #94a3b8; border-radius: 0 8px 0 0;
+      border-right: 4px solid #94a3b8; border-radius: 0 16px 0 0;
     }
     .family-tree li:first-child::after {
-      border-radius: 8px 0 0 0;
+      border-radius: 16px 0 0 0;
     }
     .family-tree ul::before {
       content: ''; position: absolute; top: 0; left: 50%;
-      border-left: 2px solid #94a3b8; width: 0; height: 40px;
-      transform: translateX(-1px);
+      border-left: 4px solid #94a3b8; width: 0; height: 40px;
+      transform: translateX(-2px); /* Penyesuaian center untuk garis tebal 4px */
       z-index: 0;
+      pointer-events: none;
     }
 
     /* -- SMART BRANCH COLORING (WARNA CABANG DINAMIS UNTUK PASANGAN BERBEDA) -- */
@@ -99,10 +104,11 @@
       top: 50%;
       right: 100%;
       width: 1.5rem;
-      height: 3px;
+      height: 4px;
       background-color: #94a3b8;
       z-index: 0;
       border-radius: 2px;
+      pointer-events: none;
     }
     .spouse-connector.colored {
       background-color: var(--branch-color) !important;
@@ -110,7 +116,7 @@
     .spouse-connector::after {
       content: '❤️';
       position: absolute;
-      font-size: 9px;
+      font-size: 10px;
       color: #e11d48;
       top: 50%;
       left: 50%;
@@ -120,6 +126,7 @@
       padding: 1px;
       line-height: 1;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      pointer-events: none;
     }
     
     /* Ruang Ekstra untuk Besan (Anti-Tumpang Tindih) */
@@ -144,7 +151,6 @@
       user-select: none;
     }
 
-    /* Optimalisasi Transformasi GPU tingkat lanjut untuk pergerakan mulus tanpa lag 60FPS */
     #tree-transform {
       will-change: transform;
       transform-style: preserve-3d;
@@ -158,7 +164,7 @@
     .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; }
 
     @media print {
-      header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, .zoom-controls, .action-buttons { 
+      header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, #custom-confirm-modal, .zoom-controls, .action-buttons { 
         display: none !important; 
       }
       body, main, html { 
@@ -186,11 +192,28 @@
 </head>
 <body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
 
+  <!-- Notifikasi Toast -->
   <div id="toast-notification" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-[200] flex items-center">
     <i class="fa-solid fa-circle-check mr-2"></i>
     <span id="toast-message">Tersimpan!</span>
   </div>
 
+  <!-- Custom Confirm Modal (Pengganti Confirm Alert Bawaan) -->
+  <div id="custom-confirm-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[400] p-4 opacity-0 transition-opacity duration-300">
+    <div id="custom-confirm-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center transform scale-95 transition-transform duration-300">
+      <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 id="custom-confirm-title" class="text-xl font-bold text-slate-800 mb-2">Konfirmasi</h3>
+      <p id="custom-confirm-message" class="text-sm text-slate-500 mb-6">Apakah Anda yakin?</p>
+      <div class="flex gap-3 justify-center">
+        <button id="custom-confirm-cancel" class="px-5 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-bold transition">Batal</button>
+        <button id="custom-confirm-ok" class="px-5 py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-xl text-sm font-bold shadow-md transition">Ya, Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HALAMAN LOGIN -->
   <div id="login-screen" class="fixed inset-0 bg-slate-800 z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
     <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform">
       <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -204,6 +227,7 @@
     </div>
   </div>
 
+  <!-- HEADER NAVBAR -->
   <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-col md:flex-row justify-between items-center shadow-sm z-10 gap-3">
     <div class="flex items-center justify-between w-full md:w-auto">
       <div class="flex items-center space-x-3">
@@ -217,6 +241,7 @@
       </div>
     </div>
     
+    <!-- Search Bar -->
     <div class="flex w-full md:flex-1 max-w-sm relative">
       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <i class="fa-solid fa-search text-slate-400 text-sm"></i>
@@ -655,7 +680,6 @@
     let dragStart = { x: 0, y: 0 };
     let searchQuery = '';
     
-    // Variabel RAF untuk performa 60FPS
     let isRenderPending = false;
     
     let modalMode = 'edit'; 
@@ -670,14 +694,55 @@
     const loginScreen = document.getElementById('login-screen');
 
     let toastTimeout;
-    window.showToast = function(message) {
+    window.showToast = function(message, isError = false) {
       const toast = document.getElementById('toast-notification');
+      const icon = toast.querySelector('i');
+      
       document.getElementById('toast-message').innerText = message;
+      
+      if (isError) {
+        toast.classList.remove('bg-green-600');
+        toast.classList.add('bg-red-600');
+        icon.className = 'fa-solid fa-circle-exclamation mr-2';
+      } else {
+        toast.classList.remove('bg-red-600');
+        toast.classList.add('bg-green-600');
+        icon.className = 'fa-solid fa-circle-check mr-2';
+      }
+
       toast.classList.remove('translate-y-20', 'opacity-0');
       clearTimeout(toastTimeout);
       toastTimeout = setTimeout(() => {
         toast.classList.add('translate-y-20', 'opacity-0');
-      }, 3000);
+      }, isError ? 4000 : 3000);
+    };
+
+    window.customConfirm = function(title, message, onConfirm) {
+      const modal = document.getElementById('custom-confirm-modal');
+      const box = document.getElementById('custom-confirm-box');
+      
+      document.getElementById('custom-confirm-title').innerText = title;
+      document.getElementById('custom-confirm-message').innerText = message;
+      
+      modal.classList.remove('hidden');
+      void modal.offsetWidth; 
+      modal.classList.remove('opacity-0');
+      box.classList.remove('scale-95');
+
+      const btnOk = document.getElementById('custom-confirm-ok');
+      const btnCancel = document.getElementById('custom-confirm-cancel');
+
+      const closeAndClean = () => {
+        modal.classList.add('opacity-0');
+        box.classList.add('scale-95');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+      };
+
+      btnCancel.onclick = closeAndClean;
+      btnOk.onclick = () => {
+        closeAndClean();
+        onConfirm();
+      };
     };
 
     function initApp() {
@@ -895,7 +960,7 @@
         : `<i class="fa-solid fa-user text-2xl ${theme === 'minimalist' ? 'text-slate-400' : ''}"></i>`;
 
       const expandBtn = (!isSpouse && hasChildren) ? `
-        <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20" data-html2canvas-ignore>
+        <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20 pointer-events-auto" data-html2canvas-ignore>
           <i class="fa-solid fa-chevron-${isCollapsed ? 'down' : 'up'} text-xs"></i>
         </button>
       ` : '';
@@ -936,7 +1001,7 @@
       const bdayIcon = isBday ? `<div class="absolute -top-4 -left-4 text-3xl z-20 animate-bounce filter drop-shadow-md" title="Selamat Ulang Tahun!">🎂</div>` : '';
 
       return `
-        <div class="relative flex flex-col items-center ${fontClass}">
+        <div class="relative flex flex-col items-center ${fontClass} pointer-events-auto">
           <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] shadow-sm cursor-pointer transition-transform duration-200 hover:shadow-md hover:-translate-y-1 hover:z-30 ${borderClass} ${roundedClass} ${bgColor} ${deadStyle} ${highlightStyle}">
             ${badge}
             ${bdayIcon}
@@ -967,7 +1032,6 @@
       if (!node) return '';
       let hasChildren = node.children && node.children.length > 0;
       
-      // Peta Warna untuk pasangan node ini (Berguna untuk mewarnai garis anak-anak di bawahnya)
       let currentSpouseColorMap = {};
       if (node.spouses && node.spouses.length > 0) {
          node.spouses.forEach((s, idx) => {
@@ -978,7 +1042,6 @@
       let liClass = '';
       let liStyle = '';
       
-      // Jika Node ini adalah ANAK dari pasangan tertentu (linkedSpouseId), warnai seluruh garis atas & sampingnya
       if (node.linkedSpouseId && spouseColorMapContext[node.linkedSpouseId]) {
          liClass = 'has-branch-color';
          liStyle = `style="--branch-color: ${spouseColorMapContext[node.linkedSpouseId]};"`;
@@ -997,24 +1060,23 @@
           
           if (spouse.parents && spouse.parents.length > 0) {
               html += `
-              <div class="absolute bottom-full left-1/2 -translate-x-1/2 flex flex-col items-center pb-2 z-0">
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 flex flex-col items-center pb-2 z-20 pointer-events-none">
                  <div class="flex justify-center items-end w-max">
                      ${spouse.parents.map((p, i) => `
                        <div class="relative flex flex-col items-center px-4">
                          ${buildPersonCard(p, false, false, false, level-1, spouse.id)}
-                         <div class="w-[2px] h-6 bg-slate-400 relative z-10"></div>
+                         <div class="w-[4px] h-6 bg-slate-400 relative z-10 pointer-events-none"></div>
                          ${spouse.parents.length > 1 ? `
-                            <div class="absolute bottom-0 ${i === 0 ? 'right-0 w-[50%]' : 'left-0 w-[50%]'} h-[2px] bg-slate-400"></div>
+                            <div class="absolute bottom-0 ${i === 0 ? 'right-0 w-[50%]' : 'left-0 w-[50%]'} h-[4px] bg-slate-400 pointer-events-none"></div>
                          ` : ''}
                        </div>
                      `).join('')}
                  </div>
-                 <div class="w-[2px] h-6 bg-slate-400"></div>
+                 <div class="w-[4px] h-6 bg-slate-400 pointer-events-none"></div>
               </div>`;
           }
 
           html += `<div class="relative z-10">`;
-          // Warnai garis hati yang menyambungkan ke pasangan
           html += `<div class="spouse-connector colored w-6 right-full" style="--branch-color: ${spouseColor};"></div>`;
           html += buildPersonCard(spouse, true, false, false, level, node.id, null, {});
           html += `</div>`;
@@ -1028,7 +1090,6 @@
         let childHasSpouseParents = node.children.some(c => c.spouses && c.spouses.some(s => s.parents && s.parents.length > 0));
         let ulClass = childHasSpouseParents ? (node.children.length === 1 ? 'extend-ul' : 'extend-li') : '';
 
-        // Mengurutkan Anak Berdasarkan Pasangan (Agar anak dari istri 1 kumpul di kiri, istri 2 di kanan)
         let sortedChildren = [...node.children].sort((a, b) => {
             let spA = a.linkedSpouseId || '';
             let spB = b.linkedSpouseId || '';
@@ -1037,7 +1098,6 @@
 
         html += `<ul class="${ulClass}">`;
         sortedChildren.forEach(child => {
-          // Bawa peta warna pasangan Node ini turun ke anak-anaknya
           html += buildNodeHTML(child, level + 1, node.spouses, currentSpouseColorMap);
         });
         html += `</ul>`;
@@ -1046,7 +1106,6 @@
       return html;
     }
 
-    // --- PEMBARUAN TRANSFORM ENGINE (ANTI-LAG 60FPS RAF) ---
     function executeTransformRAF() {
        transformDiv.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`;
        isRenderPending = false;
@@ -1077,10 +1136,9 @@
       requestTransformUpdate(false);
     }
 
-    // --- EVENT LISTENERS (PAN, ZOOM) ---
     function adjustZoom(delta) {
       scale = Math.min(Math.max(0.15, scale + delta), 3);
-      requestTransformUpdate(true); // Gunakan animasi mulus saat klik tombol +/-
+      requestTransformUpdate(true); 
     }
     
     function resetZoom() {
@@ -1096,7 +1154,6 @@
       requestTransformUpdate(false);
     }, { passive: false });
 
-    // --- KONTROL SENTUH & PINCH-TO-ZOOM UNTUK HP TERBARU (SMOOTH 60FPS) ---
     let initialDistance = 0;
     let initialScale = 1;
     let pinchCenter = { x: 0, y: 0 };
@@ -1121,7 +1178,6 @@
       mainArea.classList.remove('cursor-grabbing');
     });
 
-    // Touch Event (Mobile)
     mainArea.addEventListener('touchstart', (e) => {
       if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a') || e.target.closest('input')) return;
       
@@ -1260,6 +1316,21 @@
         }
       }
       return null;
+    }
+    
+    function isSpouseParent(node, id) {
+      if (!node) return false;
+      if (node.spouses) {
+        for (let s of node.spouses) {
+          if (s.parents && s.parents.some(p => p.id === id)) return true;
+        }
+      }
+      if (node.children) {
+        for (let c of node.children) {
+          if (isSpouseParent(c, id)) return true;
+        }
+      }
+      return false;
     }
 
     function updateTreeData(node, id, updatedData) {
@@ -1417,7 +1488,10 @@
       if (spouseId && person && person.spouses) {
         person = person.spouses.find(s => s.id === spouseId);
       }
-      setFormData(person || {});
+      
+      if (!person) person = {};
+      
+      setFormData(person);
 
       if (!spouseId && nodeId !== treeData.id) {
           const parent = findParent(treeData, nodeId);
@@ -1434,7 +1508,6 @@
       document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
       document.getElementById('modal-title-icon').className = isEditAllowed ? 'fa-solid fa-pen-to-square mr-2 text-blue-600' : 'fa-solid fa-address-card mr-2 text-blue-600';
       
-      // Tampilkan Aksi Cepat jika Edit Diizinkan
       document.getElementById('quick-actions-panel').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-save').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-cancel').innerText = isEditAllowed ? 'Batal' : 'Tutup';
@@ -1456,8 +1529,12 @@
       modal.classList.remove('hidden');
     };
 
-    // --- INSTANT ACTION FUNCTIONS (Teal Menu) ---
     window.actionAddChild = function() {
+       if (isSpouseParent(treeData, selectedNodeId)) {
+           showToast("Anak tidak dapat ditambahkan pada profil mertua/besan.", true);
+           return;
+       }
+    
        const newId = generateId();
        const newChild = { id: newId, name: 'Anak Baru', gender: 'L', children: [], spouses: [], isCollapsed: false };
        
@@ -1473,18 +1550,22 @@
        }
        simpanKeFirebase();
        renderTree();
-       handleNodeClick(newId, null); // Langsung edit anak yg baru dibuat
+       handleNodeClick(newId, null); 
        showToast("Anak berhasil ditambahkan.");
     };
 
     window.actionAddPartner = function() {
-       const newId = generateId();
-       const newPartner = { id: newId, name: 'Pasangan Baru', gender: 'P' };
-       
        if (modalMode === 'editSpouse') {
-           alert("Silakan tambahkan pasangan dari Anggota Utama (garis keturunan utama).");
+           showToast("Silakan tambahkan pasangan melalui profil keturunan utama.", true);
            return;
        }
+       if (isSpouseParent(treeData, selectedNodeId)) {
+           showToast("Penambahan pasangan pada profil ini belum didukung.", true);
+           return;
+       }
+       
+       const newId = generateId();
+       const newPartner = { id: newId, name: 'Pasangan Baru', gender: 'P' };
        
        let node = findNodeById(treeData, selectedNodeId);
        if (!node.spouses) node.spouses = [];
@@ -1497,17 +1578,20 @@
     };
 
     window.actionAddSibling = function() {
-       const newId = generateId();
-       const newSibling = { id: newId, name: 'Saudara Baru', gender: 'L', children: [], spouses: [], isCollapsed: false };
-       
        if (modalMode === 'editSpouse') {
-           alert("Penambahan saudara pasangan belum didukung langsung disini. Anda bisa membuatnya sbg Akar Utama terpisah.");
+           showToast("Saudara dari pasangan dapat dibuat di pohon silsilah terpisah.", true);
+           return;
+       }
+       if (isSpouseParent(treeData, selectedNodeId)) {
+           showToast("Penambahan saudara pada profil ini belum didukung.", true);
            return;
        }
        
+       const newId = generateId();
+       const newSibling = { id: newId, name: 'Saudara Baru', gender: 'L', children: [], spouses: [], isCollapsed: false };
+       
        if (selectedNodeId === treeData.id) {
-           // Root Sibling
-           const newRoot = { id: generateId(), name: 'Orang Tua (Tanpa Nama)', gender: 'L', children: [treeData, newSibling], spouses: [], isCollapsed: false };
+           const newRoot = { id: generateId(), name: 'Orang Tua', gender: 'L', children: [treeData, newSibling], spouses: [], isCollapsed: false };
            treeData = newRoot;
        } else {
            let parent = findParent(treeData, selectedNodeId);
@@ -1528,7 +1612,7 @@
            if (!spouse.parents) spouse.parents = [];
            
            if (spouse.parents.length >= 2) {
-               alert("Pasangan ini sudah memiliki orang tua penuh.");
+               showToast("Pasangan ini sudah memiliki orang tua penuh.", true);
                return;
            }
            
@@ -1546,7 +1630,7 @@
            closeEditorModal();
            showToast("Generasi leluhur berhasil ditambahkan.");
        } else {
-           alert("Anggota utama ini sudah memiliki orang tua di silsilah. Klik profil paling atas untuk menambah generasi baru.");
+           showToast("Klik profil paling atas untuk menambah orang tua / generasi baru.", true);
        }
     };
 
@@ -1556,7 +1640,7 @@
 
     window.handleSave = function() {
       if(!appSettings.enableEdit) return;
-      if(!document.getElementById('input-name').value) { alert('Nama tidak boleh kosong!'); return; }
+      if(!document.getElementById('input-name').value) { showToast('Nama tidak boleh kosong!', true); return; }
       
       const newData = getFormData();
       
@@ -1584,12 +1668,23 @@
 
     window.handleDelete = function() {
       if(!appSettings.enableEdit) return;
-      if (treeData.id === selectedNodeId && modalMode === 'edit') {
-        alert("Tidak bisa menghapus akar utama silsilah."); return;
-      }
       
-      if (confirm("Apakah Anda yakin ingin menghapus data ini secara permanen?")) {
-        if (modalMode === 'editSpouse') {
+      customConfirm('Hapus Anggota', 'Apakah Anda yakin ingin menghapus data ini secara permanen?', () => {
+        if (treeData.id === selectedNodeId && modalMode === 'edit') {
+          // Logika pintar untuk menghapus Akar Utama (Root)
+          if (treeData.children && treeData.children.length === 1) {
+            // Jika tidak sengaja klik Tambah Orang tua, kembalikan anaknya menjadi Akar
+            treeData = treeData.children[0];
+          } else if (treeData.children && treeData.children.length > 1) {
+            // Jika punya banyak cabang keturunan, larang hapus agar data anak tidak hilang
+            closeEditorModal();
+            showToast("Tidak bisa menghapus akar utama yang memiliki lebih dari satu cabang. Hapus cabang di bawahnya dulu.", true);
+            return;
+          } else {
+            // Jika ini orang terakhir di silsilah, buatkan profil kosong baru
+            treeData = { id: generateId(), name: 'Anggota Pertama', gender: 'L', isCollapsed: false };
+          }
+        } else if (modalMode === 'editSpouse') {
           treeData = updateTreeData(treeData, selectedNodeId, node => ({
             ...node, spouses: node.spouses.filter(s => s.id !== selectedSpouseId)
           }));
@@ -1600,7 +1695,7 @@
         simpanKeFirebase();
         renderTree();
         showToast('Data berhasil dihapus!');
-      }
+      });
     };
 
     // --- STATS & EXPORT/IMPORT ---
@@ -1655,7 +1750,7 @@
 
     window.exportPNG = function() {
       if (typeof html2canvas === 'undefined') {
-        alert("Library untuk Export belum termuat.");
+        showToast("Sistem render gagal dimuat.", true);
         return;
       }
       
@@ -1663,7 +1758,6 @@
       const container = document.getElementById('tree-transform');
       const originalTransform = container.style.transform;
       
-      // Matikan animasi saat rendering CSS image
       container.classList.remove('smooth-transform');
       container.style.transform = 'translate(0, 0) scale(1)';
       
@@ -1718,7 +1812,7 @@
           applySettingsToUI();
           simpanKeFirebase();
           showToast('Data berhasil dimuat!');
-        } catch (err) { alert("Format file JSON tidak valid"); }
+        } catch (err) { showToast("Format file JSON tidak valid", true); }
       };
       reader.readAsText(file);
       e.target.value = ''; 
@@ -1726,7 +1820,7 @@
 
     window.exportWebProject = function() {
       if (typeof JSZip === 'undefined') {
-        alert("Library JSZip belum dimuat, harap tunggu sebentar atau periksa koneksi internet Anda.");
+        showToast("Sistem kompresor gagal dimuat.", true);
         return;
       }
 
@@ -1740,6 +1834,7 @@
       bodyClone.querySelector('#editor-modal').classList.add('hidden');
       bodyClone.querySelector('#stats-modal').classList.add('hidden');
       bodyClone.querySelector('#settings-modal').classList.add('hidden');
+      bodyClone.querySelector('#custom-confirm-modal').classList.add('hidden');
       bodyClone.querySelector('#map-wrapper').classList.add('hidden');
       bodyClone.querySelector('#clear-search').style.display = 'none';
       bodyClone.querySelector('#search-input').value = '';
@@ -1760,16 +1855,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${escapeHTML(appSettings.appTitle)}</title>
   
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></` + `script>
-  
-  <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- JSZip & HTML2Canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></` + `script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
-
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></` + `script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></` + `script>
 
@@ -1777,7 +1866,6 @@
 </head>
 <body class="${bodyClone.className}">
 ${bodyClone.innerHTML}
-  
   <script src="script.js"></` + `script>
 </body>
 </html>`;
