@@ -155,9 +155,8 @@
     }
 
     #tree-transform {
+      transform-origin: 50% 0%;
       will-change: transform;
-      transform-style: preserve-3d;
-      backface-visibility: hidden;
     }
     
     .smooth-transform {
@@ -203,6 +202,8 @@
         position: relative !important; 
         width: 100% !important; 
         display: block !important;
+        left: 0 !important;
+        top: 0 !important;
       }
       .family-tree { padding: 0 !important; transform: scale(0.8); transform-origin: top center; }
       * { 
@@ -334,8 +335,8 @@
   <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab transition-colors duration-500">
     <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
 
-    <div id="tree-transform" class="absolute transform-gpu flex justify-center min-w-full min-h-full items-center">
-      <div class="family-tree pb-32 pt-10 px-20"> 
+    <div id="tree-transform" class="absolute w-max h-max left-1/2 top-10">
+      <div class="family-tree pb-32 px-10"> 
         <ul id="tree-container" class="transition-all duration-500 ease-in-out">
           </ul>
       </div>
@@ -943,6 +944,15 @@
         }[tag] || tag));
     };
 
+    const sanitizeURL = (url) => {
+      if (!url) return '';
+      const sanitized = escapeHTML(url);
+      if (sanitized.trim().toLowerCase().startsWith('javascript:')) {
+        return '#'; 
+      }
+      return sanitized;
+    };
+
     function calculateStats(node, currentDepth = 1, stats = { total: 0, male: 0, female: 0, deceased: 0, maxDepth: 1 }) {
       if (!node) return stats;
       if (currentDepth > stats.maxDepth) stats.maxDepth = currentDepth;
@@ -1051,16 +1061,16 @@
       const clickAction = isSpouse ? `handleNodeClick('${parentId}', '${person.id}')` : `handleNodeClick('${person.id}', null)`;
 
       let extraIcons = '';
-      if (person.phone) extraIcons += `<a href="tel:${escapeHTML(person.phone)}" onclick="event.stopPropagation()" class="text-emerald-600 hover:text-emerald-800 transition-colors pointer-events-auto" title="Telepon: ${escapeHTML(person.phone)}"><i class="fa-solid fa-phone"></i></a>`;
+      if (person.phone) extraIcons += `<a href="tel:${sanitizeURL(person.phone)}" onclick="event.stopPropagation()" class="text-emerald-600 hover:text-emerald-800 transition-colors pointer-events-auto" title="Telepon: ${escapeHTML(person.phone)}"><i class="fa-solid fa-phone"></i></a>`;
       if (person.occupation) extraIcons += `<i class="fa-solid fa-briefcase" title="Pekerjaan: ${escapeHTML(person.occupation)}"></i>`;
       if (person.address) extraIcons += `<i class="fa-solid fa-house" title="Alamat: ${escapeHTML(person.address)}"></i>`;
       if (person.birthPlace && !person.gmapUrl) extraIcons += `<i class="fa-solid fa-location-dot" title="Tempat: ${escapeHTML(person.birthPlace)}"></i>`;
-      if (person.gmapUrl) extraIcons += `<a href="${escapeHTML(person.gmapUrl)}" target="_blank" onclick="event.stopPropagation()" class="text-blue-600 hover:text-blue-800 transition-colors pointer-events-auto" title="Buka di GMap"><i class="fa-solid fa-map"></i></a>`;
+      if (person.gmapUrl) extraIcons += `<a href="${sanitizeURL(person.gmapUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="text-blue-600 hover:text-blue-800 transition-colors pointer-events-auto" title="Buka di GMap"><i class="fa-solid fa-map"></i></a>`;
       if (person.bloodType) extraIcons += `<i class="fa-solid fa-droplet" title="Gol. Darah: ${escapeHTML(person.bloodType)}"></i>`;
       if (person.biography && person.biography.trim() !== '') extraIcons += `<i class="fa-solid fa-book-open text-amber-600" title="Ada catatan Biografi"></i>`;
 
       const avatar = person.photoUrl 
-        ? `<img src="${escapeHTML(person.photoUrl)}" class="w-full h-full object-cover" crossorigin="anonymous">`
+        ? `<img src="${sanitizeURL(person.photoUrl)}" class="w-full h-full object-cover" crossorigin="anonymous" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMi4xMyAyIDExLjIgMiAxMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6bTAtMTRjLTIuMjEgMC00IDEuNzktNCA0czEuNzkgNCA0IDQgNC0xLjc5IDQtNC0xLjc5LTQtNC00em0wIDZjLTEuMSAwLTItLjktMi0yczktMiAyLTIgMiAuOSAyIDItLjkgMi0yIDJ6bTcgNGMtMS0xLTYuNjMtMy03LTNzLTYgMS43Ny03IDNsMSAxYzEuMjUtMS4yNyAzLjcyLTIgNi0yczQuNzUuNzMgNiAybDEtMXoiLz48L3N2Zz4='">`
         : `<i class="fa-solid fa-user text-2xl ${theme === 'minimalist' ? 'text-slate-400' : ''}"></i>`;
 
       const expandBtn = (!isSpouse && hasChildren) ? `
@@ -1223,7 +1233,7 @@
     }
 
     function executeTransformRAF() {
-       transformDiv.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`;
+       transformDiv.style.transform = `translate(${Math.round(position.x)}px, ${Math.round(position.y)}px) scale(${scale}) translate(-50%, 0)`;
        isRenderPending = false;
     }
 
@@ -1231,7 +1241,7 @@
        if (useSmooth) {
          transformDiv.classList.add('smooth-transform');
          setTimeout(() => transformDiv.classList.remove('smooth-transform'), 310);
-         transformDiv.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`;
+         transformDiv.style.transform = `translate(${Math.round(position.x)}px, ${Math.round(position.y)}px) scale(${scale}) translate(-50%, 0)`;
          return;
        }
        
@@ -1253,7 +1263,19 @@
     }
 
     function adjustZoom(delta) {
+      const oldScale = scale;
       scale = Math.min(Math.max(0.15, scale + delta), 3);
+      const ratio = scale / oldScale;
+
+      const focalX = mainArea.clientWidth / 2;
+      const focalY = mainArea.clientHeight / 2;
+
+      const originX = (mainArea.clientWidth / 2) + position.x;
+      const originY = 40 + position.y;
+
+      position.x -= (focalX - originX) * (ratio - 1);
+      position.y -= (focalY - originY) * (ratio - 1);
+
       requestTransformUpdate(true); 
     }
     
@@ -1266,7 +1288,21 @@
     mainArea.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY * -0.001;
+      
+      const oldScale = scale;
       scale = Math.min(Math.max(0.15, scale + delta), 3);
+      const ratio = scale / oldScale;
+
+      const rect = mainArea.getBoundingClientRect();
+      const focalX = e.clientX - rect.left;
+      const focalY = e.clientY - rect.top;
+
+      const originX = (mainArea.clientWidth / 2) + position.x;
+      const originY = 40 + position.y;
+
+      position.x -= (focalX - originX) * (ratio - 1);
+      position.y -= (focalY - originY) * (ratio - 1);
+
       requestTransformUpdate(false);
     }, { passive: false });
 
@@ -1311,9 +1347,10 @@
         );
         initialScale = scale;
         
+        const rect = mainArea.getBoundingClientRect();
         pinchCenter = {
-          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-          y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+          x: ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left,
+          y: ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top
         };
       }
     }, { passive: false });
@@ -1331,16 +1368,25 @@
           e.touches[0].clientY - e.touches[1].clientY
         );
         
+        const oldScale = scale;
         const distanceRatio = currentDistance / initialDistance;
         scale = Math.min(Math.max(0.15, initialScale * distanceRatio), 3); 
+        const ratio = scale / oldScale;
         
-        const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-        const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const rect = mainArea.getBoundingClientRect();
+        const focalX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+        const focalY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
         
-        position.x += (currentCenterX - pinchCenter.x);
-        position.y += (currentCenterY - pinchCenter.y);
+        const originX = (mainArea.clientWidth / 2) + position.x;
+        const originY = 40 + position.y;
+
+        position.x -= (focalX - originX) * (ratio - 1);
+        position.y -= (focalY - originY) * (ratio - 1);
         
-        pinchCenter = { x: currentCenterX, y: currentCenterY };
+        position.x += (focalX - pinchCenter.x);
+        position.y += (focalY - pinchCenter.y);
+        
+        pinchCenter = { x: focalX, y: focalY };
 
         requestTransformUpdate(false);
       }
