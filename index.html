@@ -81,12 +81,12 @@
     .family-tree ul::before {
       content: ''; position: absolute; top: 0; left: 50%;
       border-left: 4px solid #94a3b8; width: 0; height: 40px;
-      transform: translateX(-2px); /* Penyesuaian center untuk garis tebal 4px */
+      transform: translateX(-2px);
       z-index: 0;
       pointer-events: none;
     }
 
-    /* -- SMART BRANCH COLORING (WARNA CABANG DINAMIS UNTUK PASANGAN BERBEDA) -- */
+    /* -- SMART BRANCH COLORING -- */
     .family-tree li.has-branch-color::before {
       border-top-color: var(--branch-color) !important;
     }
@@ -198,7 +198,7 @@
     <span id="toast-message">Tersimpan!</span>
   </div>
 
-  <!-- Custom Confirm Modal (Pengganti Confirm Alert Bawaan) -->
+  <!-- Custom Confirm Modal -->
   <div id="custom-confirm-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[400] p-4 opacity-0 transition-opacity duration-300">
     <div id="custom-confirm-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center transform scale-95 transition-transform duration-300">
       <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -235,8 +235,16 @@
           <i class="fa-solid fa-users text-xl"></i>
         </div>
         <div>
-          <h1 id="app-main-title" class="text-lg md:text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
-          <p id="app-sub-title" class="text-[10px] md:text-[11px] text-slate-500 font-medium">Visualisasi & Manajemen Pro</p>
+          <!-- PERBAIKAN: Judul, Versi dan by charisna dipisah -->
+          <div class="flex items-center gap-2">
+            <h1 id="app-main-title" class="text-lg md:text-xl font-bold text-slate-800 leading-tight">Silsilah Keluarga</h1>
+            <span class="bg-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2 py-0.5 rounded border border-indigo-200 shadow-sm">v2.8</span>
+          </div>
+          <div class="flex items-center text-[10px] md:text-[11px] text-slate-500 font-medium mt-0.5 whitespace-nowrap">
+            <span id="app-sub-title">Visualisasi & Manajemen Pro</span>
+            <span class="mx-1.5 text-slate-300">|</span>
+            <span>by <strong class="text-slate-700">charisna</strong></span>
+          </div>
         </div>
       </div>
     </div>
@@ -422,7 +430,7 @@
              <button type="button" onclick="actionAddSibling()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD SIBLING</button>
              <button type="button" onclick="actionAddPartner()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD PARTNER</button>
              <button type="button" onclick="actionAddChild()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD CHILD</button>
-             <button type="button" onclick="handleDelete()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition mt-2 text-center w-full">DELETE PERSON</button>
+             <button type="button" onclick="handleDelete()" class="bg-[#e11d48] hover:bg-[#be123c] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition mt-2 text-center w-full">DELETE PERSON</button>
            </div>
         </div>
 
@@ -1671,17 +1679,13 @@
       
       customConfirm('Hapus Anggota', 'Apakah Anda yakin ingin menghapus data ini secara permanen?', () => {
         if (treeData.id === selectedNodeId && modalMode === 'edit') {
-          // Logika pintar untuk menghapus Akar Utama (Root)
           if (treeData.children && treeData.children.length === 1) {
-            // Jika tidak sengaja klik Tambah Orang tua, kembalikan anaknya menjadi Akar
             treeData = treeData.children[0];
           } else if (treeData.children && treeData.children.length > 1) {
-            // Jika punya banyak cabang keturunan, larang hapus agar data anak tidak hilang
             closeEditorModal();
             showToast("Tidak bisa menghapus akar utama yang memiliki lebih dari satu cabang. Hapus cabang di bawahnya dulu.", true);
             return;
           } else {
-            // Jika ini orang terakhir di silsilah, buatkan profil kosong baru
             treeData = { id: generateId(), name: 'Anggota Pertama', gender: 'L', isCollapsed: false };
           }
         } else if (modalMode === 'editSpouse') {
