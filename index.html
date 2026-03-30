@@ -16,12 +16,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
   <style id="app-style">
-    /* Menghilangkan efek kilatan biru saat layar HP disentuh */
     * { -webkit-tap-highlight-color: transparent; }
     
     body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
     
-    /* CSS untuk Garis Pohon Silsilah */
+    /* ========================================== */
+    /* CSS UNTUK GARIS POHON SILSILAH             */
+    /* ========================================== */
     .family-tree ul {
       display: flex;
       padding-top: 40px;
@@ -29,6 +30,19 @@
       justify-content: center;
       margin: 0;
     }
+    
+    /* Indikator Garis Keturunan (Anak) Default */
+    .family-tree ul::after {
+      content: '▼';
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #94a3b8;
+      font-size: 10px;
+      z-index: 0;
+    }
+
     .family-tree li {
       display: flex;
       flex-direction: column;
@@ -37,10 +51,12 @@
       list-style-type: none;
       position: relative;
       padding: 40px 15px 0 15px;
+      transition: all 0.3s ease;
     }
     .family-tree li::before, .family-tree li::after {
       content: ''; position: absolute; top: 0; right: 50%;
       border-top: 2px solid #94a3b8; width: 50%; height: 40px;
+      z-index: 0;
     }
     .family-tree li::after {
       right: auto; left: 50%; border-left: 2px solid #94a3b8;
@@ -62,8 +78,57 @@
       content: ''; position: absolute; top: 0; left: 50%;
       border-left: 2px solid #94a3b8; width: 0; height: 40px;
       transform: translateX(-1px);
+      z-index: 0;
+    }
+
+    /* -- SMART BRANCH COLORING (WARNA CABANG DINAMIS UNTUK PASANGAN BERBEDA) -- */
+    .family-tree li.has-branch-color::before {
+      border-top-color: var(--branch-color) !important;
+    }
+    .family-tree li.has-branch-color::after {
+      border-top-color: var(--branch-color) !important;
+      border-left-color: var(--branch-color) !important;
+    }
+    .family-tree li:last-child.has-branch-color::before {
+      border-right-color: var(--branch-color) !important;
     }
     
+    /* Indikator Garis Pernikahan (Pasangan) */
+    .spouse-connector {
+      position: absolute;
+      top: 50%;
+      right: 100%;
+      width: 1.5rem;
+      height: 3px;
+      background-color: #94a3b8;
+      z-index: 0;
+      border-radius: 2px;
+    }
+    .spouse-connector.colored {
+      background-color: var(--branch-color) !important;
+    }
+    .spouse-connector::after {
+      content: '❤️';
+      position: absolute;
+      font-size: 9px;
+      color: #e11d48;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.9);
+      border-radius: 50%;
+      padding: 1px;
+      line-height: 1;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    /* Ruang Ekstra untuk Besan (Anti-Tumpang Tindih) */
+    .family-tree ul.extend-ul { padding-top: 280px; }
+    .family-tree ul.extend-ul::before { height: 280px; }
+    .family-tree ul.extend-li > li { padding-top: 280px; }
+    .family-tree ul.extend-li > li::before, .family-tree ul.extend-li > li::after { height: 280px; }
+    .family-tree ul.extend-li > li:only-child { padding-top: 0; }
+
     /* Custom scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -75,34 +140,57 @@
 
     #main-area {
       touch-action: none; 
-      /* Mencegah text tersorot saat digeser */
       -webkit-user-select: none;
       user-select: none;
     }
 
-    /* Optimalisasi Transformasi GPU untuk pergerakan mulus tanpa lag */
+    /* Optimalisasi Transformasi GPU tingkat lanjut untuk pergerakan mulus tanpa lag 60FPS */
     #tree-transform {
       will-change: transform;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
     }
     
-    /* Transisi ini HANYA aktif saat menekan tombol Zoom (Bukan saat sentuh/geser) */
     .smooth-transform {
-      transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+      transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
     }
 
-    /* Memastikan Leaflet popup render fotonya dengan rapi */
     .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; }
+
+    @media print {
+      header, #toast-notification, .absolute.bottom-6, #settings-modal, #editor-modal, #stats-modal, #login-screen, .zoom-controls, .action-buttons { 
+        display: none !important; 
+      }
+      body, main, html { 
+        overflow: visible !important; 
+        height: auto !important; 
+        background: white !important; 
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #main-area { background-image: none !important; }
+      #tree-transform { 
+        transform: none !important; 
+        position: relative !important; 
+        width: 100% !important; 
+        display: block !important;
+      }
+      .family-tree { padding: 0 !important; transform: scale(0.8); transform-origin: top center; }
+      * { 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important; 
+      }
+      button[onclick*="toggleCollapse"] { display: none !important; }
+    }
   </style>
 </head>
 <body class="flex flex-col h-screen w-full bg-slate-50 overflow-hidden">
 
-  <!-- Notifikasi Toast -->
   <div id="toast-notification" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-[200] flex items-center">
     <i class="fa-solid fa-circle-check mr-2"></i>
     <span id="toast-message">Tersimpan!</span>
   </div>
 
-  <!-- HALAMAN LOGIN -->
   <div id="login-screen" class="fixed inset-0 bg-slate-800 z-[100] flex flex-col items-center justify-center transition-opacity duration-300">
     <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center transform scale-100 transition-transform">
       <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -116,7 +204,6 @@
     </div>
   </div>
 
-  <!-- HEADER NAVBAR -->
   <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-col md:flex-row justify-between items-center shadow-sm z-10 gap-3">
     <div class="flex items-center justify-between w-full md:w-auto">
       <div class="flex items-center space-x-3">
@@ -130,7 +217,6 @@
       </div>
     </div>
     
-    <!-- Search Bar -->
     <div class="flex w-full md:flex-1 max-w-sm relative">
       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <i class="fa-solid fa-search text-slate-400 text-sm"></i>
@@ -190,14 +276,12 @@
     </div>
   </header>
 
-  <!-- CANVAS AREA -->
   <main id="main-area" class="flex-1 overflow-hidden relative bg-slate-100 cursor-grab transition-colors duration-500">
     <div class="absolute inset-0 pointer-events-none opacity-20" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 30px 30px;"></div>
 
-    <!-- Hapus class transition dari element ini agar tidak ada delay input saat di drag -->
     <div id="tree-transform" class="absolute transform-gpu flex justify-center min-w-full min-h-full items-center">
       <div class="family-tree pb-32 pt-10 px-20"> 
-        <ul id="tree-container">
+        <ul id="tree-container" class="transition-all duration-500 ease-in-out">
           </ul>
       </div>
     </div>
@@ -205,11 +289,11 @@
     <div class="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-3 rounded-xl border border-slate-200 shadow-lg flex items-start max-w-sm pointer-events-none">
       <i class="fa-solid fa-circle-info text-blue-500 mr-3 mt-1 text-lg flex-shrink-0"></i>
       <div class="text-sm text-slate-600">
-        <p class="font-semibold text-slate-800 mb-1">Panduan:</p>
+        <p class="font-semibold text-slate-800 mb-1">Panduan Warna:</p>
         <ul class="list-disc pl-4 space-y-1 text-xs">
-          <li>Lencana kuning menandakan <b>Generasi</b>.</li>
+          <li>Garis <b>berwarna</b> menandakan keturunan dari istri/suami tertentu secara spesifik.</li>
           <li id="help-text-edit">Klik kartu untuk <b>Edit</b> / <b>Tambah</b>.</li>
-          <li>Ikon 🎂 menandakan orang tersebut <b>Ulang Tahun Hari Ini</b>.</li>
+          <li>Garis <b>❤️</b> = Pasangan | Garis <b>▼</b> = Anak</li>
         </ul>
       </div>
     </div>
@@ -250,6 +334,16 @@
             <option value="bg-blue-50">Biru Laut (Ocean)</option>
             <option value="bg-emerald-50">Hijau Daun (Nature)</option>
             <option value="bg-amber-50">Kuning Hangat (Warm)</option>
+            <option value="bg-white">Putih Bersih</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Gaya Kartu Profil</label>
+          <select id="set-cardstyle" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
+            <option value="default">Bawaan (Modern & Berwarna)</option>
+            <option value="minimalist">Minimalis (Garis Tipis, Putih)</option>
+            <option value="classic">Klasik (Sepia & Serif)</option>
           </select>
         </div>
 
@@ -282,7 +376,6 @@
     </div>
   </div>
 
-  <!-- MODAL EDITOR PROFIL -->
   <div id="editor-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
       
@@ -296,6 +389,18 @@
       </div>
 
       <div class="p-6 overflow-y-auto">
+        <!-- TOMBOL AKSI CEPAT (Teal Menu Style) -->
+        <div id="quick-actions-panel" class="mb-6 pb-6 border-b border-slate-200 hidden">
+           <h3 class="text-xs font-bold text-slate-400 mb-3 text-center uppercase tracking-widest">Aksi Cepat Relasi</h3>
+           <div class="flex flex-col gap-2">
+             <button type="button" onclick="actionAddParents()" class="bg-[#82b5b2] hover:bg-[#6c9a97] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD PARENTS</button>
+             <button type="button" onclick="actionAddSibling()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD SIBLING</button>
+             <button type="button" onclick="actionAddPartner()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD PARTNER</button>
+             <button type="button" onclick="actionAddChild()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition text-center w-full">ADD CHILD</button>
+             <button type="button" onclick="handleDelete()" class="bg-[#468e8e] hover:bg-[#3b7a7a] text-white py-3 rounded-md shadow-sm text-sm font-bold uppercase tracking-wider transition mt-2 text-center w-full">DELETE PERSON</button>
+           </div>
+        </div>
+
         <form id="family-form" class="space-y-5">
           <div class="space-y-4">
             <div>
@@ -374,7 +479,7 @@
             <div class="grid grid-cols-2 gap-4 mt-2">
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tempat Lahir</label>
-                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="Nama Kota" />
+                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="Nama Kota (Misal: Surabaya)" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Golongan Darah</label>
@@ -382,6 +487,11 @@
                   <option value="">- Pilih -</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-book-open mr-1"></i> Biografi / Kisah Hidup</label>
+              <textarea id="input-biography" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition resize-y" placeholder="Ceritakan riwayat hidup, penghargaan, atau kenangan tentang orang ini..." rows="3"></textarea>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -406,24 +516,12 @@
 
           </div>
         </form>
-
-        <div id="modal-actions" class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-2 gap-3 hidden">
-          <button type="button" onclick="openAddModal('child')" class="bg-green-50 text-green-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-green-100 border border-green-200 transition shadow-sm flex justify-center items-center">
-            <i class="fa-solid fa-plus mr-1.5"></i> Tambah Anak
-          </button>
-          <button type="button" onclick="openAddModal('spouse')" class="bg-purple-50 text-purple-700 py-2.5 px-3 rounded-xl text-sm font-bold hover:bg-purple-100 border border-purple-200 transition shadow-sm flex justify-center items-center">
-            <i class="fa-solid fa-plus mr-1.5"></i> Tambah Pasangan
-          </button>
-        </div>
       </div>
 
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
-        <button id="btn-delete" type="button" onclick="handleDelete()" class="text-red-600 hover:text-white bg-white hover:bg-red-600 border border-red-200 hover:border-red-600 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center shadow-sm">
-          <i class="fa-solid fa-trash mr-2"></i> Hapus
-        </button>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end items-center rounded-b-2xl">
         <div class="flex gap-3 ml-auto">
           <button type="button" id="btn-cancel" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
-          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan</button>
+          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan Perubahan</button>
         </div>
       </div>
     </div>
@@ -460,6 +558,12 @@
           <span class="text-slate-600">Telah Wafat</span>
           <span id="stat-deceased" class="font-bold text-slate-800">0 orang</span>
         </div>
+        
+        <div class="mt-4 border-t border-slate-200 pt-4">
+          <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center"><i class="fa-solid fa-cake-candles text-amber-500 mr-2"></i> Ulang Tahun Bulan Ini</h3>
+          <div id="stat-birthdays" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1">
+            </div>
+        </div>
       </div>
       <div class="px-5 py-3 bg-white border-t border-slate-100 text-right">
         <button onclick="closeStatsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition">Tutup</button>
@@ -467,7 +571,6 @@
     </div>
   </div>
 
-  <!-- CONTAINER PETA -->
   <div id="map-wrapper" class="hidden fixed inset-0 z-[300] bg-slate-900 flex flex-col">
     <div class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-md z-10 shrink-0">
       <div class="flex items-center space-x-3">
@@ -487,7 +590,9 @@
   </div>
 
   <script id="app-script">
-    // --- KONFIGURASI FIREBASE ---
+    // Daftar warna untuk masing-masing cabang pasangan (Visualisasi Keluarga Campuran)
+    const branchColors = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#0ea5e9', '#f43f5e', '#06b6d4'];
+
     const firebaseConfig = {
       apiKey: "AIzaSyDZ-XP6H_yE-uZBupOgrLrjnHd1CbAEXjA",
       authDomain: "silsilah-keluarga-9524e.firebaseapp.com",
@@ -507,7 +612,6 @@
       });
     }
 
-    // --- BEGIN INITIAL DATA ---
     const todayStr = new Date().toISOString().split('T')[0]; 
     const bdayYear = parseInt(todayStr.split('-')[0]) - 30; 
     const demoBday = `${bdayYear}-${todayStr.split('-')[1]}-${todayStr.split('-')[2]}`;
@@ -523,7 +627,7 @@
             { id: 'spouse-2b', name: 'Linda Kusuma', gender: 'P', birthYear: '1975', notes: 'Istri Kedua', birthPlace: 'Semarang', gmapUrl: 'https://maps.google.com/?q=-6.9667,110.4167' }
           ],
           children: [
-            { id: 'grandchild-1', name: 'Dewi Lestari', gender: 'P', birthDate: demoBday, occupation: 'Dokter', spouses: [], children: [], birthPlace: 'Jakarta', gmapUrl: 'https://maps.google.com/?q=-6.2088,106.8456' },
+            { id: 'grandchild-1', name: 'Dewi Lestari', gender: 'P', birthDate: demoBday, occupation: 'Dokter', linkedSpouseId: 'spouse-2', spouses: [], children: [], birthPlace: 'Jakarta', gmapUrl: 'https://maps.google.com/?q=-6.2088,106.8456' },
             { id: 'grandchild-2', name: 'Bima Saputra', gender: 'L', birthYear: '1995', linkedSpouseId: 'spouse-2b', occupation: 'Insinyur', notes: 'Anak dari pernikahan kedua', spouses: [], children: [], birthPlace: 'Tokyo', gmapUrl: 'https://maps.google.com/?q=35.6762,139.6503' }
           ]
         }
@@ -537,12 +641,11 @@
       appSubtitle: 'Visualisasi & Manajemen Pro',
       enableEdit: true, 
       bgColor: 'bg-slate-100',
+      cardStyle: 'default',
       loginTitle: 'Akses Terbatas',
       loginDesc: 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.'
     };
-    // --- END INITIAL DATA ---
 
-    // --- STATE MANAGEMENT ---
     let treeData;
     let appSettings;
     
@@ -551,6 +654,9 @@
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let searchQuery = '';
+    
+    // Variabel RAF untuk performa 60FPS
+    let isRenderPending = false;
     
     let modalMode = 'edit'; 
     let selectedNodeId = null;
@@ -635,7 +741,7 @@
       document.getElementById('login-title-text').innerText = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('login-desc-text').innerText = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
 
-      mainArea.classList.remove('bg-slate-100', 'bg-amber-50', 'bg-blue-50', 'bg-emerald-50');
+      mainArea.classList.remove('bg-slate-100', 'bg-amber-50', 'bg-blue-50', 'bg-emerald-50', 'bg-white');
       mainArea.classList.add(appSettings.bgColor);
 
       if (appSettings.accessCode && appSettings.accessCode.trim() !== '') {
@@ -662,9 +768,11 @@
       document.getElementById('set-subtitle').value = appSettings.appSubtitle;
       document.getElementById('set-password').value = appSettings.accessCode;
       document.getElementById('set-bg').value = appSettings.bgColor;
+      document.getElementById('set-cardstyle').value = appSettings.cardStyle || 'default';
       document.getElementById('set-editmode').checked = appSettings.enableEdit;
       document.getElementById('set-login-title').value = appSettings.loginTitle || 'Akses Terbatas';
       document.getElementById('set-login-desc').value = appSettings.loginDesc || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
+      
       document.getElementById('settings-modal').classList.remove('hidden');
     };
 
@@ -677,12 +785,14 @@
       appSettings.appSubtitle = document.getElementById('set-subtitle').value;
       appSettings.accessCode = document.getElementById('set-password').value;
       appSettings.bgColor = document.getElementById('set-bg').value;
+      appSettings.cardStyle = document.getElementById('set-cardstyle').value;
       appSettings.enableEdit = document.getElementById('set-editmode').checked;
       appSettings.loginTitle = document.getElementById('set-login-title').value || 'Akses Terbatas';
       appSettings.loginDesc = document.getElementById('set-login-desc').value || 'Silakan masukkan kode akses untuk melihat data silsilah keluarga.';
       
       applySettingsToUI();
       simpanKeFirebase(); 
+      renderTree(); 
       closeSettingsModal();
       showToast('Pengaturan berhasil disimpan!');
     };
@@ -738,11 +848,32 @@
     }
 
     // --- RENDER LOGIC ---
-    function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId, parentSpouses = null) {
+    function buildPersonCard(person, isSpouse, hasChildren, isCollapsed, level, parentId, parentSpouses = null, spouseColorMap = {}) {
       const isMale = person.gender === 'L';
-      const bgColor = isMale ? 'bg-blue-50 border-blue-200' : 'bg-pink-50 border-pink-200';
-      const headerColor = isMale ? 'bg-blue-500' : 'bg-pink-500';
       const isDeceased = !!person.deathDate || !!person.deathYear;
+      
+      let bgColor, headerColor, fontClass, borderClass, roundedClass;
+      const theme = appSettings.cardStyle || 'default';
+
+      if (theme === 'classic') {
+        bgColor = 'bg-[#fdf6e3]';
+        headerColor = 'bg-[#d4a373]';
+        fontClass = 'font-serif';
+        borderClass = 'border-2 border-[#d4a373]';
+        roundedClass = 'rounded-md';
+      } else if (theme === 'minimalist') {
+        bgColor = 'bg-white';
+        headerColor = 'bg-slate-200';
+        fontClass = 'font-sans';
+        borderClass = 'border border-slate-300';
+        roundedClass = 'rounded-xl';
+      } else { 
+        bgColor = isMale ? 'bg-blue-50 border-blue-200' : 'bg-pink-50 border-pink-200';
+        headerColor = isMale ? 'bg-blue-500' : 'bg-pink-500';
+        fontClass = 'font-sans';
+        borderClass = 'border-2';
+        roundedClass = 'rounded-xl';
+      }
       
       const isHighlighted = searchQuery && person.name.toLowerCase().includes(searchQuery.toLowerCase());
       const highlightStyle = isHighlighted ? 'ring-4 ring-yellow-400 shadow-xl scale-105 z-10' : '';
@@ -757,10 +888,11 @@
       if (person.birthPlace && !person.gmapUrl) extraIcons += `<i class="fa-solid fa-location-dot" title="Tempat: ${escapeHTML(person.birthPlace)}"></i>`;
       if (person.gmapUrl) extraIcons += `<a href="${escapeHTML(person.gmapUrl)}" target="_blank" onclick="event.stopPropagation()" class="text-blue-600 hover:text-blue-800 transition-colors pointer-events-auto" title="Buka di GMap"><i class="fa-solid fa-map"></i></a>`;
       if (person.bloodType) extraIcons += `<i class="fa-solid fa-droplet" title="Gol. Darah: ${escapeHTML(person.bloodType)}"></i>`;
+      if (person.biography && person.biography.trim() !== '') extraIcons += `<i class="fa-solid fa-book-open text-amber-600" title="Ada catatan Biografi"></i>`;
 
       const avatar = person.photoUrl 
         ? `<img src="${escapeHTML(person.photoUrl)}" class="w-full h-full object-cover">`
-        : `<i class="fa-solid fa-user text-2xl"></i>`;
+        : `<i class="fa-solid fa-user text-2xl ${theme === 'minimalist' ? 'text-slate-400' : ''}"></i>`;
 
       const expandBtn = (!isSpouse && hasChildren) ? `
         <button onclick="event.stopPropagation(); toggleCollapse('${person.id}')" class="absolute -bottom-4 bg-white border border-slate-300 text-slate-600 rounded-full w-6 h-6 flex items-center justify-center shadow-sm hover:bg-slate-100 z-20" data-html2canvas-ignore>
@@ -783,28 +915,43 @@
       if (!isSpouse && person.linkedSpouseId && parentSpouses) {
           const spouse = parentSpouses.find(s => s.id === person.linkedSpouseId);
           if (spouse) {
-              spouseBadge = `<div class="bg-indigo-100 text-indigo-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-indigo-200 truncate w-full" title="Anak kandung bersama: ${escapeHTML(spouse.name)}">Anak dari: ${escapeHTML(spouse.name.split(' ')[0])}</div>`;
+              const assignedColor = spouseColorMap[spouse.id] || '#4f46e5';
+              spouseBadge = `<div class="text-white text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 truncate w-full shadow-sm" style="background-color: ${assignedColor};" title="Anak dari: ${escapeHTML(spouse.name)}">Dari: ${escapeHTML(spouse.name.split(' ')[0])}</div>`;
           }
+      }
+
+      let statusBadge = '';
+      if (!isSpouse && parentId && person.childStatus && person.childStatus !== 'kandung') {
+          const statusText = person.childStatus === 'tiri' ? 'Anak Tiri' : 'Anak Adopsi';
+          const statusColor = person.childStatus === 'tiri' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-teal-100 text-teal-700 border-teal-200';
+          statusBadge = `<div class="${statusColor} text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border truncate w-full" title="Status: ${statusText}">${statusText}</div>`;
+      }
+
+      let otherPartnerBadge = '';
+      if (person.otherPartner) {
+          otherPartnerBadge = `<div class="bg-purple-100 text-purple-700 text-[9px] font-bold px-1.5 py-[1px] rounded mt-1 border border-purple-200 w-full truncate" title="Pernah menikah / Pasangan lain: ${escapeHTML(person.otherPartner)}"><i class="fa-solid fa-ring text-[8px]"></i> Eks: ${escapeHTML(person.otherPartner.split(' ')[0])}</div>`;
       }
 
       const isBday = checkBirthday(person.birthDate, person.deathDate);
       const bdayIcon = isBday ? `<div class="absolute -top-4 -left-4 text-3xl z-20 animate-bounce filter drop-shadow-md" title="Selamat Ulang Tahun!">🎂</div>` : '';
 
       return `
-        <div class="relative flex flex-col items-center">
-          <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] border-2 rounded-xl shadow-sm cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${bgColor} ${deadStyle} ${highlightStyle}">
+        <div class="relative flex flex-col items-center ${fontClass}">
+          <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] shadow-sm cursor-pointer transition-transform duration-200 hover:shadow-md hover:-translate-y-1 hover:z-30 ${borderClass} ${roundedClass} ${bgColor} ${deadStyle} ${highlightStyle}">
             ${badge}
             ${bdayIcon}
-            <div class="h-2 w-full rounded-t-lg ${headerColor}"></div>
+            ${theme !== 'minimalist' ? `<div class="h-2 w-full ${headerColor} ${theme === 'classic' ? 'rounded-t-sm' : 'rounded-t-lg'}"></div>` : ''}
             <div class="p-3 flex flex-col items-center text-center">
               <div class="w-14 h-14 rounded-full flex items-center justify-center mb-2 text-white shadow-inner overflow-hidden border-2 border-white ${headerColor}">
                 ${avatar}
               </div>
               <h3 class="font-bold text-gray-800 text-sm leading-tight mb-0.5">${escapeHTML(person.name) || 'Tanpa Nama'}</h3>
-              <p class="text-[11px] text-gray-600 font-medium bg-white/60 px-2 py-0.5 rounded-full mb-1 border border-black/5 whitespace-nowrap">
-                ${escapeHTML(birthText)} - ${escapeHTML(deathText)} <span class="text-blue-600 font-bold">${ageText}</span>
+              <p class="text-[11px] text-gray-600 font-medium ${theme==='classic' ? 'bg-transparent' : 'bg-white/60 px-2 rounded-full border border-black/5'} py-0.5 mb-1 whitespace-nowrap">
+                ${escapeHTML(birthText)} - ${escapeHTML(deathText)} <span class="${theme==='classic' ? 'text-amber-700' : 'text-blue-600'} font-bold">${ageText}</span>
               </p>
               ${spouseBadge}
+              ${statusBadge}
+              ${otherPartnerBadge}
               <div class="flex flex-wrap gap-2 mt-1.5 text-gray-500 items-center justify-center text-[11px]">
                 ${extraIcons}
               </div>
@@ -816,23 +963,82 @@
       `;
     }
 
-    function buildNodeHTML(node, level, parentSpouses = null) {
+    function buildNodeHTML(node, level, parentSpouses = null, spouseColorMapContext = {}) {
+      if (!node) return '';
       let hasChildren = node.children && node.children.length > 0;
-      let html = `<li><div class="flex flex-col items-center"><div class="flex items-center justify-center relative">`;
-      html += buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null, parentSpouses);
+      
+      // Peta Warna untuk pasangan node ini (Berguna untuk mewarnai garis anak-anak di bawahnya)
+      let currentSpouseColorMap = {};
+      if (node.spouses && node.spouses.length > 0) {
+         node.spouses.forEach((s, idx) => {
+            currentSpouseColorMap[s.id] = branchColors[idx % branchColors.length];
+         });
+      }
+
+      let liClass = '';
+      let liStyle = '';
+      
+      // Jika Node ini adalah ANAK dari pasangan tertentu (linkedSpouseId), warnai seluruh garis atas & sampingnya
+      if (node.linkedSpouseId && spouseColorMapContext[node.linkedSpouseId]) {
+         liClass = 'has-branch-color';
+         liStyle = `style="--branch-color: ${spouseColorMapContext[node.linkedSpouseId]};"`;
+      }
+
+      let html = `<li class="${liClass}" ${liStyle}>
+        <div class="flex flex-col items-center">
+           <div class="flex items-center justify-center relative">`;
+      
+      html += `<div class="relative z-10">${buildPersonCard(node, false, hasChildren, node.isCollapsed, level, null, parentSpouses, spouseColorMapContext)}</div>`;
 
       if (node.spouses && node.spouses.length > 0) {
         node.spouses.forEach(spouse => {
-          html += `<div class="w-8 h-[2px] bg-slate-400"></div>`;
-          html += buildPersonCard(spouse, true, false, false, level, node.id);
+          const spouseColor = currentSpouseColorMap[spouse.id];
+          html += `<div class="flex items-center relative ml-6">`;
+          
+          if (spouse.parents && spouse.parents.length > 0) {
+              html += `
+              <div class="absolute bottom-full left-1/2 -translate-x-1/2 flex flex-col items-center pb-2 z-0">
+                 <div class="flex justify-center items-end w-max">
+                     ${spouse.parents.map((p, i) => `
+                       <div class="relative flex flex-col items-center px-4">
+                         ${buildPersonCard(p, false, false, false, level-1, spouse.id)}
+                         <div class="w-[2px] h-6 bg-slate-400 relative z-10"></div>
+                         ${spouse.parents.length > 1 ? `
+                            <div class="absolute bottom-0 ${i === 0 ? 'right-0 w-[50%]' : 'left-0 w-[50%]'} h-[2px] bg-slate-400"></div>
+                         ` : ''}
+                       </div>
+                     `).join('')}
+                 </div>
+                 <div class="w-[2px] h-6 bg-slate-400"></div>
+              </div>`;
+          }
+
+          html += `<div class="relative z-10">`;
+          // Warnai garis hati yang menyambungkan ke pasangan
+          html += `<div class="spouse-connector colored w-6 right-full" style="--branch-color: ${spouseColor};"></div>`;
+          html += buildPersonCard(spouse, true, false, false, level, node.id, null, {});
+          html += `</div>`;
+          html += `</div>`;
         });
       }
 
       html += `</div></div>`;
+      
       if (hasChildren && !node.isCollapsed) {
-        html += `<ul>`;
-        node.children.forEach(child => {
-          html += buildNodeHTML(child, level + 1, node.spouses);
+        let childHasSpouseParents = node.children.some(c => c.spouses && c.spouses.some(s => s.parents && s.parents.length > 0));
+        let ulClass = childHasSpouseParents ? (node.children.length === 1 ? 'extend-ul' : 'extend-li') : '';
+
+        // Mengurutkan Anak Berdasarkan Pasangan (Agar anak dari istri 1 kumpul di kiri, istri 2 di kanan)
+        let sortedChildren = [...node.children].sort((a, b) => {
+            let spA = a.linkedSpouseId || '';
+            let spB = b.linkedSpouseId || '';
+            return spA.localeCompare(spB);
+        });
+
+        html += `<ul class="${ulClass}">`;
+        sortedChildren.forEach(child => {
+          // Bawa peta warna pasangan Node ini turun ke anak-anaknya
+          html += buildNodeHTML(child, level + 1, node.spouses, currentSpouseColorMap);
         });
         html += `</ul>`;
       }
@@ -840,40 +1046,60 @@
       return html;
     }
 
-    // --- PEMBARUAN TRANSFORM ENGINE (ANTI-LAG) ---
-    // Memisahkan update transform dan update DOM tree
-    function updateTransform(smooth = false) {
-      if (smooth) {
-        transformDiv.classList.add('smooth-transform');
-        setTimeout(() => transformDiv.classList.remove('smooth-transform'), 260);
-      }
-      transformDiv.style.transform = `translate(${position.x}px, ${position.y}px) scale(${scale})`;
+    // --- PEMBARUAN TRANSFORM ENGINE (ANTI-LAG 60FPS RAF) ---
+    function executeTransformRAF() {
+       transformDiv.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`;
+       isRenderPending = false;
+    }
+
+    function requestTransformUpdate(useSmooth = false) {
+       if (useSmooth) {
+         transformDiv.classList.add('smooth-transform');
+         setTimeout(() => transformDiv.classList.remove('smooth-transform'), 310);
+         transformDiv.style.transform = `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`;
+         return;
+       }
+       
+       if (!isRenderPending) {
+           isRenderPending = true;
+           requestAnimationFrame(executeTransformRAF);
+       }
     }
 
     function renderTree() {
       if (!treeData) return;
+      
+      let rootHasSpouseParents = treeData.spouses && treeData.spouses.some(s => s.parents && s.parents.length > 0);
+      let extraPt = rootHasSpouseParents ? 'margin-top: 260px;' : '';
+      treeContainer.style.cssText = extraPt;
+
       treeContainer.innerHTML = buildNodeHTML(treeData, 1);
-      updateTransform(false);
+      requestTransformUpdate(false);
     }
 
     // --- EVENT LISTENERS (PAN, ZOOM) ---
     function adjustZoom(delta) {
       scale = Math.min(Math.max(0.15, scale + delta), 3);
-      updateTransform(true);
+      requestTransformUpdate(true); // Gunakan animasi mulus saat klik tombol +/-
     }
     
     function resetZoom() {
       scale = window.innerWidth < 768 ? 0.6 : 1; 
       position = { x: 0, y: 0 };
-      updateTransform(true);
+      requestTransformUpdate(true);
     }
 
     mainArea.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY * -0.001;
       scale = Math.min(Math.max(0.15, scale + delta), 3);
-      updateTransform(false);
+      requestTransformUpdate(false);
     }, { passive: false });
+
+    // --- KONTROL SENTUH & PINCH-TO-ZOOM UNTUK HP TERBARU (SMOOTH 60FPS) ---
+    let initialDistance = 0;
+    let initialScale = 1;
+    let pinchCenter = { x: 0, y: 0 };
 
     mainArea.addEventListener('mousedown', (e) => {
       if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a')) return;
@@ -887,7 +1113,7 @@
       if (!isDragging) return;
       position.x = e.clientX - dragStart.x;
       position.y = e.clientY - dragStart.y;
-      updateTransform(false);
+      requestTransformUpdate(false);
     });
 
     window.addEventListener('mouseup', () => {
@@ -895,15 +1121,11 @@
       mainArea.classList.remove('cursor-grabbing');
     });
 
-    // --- KONTROL SENTUH & PINCH-TO-ZOOM UNTUK HP TERBARU (SMOOTH 60FPS) ---
-    let initialDistance = 0;
-    let initialScale = 1;
-    let pinchCenter = { x: 0, y: 0 };
-
+    // Touch Event (Mobile)
     mainArea.addEventListener('touchstart', (e) => {
       if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a') || e.target.closest('input')) return;
       
-      transformDiv.classList.remove('smooth-transform'); // Pastikan tidak ada delay transisi CSS
+      transformDiv.classList.remove('smooth-transform'); 
       
       if (e.touches.length === 1) {
         isDragging = true;
@@ -928,12 +1150,10 @@
       if (e.cancelable) e.preventDefault(); 
       
       if (isDragging && e.touches.length === 1) {
-        // Menggeser / Pan biasa
         position.x = e.touches[0].clientX - dragStart.x;
         position.y = e.touches[0].clientY - dragStart.y;
-        updateTransform(false);
+        requestTransformUpdate(false);
       } else if (e.touches.length === 2) {
-        // Zooming dan Menggeser secara bersamaan (Pinch & Pan)
         const currentDistance = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
@@ -945,13 +1165,12 @@
         const currentCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const currentCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         
-        // Kompensasi pergeseran agar titik fokus di jari terasa natural
         position.x += (currentCenterX - pinchCenter.x);
         position.y += (currentCenterY - pinchCenter.y);
         
         pinchCenter = { x: currentCenterX, y: currentCenterY };
 
-        updateTransform(false);
+        requestTransformUpdate(false);
       }
     }, { passive: false });
 
@@ -960,7 +1179,6 @@
       mainArea.classList.remove('cursor-grabbing');
       
       if (e.touches.length === 1) {
-        // Mode transisi halus dari zoom 2 jari kembali ke drag 1 jari
         isDragging = true;
         dragStart = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
       }
@@ -1002,7 +1220,17 @@
     });
 
     function findNodeById(node, id) {
+      if (!node) return null;
       if (node.id === id) return node;
+      if (node.spouses) {
+        for (let s of node.spouses) {
+          if (s.id === id) return s;
+          if (s.parents) {
+             let found = s.parents.find(p => p.id === id);
+             if (found) return found;
+          }
+        }
+      }
       if (node.children) {
         for (let child of node.children) {
           let found = findNodeById(child, id);
@@ -1022,32 +1250,51 @@
       return null;
     }
 
-    function updateTreeData(node, id, updatedData) {
-      if (node.id === id) {
-        return typeof updatedData === 'function' ? updatedData(node) : { ...node, ...updatedData };
-      }
+    function findNodeBySpouseId(node, spouseId) {
+      if (!node) return null;
+      if (node.spouses && node.spouses.some(s => s.id === spouseId)) return node;
       if (node.children) {
-        return { ...node, children: node.children.map(child => updateTreeData(child, id, updatedData)) };
+        for (let c of node.children) {
+          let f = findNodeBySpouseId(c, spouseId);
+          if (f) return f;
+        }
       }
-      return node;
+      return null;
     }
 
-    function addChildToTreeData(node, parentId, newChild) {
-      if (node.id === parentId) {
-        return { ...node, isCollapsed: false, children: [...(node.children || []), newChild] };
+    function updateTreeData(node, id, updatedData) {
+      if (node.id === id) return typeof updatedData === 'function' ? updatedData(node) : { ...node, ...updatedData };
+      
+      let newNode = { ...node };
+      if (newNode.spouses) {
+        newNode.spouses = newNode.spouses.map(s => {
+           if (s.id === id) return typeof updatedData === 'function' ? updatedData(s) : { ...s, ...updatedData };
+           if (s.parents) {
+             s.parents = s.parents.map(p => p.id === id ? (typeof updatedData === 'function' ? updatedData(p) : { ...p, ...updatedData }) : p);
+           }
+           return s;
+        });
       }
-      if (node.children) {
-        return { ...node, children: node.children.map(child => addChildToTreeData(child, parentId, newChild)) };
+
+      if (newNode.children) {
+        newNode.children = newNode.children.map(child => updateTreeData(child, id, updatedData));
       }
-      return node;
+      return newNode;
     }
 
     function deleteNodeFromTreeData(node, idToDelete) {
-      if (!node.children) return node;
-      return { 
-        ...node, 
-        children: node.children.filter(c => c.id !== idToDelete).map(c => deleteNodeFromTreeData(c, idToDelete)) 
-      };
+      let newNode = { ...node };
+      if (newNode.spouses) {
+        newNode.spouses = newNode.spouses.filter(s => s.id !== idToDelete).map(s => {
+           if (s.parents) {
+              s.parents = s.parents.filter(p => p.id !== idToDelete);
+           }
+           return s;
+        });
+      }
+      if (!newNode.children) return newNode;
+      newNode.children = newNode.children.filter(c => c.id !== idToDelete).map(c => deleteNodeFromTreeData(c, idToDelete));
+      return newNode;
     }
 
     window.toggleCollapse = function(nodeId) {
@@ -1056,12 +1303,12 @@
       simpanKeFirebase();
     };
 
-    // --- MODAL LOGIC (EDITOR / VIEWER) ---
+    // --- MODAL LOGIC & ACTIONS ---
     const modal = document.getElementById('editor-modal');
     const formFields = [
-      'name', 'gender', 'notes', 'photo', 'birthplace', 'blood', 
+      'name', 'gender', 'notes', 'otherpartner', 'childstatus', 'photo', 'birthplace', 'blood', 
       'phone', 'occupation', 'address', 'gmap', 'birthdate', 'birthyear', 
-      'deathdate', 'deathyear', 'linkedspouse'
+      'deathdate', 'deathyear', 'linkedspouse', 'biography'
     ];
 
     function getFormData() {
@@ -1079,6 +1326,8 @@
           if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
           if(f === 'linkedspouse') key = 'linkedSpouseId';
+          if(f === 'otherpartner') key = 'otherPartner';
+          if(f === 'childstatus') key = 'childStatus';
           data[key] = el.value;
         }
       });
@@ -1099,7 +1348,11 @@
           if(f === 'deathdate') key = 'deathDate';
           if(f === 'deathyear') key = 'deathYear';
           if(f === 'linkedspouse') key = 'linkedSpouseId';
-          el.value = data[key] || '';
+          if(f === 'otherpartner') key = 'otherPartner';
+          if(f === 'childstatus') key = 'childStatus';
+          
+          if(key === 'childStatus' && !data[key]) el.value = 'kandung';
+          else el.value = data[key] || '';
         }
       });
       document.getElementById('input-photo-file').value = ''; 
@@ -1170,6 +1423,8 @@
           const parent = findParent(treeData, nodeId);
           populateSpouseDropdown(parent);
           document.getElementById('input-linkedspouse').value = person.linkedSpouseId || '';
+          document.getElementById('input-childstatus').value = person.childStatus || 'kandung';
+          document.getElementById('container-childrelations').classList.remove('hidden');
       } else {
           document.getElementById('container-childrelations').classList.add('hidden');
       }
@@ -1179,8 +1434,8 @@
       document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
       document.getElementById('modal-title-icon').className = isEditAllowed ? 'fa-solid fa-pen-to-square mr-2 text-blue-600' : 'fa-solid fa-address-card mr-2 text-blue-600';
       
-      document.getElementById('modal-actions').style.display = (modalMode === 'edit' && isEditAllowed) ? 'grid' : 'none';
-      document.getElementById('btn-delete').style.display = isEditAllowed ? 'flex' : 'none';
+      // Tampilkan Aksi Cepat jika Edit Diizinkan
+      document.getElementById('quick-actions-panel').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-save').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-cancel').innerText = isEditAllowed ? 'Batal' : 'Tutup';
 
@@ -1195,37 +1450,104 @@
       });
       document.getElementById('input-gender').disabled = !isEditAllowed;
       document.getElementById('input-blood').disabled = !isEditAllowed;
-      document.getElementById('input-linkedspouse').disabled = !isEditAllowed;
+      document.getElementById('input-linkedspouse').disabled = !isEditAllowed && !document.getElementById('input-linkedspouse').disabled;
+      document.getElementById('input-childstatus').disabled = !isEditAllowed;
 
       modal.classList.remove('hidden');
     };
 
-    window.openAddModal = function(type) {
-      if (!appSettings.enableEdit) return;
-      modalMode = type === 'child' ? 'addChild' : 'addSpouse';
-      setFormData({ gender: type === 'child' ? 'L' : 'P' });
-      
-      document.getElementById('modal-title-text').innerText = `Tambah ${type==='child'?'Anak':'Pasangan'}`;
-      document.getElementById('modal-title-icon').className = `fa-solid fa-plus mr-2 text-${type==='child'?'green':'purple'}-600`;
-      
-      document.getElementById('modal-actions').style.display = 'none';
-      document.getElementById('btn-delete').style.display = 'none';
-      
-      if (type === 'child') {
-          const parent = findNodeById(treeData, selectedNodeId);
-          populateSpouseDropdown(parent);
-      } else {
-          document.getElementById('container-childrelations').classList.add('hidden');
-      }
+    // --- INSTANT ACTION FUNCTIONS (Teal Menu) ---
+    window.actionAddChild = function() {
+       const newId = generateId();
+       const newChild = { id: newId, name: 'Anak Baru', gender: 'L', children: [], spouses: [], isCollapsed: false };
+       
+       if (modalMode === 'editSpouse') {
+           let hostNode = findNodeBySpouseId(treeData, selectedSpouseId);
+           newChild.linkedSpouseId = selectedSpouseId;
+           if (!hostNode.children) hostNode.children = [];
+           hostNode.children.push(newChild);
+       } else {
+           let node = findNodeById(treeData, selectedNodeId);
+           if (!node.children) node.children = [];
+           node.children.push(newChild);
+       }
+       simpanKeFirebase();
+       renderTree();
+       handleNodeClick(newId, null); // Langsung edit anak yg baru dibuat
+       showToast("Anak berhasil ditambahkan.");
+    };
 
-      document.querySelectorAll('.edit-only-field').forEach(el => el.style.display = 'block');
-      formFields.forEach(f => {
-        const el = document.getElementById(`input-${f}`);
-        if (el) el.removeAttribute('readonly');
-      });
-      document.getElementById('input-gender').disabled = false;
-      document.getElementById('input-blood').disabled = false;
-      document.getElementById('input-linkedspouse').disabled = false;
+    window.actionAddPartner = function() {
+       const newId = generateId();
+       const newPartner = { id: newId, name: 'Pasangan Baru', gender: 'P' };
+       
+       if (modalMode === 'editSpouse') {
+           alert("Silakan tambahkan pasangan dari Anggota Utama (garis keturunan utama).");
+           return;
+       }
+       
+       let node = findNodeById(treeData, selectedNodeId);
+       if (!node.spouses) node.spouses = [];
+       node.spouses.push(newPartner);
+       
+       simpanKeFirebase();
+       renderTree();
+       handleNodeClick(selectedNodeId, newId);
+       showToast("Pasangan berhasil ditambahkan.");
+    };
+
+    window.actionAddSibling = function() {
+       const newId = generateId();
+       const newSibling = { id: newId, name: 'Saudara Baru', gender: 'L', children: [], spouses: [], isCollapsed: false };
+       
+       if (modalMode === 'editSpouse') {
+           alert("Penambahan saudara pasangan belum didukung langsung disini. Anda bisa membuatnya sbg Akar Utama terpisah.");
+           return;
+       }
+       
+       if (selectedNodeId === treeData.id) {
+           // Root Sibling
+           const newRoot = { id: generateId(), name: 'Orang Tua (Tanpa Nama)', gender: 'L', children: [treeData, newSibling], spouses: [], isCollapsed: false };
+           treeData = newRoot;
+       } else {
+           let parent = findParent(treeData, selectedNodeId);
+           if (parent) {
+               parent.children.push(newSibling);
+           }
+       }
+       simpanKeFirebase();
+       renderTree();
+       handleNodeClick(newId, null);
+       showToast("Saudara berhasil ditambahkan.");
+    };
+
+    window.actionAddParents = function() {
+       if (modalMode === 'editSpouse') {
+           let hostNode = findNodeBySpouseId(treeData, selectedSpouseId);
+           let spouse = hostNode.spouses.find(s => s.id === selectedSpouseId);
+           if (!spouse.parents) spouse.parents = [];
+           
+           if (spouse.parents.length >= 2) {
+               alert("Pasangan ini sudah memiliki orang tua penuh.");
+               return;
+           }
+           
+           spouse.parents.push({ id: generateId(), name: 'Ayah Pasangan', gender: 'L' });
+           spouse.parents.push({ id: generateId(), name: 'Ibu Pasangan', gender: 'P' });
+           simpanKeFirebase();
+           renderTree();
+           closeEditorModal();
+           showToast("Orang tua dari pasangan berhasil ditambah.");
+       } else if (selectedNodeId === treeData.id) {
+           const newRoot = { id: generateId(), name: 'Ayah', gender: 'L', children: [treeData], spouses: [{ id: generateId(), name: 'Ibu', gender: 'P' }], isCollapsed: false };
+           treeData = newRoot;
+           simpanKeFirebase();
+           renderTree();
+           closeEditorModal();
+           showToast("Generasi leluhur berhasil ditambahkan.");
+       } else {
+           alert("Anggota utama ini sudah memiliki orang tua di silsilah. Klik profil paling atas untuk menambah generasi baru.");
+       }
     };
 
     window.closeEditorModal = function() {
@@ -1266,7 +1588,7 @@
         alert("Tidak bisa menghapus akar utama silsilah."); return;
       }
       
-      if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
+      if (confirm("Apakah Anda yakin ingin menghapus data ini secara permanen?")) {
         if (modalMode === 'editSpouse') {
           treeData = updateTreeData(treeData, selectedNodeId, node => ({
             ...node, spouses: node.spouses.filter(s => s.id !== selectedSpouseId)
@@ -1283,6 +1605,26 @@
 
     // --- STATS & EXPORT/IMPORT ---
     const statsModal = document.getElementById('stats-modal');
+    
+    function getUpcomingBirthdays(node, currentMonth, list = []) {
+      if (!node) return list;
+      
+      const checkBday = (person) => {
+        if (person.birthDate && !person.deathDate && !person.deathYear) {
+          const [y, m, d] = person.birthDate.split('-');
+          if (parseInt(m) === currentMonth) {
+            list.push({ name: person.name, date: parseInt(d), dateStr: person.birthDate });
+          }
+        }
+      };
+      
+      checkBday(node);
+      if (node.spouses) node.spouses.forEach(s => checkBday(s));
+      if (node.children) node.children.forEach(c => getUpcomingBirthdays(c, currentMonth, list));
+      
+      return list;
+    }
+
     window.openStatsModal = function() {
       const stats = calculateStats(treeData);
       document.getElementById('stat-total').innerText = stats.total;
@@ -1290,6 +1632,23 @@
       document.getElementById('stat-male').innerText = stats.male;
       document.getElementById('stat-female').innerText = stats.female;
       document.getElementById('stat-deceased').innerText = stats.deceased + ' orang';
+      
+      const currentMonth = new Date().getMonth() + 1;
+      let bdays = getUpcomingBirthdays(treeData, currentMonth);
+      bdays.sort((a, b) => a.date - b.date); 
+      
+      const bdayContainer = document.getElementById('stat-birthdays');
+      if (bdays.length === 0) {
+        bdayContainer.innerHTML = '<p class="text-slate-500 italic text-center py-2">Tidak ada yang berulang tahun bulan ini.</p>';
+      } else {
+        bdayContainer.innerHTML = bdays.map(b => `
+          <div class="flex justify-between items-center bg-amber-50 p-2 rounded border border-amber-100">
+            <span class="font-medium text-amber-900">${escapeHTML(b.name)}</span>
+            <span class="bg-amber-200 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">Tgl ${b.date}</span>
+          </div>
+        `).join('');
+      }
+      
       statsModal.classList.remove('hidden');
     };
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); };
@@ -1304,6 +1663,8 @@
       const container = document.getElementById('tree-transform');
       const originalTransform = container.style.transform;
       
+      // Matikan animasi saat rendering CSS image
+      container.classList.remove('smooth-transform');
       container.style.transform = 'translate(0, 0) scale(1)';
       
       setTimeout(() => {
@@ -1374,7 +1735,7 @@
 
       const bodyClone = document.body.cloneNode(true);
       
-      bodyClone.querySelector('#tree-container').innerHTML = '\n          <!-- Tree Nodes will be injected here via JS -->\n        ';
+      bodyClone.querySelector('#tree-container').innerHTML = '\n          \n        ';
       bodyClone.querySelector('#tree-transform').style.transform = '';
       bodyClone.querySelector('#editor-modal').classList.add('hidden');
       bodyClone.querySelector('#stats-modal').classList.add('hidden');
@@ -1396,7 +1757,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${escapeHTML(appSettings.appTitle)}</title>
   
   <!-- Tailwind CSS -->
@@ -1409,12 +1770,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></` + `script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></` + `script>
 
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></` + `script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></` + `script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="${bodyClone.className}">
 ${bodyClone.innerHTML}
   
-  <!-- JS Terpisah -->
   <script src="script.js"></` + `script>
 </body>
 </html>`;
