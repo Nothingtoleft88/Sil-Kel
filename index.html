@@ -1178,6 +1178,11 @@
       if (node.spouses && node.spouses.length > 0) {
          node.spouses.forEach((s, idx) => {
             currentSpouseColorMap[s.id] = branchColors[idx % branchColors.length];
+            if (s.spouses) {
+               s.spouses.forEach((ss, idx2) => {
+                   currentSpouseColorMap[ss.id] = branchColors[(idx + idx2 + 1) % branchColors.length];
+               });
+            }
          });
       }
 
@@ -1218,9 +1223,19 @@
               </div>`;
           }
 
-          html += `<div class="relative z-10">`;
+          html += `<div class="relative z-10 flex items-center">`;
           html += `<div class="spouse-connector colored w-6 right-full" style="--branch-color: ${spouseColor};"></div>`;
           html += buildPersonCard(spouse, true, false, false, level, node.id, null, {});
+          
+          if (spouse.spouses && spouse.spouses.length > 0) {
+              spouse.spouses.forEach(secSpouse => {
+                  html += `<div class="flex items-center relative ml-6">`;
+                  html += `<div class="spouse-connector w-6 right-full" style="background-color: #94a3b8;"></div>`;
+                  html += buildPersonCard(secSpouse, true, false, false, level, spouse.id, null, {});
+                  html += `</div>`;
+              });
+          }
+
           html += `</div>`;
           html += `</div>`;
         });
@@ -1459,6 +1474,10 @@
       if (node.spouses) {
         for (let s of node.spouses) {
           if (s.id === id) return s;
+          if (s.spouses) {
+             let foundSS = s.spouses.find(ss => ss.id === id);
+             if (foundSS) return foundSS;
+          }
           if (s.parents) {
              let found = s.parents.find(p => p.id === id);
              if (found) return found;
@@ -1518,6 +1537,9 @@
       if (newNode.spouses) {
         newNode.spouses = newNode.spouses.map(s => {
            if (s.id === id) return typeof updatedData === 'function' ? updatedData(s) : { ...s, ...updatedData };
+           if (s.spouses) {
+               s.spouses = s.spouses.map(ss => ss.id === id ? (typeof updatedData === 'function' ? updatedData(ss) : { ...ss, ...updatedData }) : ss);
+           }
            if (s.parents) {
              s.parents = s.parents.map(p => p.id === id ? (typeof updatedData === 'function' ? updatedData(p) : { ...p, ...updatedData }) : p);
            }
@@ -1535,6 +1557,9 @@
       let newNode = { ...node };
       if (newNode.spouses) {
         newNode.spouses = newNode.spouses.filter(s => s.id !== idToDelete).map(s => {
+           if (s.spouses) {
+               s.spouses = s.spouses.filter(ss => ss.id !== idToDelete);
+           }
            if (s.parents) {
               s.parents = s.parents.filter(p => p.id !== idToDelete);
            }
@@ -1615,6 +1640,11 @@
       if (parentNode && parentNode.spouses && parentNode.spouses.length > 0) {
           parentNode.spouses.forEach(s => {
               select.innerHTML += `<option value="${s.id}">Anak bersama: ${escapeHTML(s.name)}</option>`;
+              if (s.spouses) {
+                  s.spouses.forEach(ss => {
+                      select.innerHTML += `<option value="${ss.id}">Anak bersama: ${escapeHTML(ss.name)} (Eks/Lain)</option>`;
+                  });
+              }
           });
           container.classList.remove('hidden');
           select.disabled = false;
@@ -1662,12 +1692,8 @@
       selectedSpouseId = spouseId;
       modalMode = spouseId ? 'editSpouse' : 'edit';
       
-      let person = findNodeById(treeData, nodeId);
-      if (spouseId && person && person.spouses) {
-        person = person.spouses.find(s => s.id === spouseId);
-      }
-      
-      if (!person) person = {};
+      let targetId = spouseId || nodeId;
+      let person = findNodeById(treeData, targetId) || {};
       
       setFormData(person);
 
@@ -1718,9 +1744,14 @@
        
        if (modalMode === 'editSpouse') {
            let hostNode = findNodeBySpouseId(treeData, selectedSpouseId);
-           newChild.linkedSpouseId = selectedSpouseId;
-           if (!hostNode.children) hostNode.children = [];
-           hostNode.children.push(newChild);
+           if (hostNode) {
+               newChild.linkedSpouseId = selectedSpouseId;
+               if (!hostNode.children) hostNode.children = [];
+               hostNode.children.push(newChild);
+           } else {
+               showToast("Tambahkan anak melalui profil keturunan utama.", true);
+               return;
+           }
        } else {
            let node = findNodeById(treeData, selectedNodeId);
            if (!node.children) node.children = [];
@@ -1733,10 +1764,6 @@
     };
 
     window.actionAddPartner = function() {
-       if (modalMode === 'editSpouse') {
-           showToast("Silakan tambahkan pasangan melalui profil keturunan utama.", true);
-           return;
-       }
        if (isSpouseParent(treeData, selectedNodeId)) {
            showToast("Penambahan pasangan pada profil ini belum didukung.", true);
            return;
@@ -1745,9 +1772,10 @@
        const newId = generateId();
        const newPartner = { id: newId, name: 'Pasangan Baru', gender: 'P' };
        
-       let node = findNodeById(treeData, selectedNodeId);
-       if (!node.spouses) node.spouses = [];
-       node.spouses.push(newPartner);
+       let targetId = selectedSpouseId || selectedNodeId;
+       treeData = updateTreeData(treeData, targetId, node => ({
+           ...node, spouses: [...(node.spouses || []), newPartner]
+       }));
        
        simpanKeFirebase();
        renderTree();
@@ -1785,8 +1813,8 @@
 
     window.actionAddParents = function() {
        if (modalMode === 'editSpouse') {
-           let hostNode = findNodeBySpouseId(treeData, selectedSpouseId);
-           let spouse = hostNode.spouses.find(s => s.id === selectedSpouseId);
+           let spouse = findNodeById(treeData, selectedSpouseId);
+           if (!spouse) return;
            if (!spouse.parents) spouse.parents = [];
            
            if (spouse.parents.length >= 2) {
@@ -1796,6 +1824,8 @@
            
            spouse.parents.push({ id: generateId(), name: 'Ayah Pasangan', gender: 'L' });
            spouse.parents.push({ id: generateId(), name: 'Ibu Pasangan', gender: 'P' });
+           
+           treeData = updateTreeData(treeData, selectedSpouseId, spouse);
            simpanKeFirebase();
            renderTree();
            closeEditorModal();
@@ -1821,22 +1851,9 @@
       if(!document.getElementById('input-name').value) { showToast('Nama tidak boleh kosong!', true); return; }
       
       const newData = getFormData();
+      const targetId = selectedSpouseId || selectedNodeId;
       
-      if (modalMode === 'edit') {
-        treeData = updateTreeData(treeData, selectedNodeId, newData);
-      } else if (modalMode === 'editSpouse') {
-        treeData = updateTreeData(treeData, selectedNodeId, node => ({
-          ...node, spouses: node.spouses.map(s => s.id === selectedSpouseId ? { ...s, ...newData } : s)
-        }));
-      } else if (modalMode === 'addChild') {
-        const newChild = { ...newData, id: generateId(), children: [], spouses: [], isCollapsed: false };
-        treeData = addChildToTreeData(treeData, selectedNodeId, newChild);
-      } else if (modalMode === 'addSpouse') {
-        const newSpouse = { ...newData, id: generateId() };
-        treeData = updateTreeData(treeData, selectedNodeId, node => ({
-          ...node, spouses: [...(node.spouses || []), newSpouse]
-        }));
-      }
+      treeData = updateTreeData(treeData, targetId, newData);
       
       closeEditorModal();
       simpanKeFirebase();
@@ -1848,7 +1865,9 @@
       if(!appSettings.enableEdit) return;
       
       customConfirm('Hapus Anggota', 'Apakah Anda yakin ingin menghapus data ini secara permanen?', () => {
-        if (treeData.id === selectedNodeId && modalMode === 'edit') {
+        const targetId = selectedSpouseId || selectedNodeId;
+        
+        if (treeData.id === targetId) {
           if (treeData.children && treeData.children.length === 1) {
             treeData = treeData.children[0];
           } else if (treeData.children && treeData.children.length > 1) {
@@ -1858,12 +1877,8 @@
           } else {
             treeData = { id: generateId(), name: 'Anggota Pertama', gender: 'L', isCollapsed: false };
           }
-        } else if (modalMode === 'editSpouse') {
-          treeData = updateTreeData(treeData, selectedNodeId, node => ({
-            ...node, spouses: node.spouses.filter(s => s.id !== selectedSpouseId)
-          }));
         } else {
-          treeData = deleteNodeFromTreeData(treeData, selectedNodeId);
+          treeData = deleteNodeFromTreeData(treeData, targetId);
         }
         closeEditorModal();
         simpanKeFirebase();
