@@ -1018,10 +1018,26 @@
 
     function getShio(birthDate, birthYear) {
         let y = 0;
-        if (birthDate) y = parseInt(birthDate.split('-')[0]);
-        else if (birthYear) y = parseInt(birthYear);
+        let m = 0;
+        let d = 0;
+        
+        if (birthDate) {
+            const parts = birthDate.split('-');
+            y = parseInt(parts[0]);
+            m = parseInt(parts[1]);
+            if (parts[2]) d = parseInt(parts[2]);
+        } else if (birthYear) {
+            y = parseInt(birthYear);
+        }
         
         if (!y) return '';
+
+        // Koreksi: Imlek rata-rata jatuh pada akhir Januari hingga pertengahan Februari.
+        // Pendekatan: Jika lahir bulan Januari atau sebelum 4 Februari, ikut shio tahun sebelumnya.
+        if (m === 1 || (m === 2 && d > 0 && d < 4)) {
+            y -= 1;
+        }
+        
         const shioArr = ['Monyet', 'Ayam', 'Anjing', 'Babi', 'Tikus', 'Kerbau', 'Macan', 'Kelinci', 'Naga', 'Ular', 'Kuda', 'Kambing'];
         return shioArr[((y % 12) + 12) % 12];
     }
