@@ -1,0 +1,28 @@
+PANDUAN DEPLOY — SILSILAH KELUARGA PRO v4.0.0
+
+A. BACKUP
+1. Di Firebase Realtime Database, ekspor data node silsilah_v2 sebagai JSON.
+2. Simpan ZIP versi lama sebagai cadangan.
+
+B. GITHUB / VERCEL
+1. Ekstrak ZIP Silsilah-Keluarga-Pro-v4.0.0.zip.
+2. Salin seluruh file di dalamnya ke folder repository GitHub sil-kel.
+3. Pilih Replace/Ganti file tujuan untuk index.html, style.css, dan script.js.
+4. Commit dengan ringkasan: Rombak profesional Silsilah Keluarga v4.0.0
+5. Push origin.
+6. Vercel akan melakukan deployment otomatis dari branch main.
+7. Setelah status Ready, buka domain dan tekan Ctrl+F5 satu kali.
+
+C. FIREBASE
+- Versi ini tetap menggunakan node: silsilah_v2
+- Data lama tidak perlu dipindahkan.
+- Pastikan Firebase Rules masih mengizinkan aplikasi membaca dan menulis.
+- Aturan berbasis tanggal hanya sementara. Untuk keamanan produksi, gunakan Firebase Authentication.
+
+D. PENGUJIAN WAJIB
+1. Login menggunakan kode akses saat ini.
+2. Tutup dan buka ulang browser: sesi tetap aktif bila “Tetap masuk” dicentang.
+3. Tekan Keluar: login wajib muncul kembali.
+4. Edit satu profil lalu pastikan status berubah menjadi “Tersinkron ke cloud”.
+5. Uji pencarian, zoom, statistik, peta, ekspor PNG/PDF, ekspor/impor JSON.
+6. Uji tampilan melalui komputer, HP, dan tablet.

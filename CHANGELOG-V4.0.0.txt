@@ -1,0 +1,9 @@
+SILSILAH KELUARGA PRO v4.0.0
+
+- Rombak total tampilan menjadi dashboard profesional.
+- Login premium dengan status koneksi, tampil/sembunyikan kode, dan sesi tetap masuk.
+- Sidebar desktop, drawer mobile, topbar pencarian, dan kontrol kanvas baru.
+- Ringkasan anggota, generasi, dan ulang tahun bulan berjalan.
+- Status cloud realtime, cache lokal, penanganan error Firebase, dan tombol muat ulang.
+- Penyempurnaan visual kartu profil, konektor keluarga, modal, peta, dan ekspor.
+- Mempertahankan database lama pada path silsilah_v2 agar data tidak hilang.

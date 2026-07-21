@@ -1,0 +1,19 @@
+QA REPORT — SILSILAH KELUARGA PRO v4.0.0
+
+Pemeriksaan otomatis:
+[PASS] JavaScript syntax: node --check
+[PASS] Semua ID DOM yang dipanggil JavaScript tersedia di index.html
+[PASS] Tidak ada ID HTML duplikat
+[PASS] Struktur data tetap kompatibel dengan silsilah_v2
+[PASS] Firebase config dan lokasi database dipertahankan
+[PASS] Cache lokal dan fallback error Firebase ditambahkan
+[PASS] Sesi login sampai Logout ditambahkan
+[PASS] Tata letak responsif desktop/tablet/mobile ditambahkan
+[PASS] Vercel cache revalidation ditambahkan
+
+Pengujian manual setelah deploy tetap diperlukan untuk:
+- Koneksi aktual Firebase Rules
+- Sinkronisasi antarperangkat
+- Peta Leaflet/Nominatim
+- Ekspor canvas PNG/PDF pada silsilah berukuran besar
+- Perilaku browser perangkat pengguna
