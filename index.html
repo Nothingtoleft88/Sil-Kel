@@ -120,7 +120,7 @@
       <div class="sidebar-brand">
         <div class="brand-mark">S</div>
         <div class="min-w-0">
-          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.5</span></div>
+          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.6</span></div>
           <p id="app-sub-title" class="mt-1 truncate text-[11px] font-medium text-slate-400">Family Legacy Workspace</p>
         </div>
       </div>
@@ -197,11 +197,11 @@
         <div class="canvas-grid"></div>
         <div class="canvas-heading">
           <div><p class="canvas-eyebrow">Visualisasi hubungan</p><h3>Peta garis keturunan</h3></div>
-          <div class="canvas-legend"><span><i class="legend-line child"></i>Keturunan</span><span><i class="legend-line spouse"></i>Pasangan</span></div>
+          <div class="canvas-legend"><span><i class="legend-line child"></i>Garis keturunan dari titik pasangan</span><span><i class="legend-line spouse"></i>Pasangan</span></div>
         </div>
 
         <div id="tree-transform" class="absolute left-0 top-0 h-max w-max">
-          <div class="family-tree px-10 pb-40"><ul id="tree-container" class="transition-all duration-500 ease-in-out"></ul></div>
+          <div class="family-tree px-10 pb-40"><svg id="tree-connectors" class="tree-connectors" aria-hidden="true"></svg><ul id="tree-container" class="transition-all duration-500 ease-in-out"></ul></div>
         </div>
 
         <div class="canvas-tools zoom-controls" data-no-pan>

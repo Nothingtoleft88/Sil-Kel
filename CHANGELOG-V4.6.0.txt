@@ -1,0 +1,9 @@
+SILSILAH KELUARGA PRO v4.6.0
+
+- Mengganti total konektor CSS lama dengan mesin SVG berbasis union pasangan.
+- Garis anak kini berasal dari titik hubungan dua orang tua, bukan dari kartu pasangan.
+- Memisahkan kelompok anak berdasarkan linkedSpouseId untuk pernikahan lebih dari satu.
+- Memperbaiki garis keturunan pasangan kedua/eks.
+- Menambahkan halo putih pada garis agar cabang tidak membingungkan saat berpotongan.
+- Menjaga hasil yang sama pada desktop, HP, tablet, PNG, PDF, dan cetak.
+- Tidak mengubah data Firebase atau isi silsilah.

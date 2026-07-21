@@ -12,7 +12,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const APP_VERSION = '4.5.0';
+    const APP_VERSION = '4.6.0';
     const DATA_PATH = 'silsilah_v2';
     const SESSION_KEY = 'silsilah_family_session_v4';
     const CACHE_KEY = 'silsilah_family_cache_v4';
@@ -985,7 +985,7 @@
 
       return `
         <div class="relative flex flex-col items-center ${fontClass} pointer-events-auto">
-          <div onclick="${clickAction}" class="relative min-w-[175px] max-w-[220px] shadow-sm cursor-pointer transition-transform duration-200 hover:shadow-md hover:-translate-y-1 hover:z-30 ${borderClass} ${roundedClass} ${bgColor} ${deadStyle} ${highlightStyle}">
+          <div onclick="${clickAction}" data-person-id="${escapeHTML(person.id || '')}" data-card-role="${isSpouse ? 'spouse' : 'primary'}" ${isSpouse && parentId ? `data-spouse-of="${escapeHTML(parentId)}"` : ''} class="relative min-w-[175px] max-w-[220px] shadow-sm cursor-pointer transition-transform duration-200 hover:shadow-md hover:-translate-y-1 hover:z-30 ${borderClass} ${roundedClass} ${bgColor} ${deadStyle} ${highlightStyle}">
             ${badge}
             ${bdayIcon}
             ${theme !== 'minimalist' ? `<div class="h-2 w-full ${headerColor} ${theme === 'classic' ? 'rounded-t-sm' : 'rounded-t-lg'}"></div>` : ''}
@@ -1036,7 +1036,7 @@
          liStyle = `style="--branch-color: ${spouseColorMapContext[node.linkedSpouseId]};"`;
       }
 
-      let html = `<li class="${liClass}" ${liStyle}>
+      let html = `<li data-tree-node-id="${escapeHTML(node.id || '')}" class="${liClass}" ${liStyle}>
         <div class="flex flex-col items-center">
            <div class="flex items-center justify-center relative">`;
       
@@ -1095,7 +1095,7 @@
             return spA.localeCompare(spB);
         });
 
-        html += `<ul class="${ulClass}">`;
+        html += `<ul data-children-of="${escapeHTML(node.id || '')}" class="${ulClass}">`;
         sortedChildren.forEach(child => {
           html += buildNodeHTML(child, level + 1, node.spouses, currentSpouseColorMap);
         });
@@ -1103,6 +1103,215 @@
       }
       html += `</li>`;
       return html;
+    }
+
+
+
+    // =============================================================
+    // RELATIONSHIP CONNECTOR ENGINE v4.6
+    // Keturunan selalu dimulai dari titik hubungan orang tua (union),
+    // bukan dari kartu pasangan. Seluruh garis dibuat pada SVG terpisah
+    // agar tetap akurat pada desktop, tablet, HP, zoom, cetak, dan PDF.
+    // =============================================================
+    const TREE_SVG_NS = 'http://www.w3.org/2000/svg';
+    let connectorFrame = 0;
+    let connectorResizeObserver = null;
+
+    function makeSvgElement(tag, attrs = {}) {
+      const element = document.createElementNS(TREE_SVG_NS, tag);
+      Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, String(value)));
+      return element;
+    }
+
+    function scheduleTreeConnectorRender() {
+      cancelAnimationFrame(connectorFrame);
+      connectorFrame = requestAnimationFrame(() => requestAnimationFrame(drawTreeConnectors));
+    }
+
+    function localCardRect(element, rootRect, scaleX, scaleY) {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: (rect.left - rootRect.left) / scaleX,
+        top: (rect.top - rootRect.top) / scaleY,
+        right: (rect.right - rootRect.left) / scaleX,
+        bottom: (rect.bottom - rootRect.top) / scaleY,
+        width: rect.width / scaleX,
+        height: rect.height / scaleY,
+        centerX: ((rect.left + rect.right) / 2 - rootRect.left) / scaleX,
+        centerY: ((rect.top + rect.bottom) / 2 - rootRect.top) / scaleY
+      };
+    }
+
+    function appendConnectorPath(svg, points, color, width = 3, extra = {}) {
+      if (!points || points.length < 2) return;
+      const d = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+      const underlay = makeSvgElement('path', {
+        d, fill: 'none', stroke: '#f8fafc', 'stroke-width': width + 5,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: .96
+      });
+      const path = makeSvgElement('path', {
+        d, fill: 'none', stroke: color, 'stroke-width': width,
+        'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+        opacity: extra.opacity ?? 1
+      });
+      if (extra.dash) path.setAttribute('stroke-dasharray', extra.dash);
+      svg.append(underlay, path);
+    }
+
+    function appendUnionHeart(svg, x, y, color) {
+      const group = makeSvgElement('g', { transform: `translate(${x.toFixed(2)} ${y.toFixed(2)})` });
+      group.appendChild(makeSvgElement('circle', {
+        cx: 0, cy: 0, r: 9.5, fill: '#ffffff', stroke: color, 'stroke-width': 2.2
+      }));
+      const heart = makeSvgElement('text', {
+        x: 0, y: 3.1, 'text-anchor': 'middle', 'font-size': 10.5,
+        'font-family': 'Arial, sans-serif', 'font-weight': 900, fill: '#e11d48'
+      });
+      heart.textContent = '♥';
+      group.appendChild(heart);
+      svg.appendChild(group);
+    }
+
+    function drawUnion(svg, firstRect, secondRect, color) {
+      if (!firstRect || !secondRect) return null;
+      const firstIsLeft = firstRect.centerX <= secondRect.centerX;
+      const left = firstIsLeft ? firstRect : secondRect;
+      const right = firstIsLeft ? secondRect : firstRect;
+      const y = (left.centerY + right.centerY) / 2;
+      const x1 = left.right;
+      const x2 = right.left;
+      const midX = (x1 + x2) / 2;
+      appendConnectorPath(svg, [{x:x1,y}, {x:x2,y}], '#94a3b8', 3);
+      appendUnionHeart(svg, midX, y, color);
+      return {
+        x: midX,
+        y,
+        clearanceY: Math.max(firstRect.bottom, secondRect.bottom) + 18,
+        color
+      };
+    }
+
+    function drawChildGroup(svg, source, childRects, groupOrder, groupCount) {
+      if (!source || !childRects.length) return;
+      const sorted = [...childRects].sort((a, b) => a.centerX - b.centerX);
+      const childTop = Math.min(...sorted.map(rect => rect.top));
+      const childXs = sorted.map(rect => rect.centerX);
+      const groupCenterX = childXs.reduce((sum, value) => sum + value, 0) / childXs.length;
+      const stagger = Math.max(0, groupCount - 1 - groupOrder) * 12;
+      let railY = childTop - 26 - stagger;
+      const minimumRail = source.clearanceY + 22;
+      if (railY < minimumRail) railY = Math.max(source.clearanceY + 12, (source.clearanceY + childTop) / 2);
+      railY = Math.min(railY, childTop - 12);
+      const elbowY = Math.max(source.clearanceY, railY - 14);
+      const color = source.color || '#94a3b8';
+
+      appendConnectorPath(svg, [
+        {x:source.x, y:source.y},
+        {x:source.x, y:elbowY},
+        {x:groupCenterX, y:elbowY},
+        {x:groupCenterX, y:railY}
+      ], color, 3.2);
+
+      if (sorted.length > 1) {
+        appendConnectorPath(svg, [
+          {x:sorted[0].centerX, y:railY},
+          {x:sorted[sorted.length - 1].centerX, y:railY}
+        ], color, 3.2);
+      }
+
+      sorted.forEach(rect => {
+        appendConnectorPath(svg, [
+          {x:rect.centerX, y:railY},
+          {x:rect.centerX, y:rect.top - 3}
+        ], color, 3.2);
+      });
+    }
+
+    function drawTreeConnectors() {
+      const familyTree = document.querySelector('.family-tree');
+      const svg = document.getElementById('tree-connectors');
+      if (!familyTree || !svg || !treeData) return;
+
+      const naturalWidth = Math.max(familyTree.scrollWidth, familyTree.offsetWidth, 1);
+      const naturalHeight = Math.max(familyTree.scrollHeight, familyTree.offsetHeight, 1);
+      svg.setAttribute('width', naturalWidth);
+      svg.setAttribute('height', naturalHeight);
+      svg.setAttribute('viewBox', `0 0 ${naturalWidth} ${naturalHeight}`);
+      svg.replaceChildren();
+
+      const rootRect = familyTree.getBoundingClientRect();
+      const scaleX = rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : 1;
+      const scaleY = rootRect.height && familyTree.offsetHeight ? rootRect.height / familyTree.offsetHeight : scaleX;
+      const primaryCards = new Map();
+      const spouseCards = new Map();
+
+      familyTree.querySelectorAll('[data-person-id][data-card-role]').forEach(card => {
+        const id = card.dataset.personId;
+        if (!id) return;
+        const rect = localCardRect(card, rootRect, scaleX || 1, scaleY || 1);
+        if (card.dataset.cardRole === 'spouse') spouseCards.set(id, {element:card, rect, spouseOf:card.dataset.spouseOf || ''});
+        else primaryCards.set(id, {element:card, rect});
+      });
+
+      function walk(node) {
+        if (!node) return;
+        const primaryEntry = primaryCards.get(String(node.id));
+        if (!primaryEntry) return;
+        const primaryRect = primaryEntry.rect;
+        const unions = new Map();
+        let colorIndex = 0;
+
+        (node.spouses || []).forEach(spouse => {
+          const spouseEntry = spouseCards.get(String(spouse.id));
+          if (!spouseEntry) return;
+          const color = branchColors[colorIndex++ % branchColors.length];
+          const directUnion = drawUnion(svg, primaryRect, spouseEntry.rect, color);
+          if (directUnion) unions.set(String(spouse.id), directUnion);
+
+          (spouse.spouses || []).forEach(secondarySpouse => {
+            const secondaryEntry = spouseCards.get(String(secondarySpouse.id));
+            if (!secondaryEntry) return;
+            const secondaryColor = branchColors[colorIndex++ % branchColors.length];
+            const secondaryUnion = drawUnion(svg, spouseEntry.rect, secondaryEntry.rect, secondaryColor);
+            if (secondaryUnion) unions.set(String(secondarySpouse.id), secondaryUnion);
+          });
+        });
+
+        const renderedChildren = (node.children || []).filter(child => primaryCards.has(String(child.id)));
+        if (renderedChildren.length) {
+          const groups = new Map();
+          const directSpouseIds = (node.spouses || []).map(spouse => String(spouse.id)).filter(id => unions.has(id));
+          renderedChildren.forEach(child => {
+            let key = child.linkedSpouseId ? String(child.linkedSpouseId) : '';
+            if (!unions.has(key)) key = directSpouseIds.length === 1 ? directSpouseIds[0] : '__primary__';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(primaryCards.get(String(child.id)).rect);
+          });
+
+          const groupRows = [...groups.entries()].map(([key, rects]) => {
+            const source = key === '__primary__'
+              ? {x:primaryRect.centerX, y:primaryRect.bottom, clearanceY:primaryRect.bottom + 10, color:'#94a3b8'}
+              : unions.get(key);
+            return {key, rects, source};
+          }).filter(group => group.source).sort((a, b) => a.source.x - b.source.x);
+
+          groupRows.forEach((group, index) => drawChildGroup(svg, group.source, group.rects, index, groupRows.length));
+        }
+
+        (node.children || []).forEach(walk);
+      }
+
+      walk(treeData);
+    }
+
+    function initializeTreeConnectorObserver() {
+      if (!connectorResizeObserver && window.ResizeObserver) {
+        connectorResizeObserver = new ResizeObserver(scheduleTreeConnectorRender);
+        const familyTree = document.querySelector('.family-tree');
+        if (familyTree) connectorResizeObserver.observe(familyTree);
+        if (treeContainer) connectorResizeObserver.observe(treeContainer);
+      }
+      document.fonts?.ready?.then(scheduleTreeConnectorRender).catch(() => {});
     }
 
     // =============================================================
@@ -1202,12 +1411,15 @@
       treeContainer.style.cssText = rootHasSpouseParents ? 'margin-top: 260px;' : '';
       treeContainer.innerHTML = buildNodeHTML(treeData, 1);
       updateSidebarStats();
+      initializeTreeConnectorObserver();
+      scheduleTreeConnectorRender();
 
-      // Tunggu layout final agar ukuran pohon benar sebelum auto-fit pertama.
-      requestAnimationFrame(() => {
+      // Tunggu layout final agar ukuran pohon dan konektor benar sebelum auto-fit pertama.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        drawTreeConnectors();
         if (!cameraInitialized) fitTreeToViewport(false);
         else requestTransformUpdate(false);
-      });
+      }));
     }
 
     // Scroll/trackpad: zoom eksponensial terasa konsisten pada mouse dan touchpad.
@@ -1985,6 +2197,8 @@
       const treeElement = document.querySelector('.family-tree');
       if (!treeElement) throw new Error('Pohon keluarga tidak ditemukan');
       await document.fonts?.ready?.catch?.(() => {});
+      drawTreeConnectors();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const host = document.createElement('div');
       host.className = 'export-capture-host';
       host.style.padding = '72px';
@@ -2709,3 +2923,5 @@ ${bodyClone.innerHTML}
     // --- MULAI APLIKASI ---
     initApp();
   
+window.addEventListener('resize', scheduleTreeConnectorRender, {passive:true});
+window.addEventListener('orientationchange', scheduleTreeConnectorRender, {passive:true});

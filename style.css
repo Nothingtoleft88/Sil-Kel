@@ -365,3 +365,51 @@ html,body,.app-root,.app-shell{height:100%;height:100dvh;min-height:100%;min-hei
     print-color-adjust:exact!important;
   }
 }
+
+
+/* =========================================================
+   SILSILAH PRO v4.6 — UNION-BASED VECTOR CONNECTORS
+   Garis keturunan berasal dari titik hubungan pasangan,
+   bukan dari tengah keseluruhan baris atau kartu pasangan.
+   ========================================================= */
+.family-tree{
+  position:relative;
+  display:inline-block;
+  isolation:isolate;
+}
+.tree-connectors{
+  position:absolute;
+  inset:0 auto auto 0;
+  z-index:0;
+  overflow:visible;
+  pointer-events:none;
+}
+.family-tree>ul{
+  position:relative;
+  z-index:2;
+}
+/* Matikan seluruh pseudo-connector lama. Layout/spacing tetap dipertahankan. */
+.family-tree ul::before,
+.family-tree ul::after,
+.family-tree li::before,
+.family-tree li::after{
+  display:none!important;
+  content:none!important;
+  border:0!important;
+}
+.family-tree li:only-child{padding-top:var(--tree-level-gap)!important}
+.spouse-connector{display:none!important}
+.family-tree [data-card-role]{position:relative;z-index:3}
+.tree-connectors path{
+  shape-rendering:geometricPrecision;
+  vector-effect:none;
+}
+.tree-connectors text{
+  user-select:none;
+}
+@media(max-width:760px){
+  .tree-connectors path{stroke-linecap:round;stroke-linejoin:round}
+}
+@media print{
+  .tree-connectors{display:block!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}

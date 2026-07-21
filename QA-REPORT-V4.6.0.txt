@@ -1,0 +1,17 @@
+QA REPORT — SILSILAH KELUARGA PRO v4.6.0
+
+[PASS] APP version
+[PASS] Firebase path unchanged
+[PASS] SVG layer present
+[PASS] Identity markers present
+[PASS] Union engine present
+[PASS] Children grouped by linkedSpouseId
+[PASS] Old pseudo connectors disabled
+[PASS] Export refreshes connectors
+[PASS] Add partner preserved
+[PASS] Astrology preserved
+[PASS] PDF and family book preserved
+[PASS] No duplicate HTML ids
+[PASS] HTML click handlers resolve
+
+Uji visual tambahan dibuat untuk hubungan satu pasangan, multi-pasangan, dan dua generasi. Pengujian akhir tetap dilakukan pada data produksi setelah Vercel Ready.
