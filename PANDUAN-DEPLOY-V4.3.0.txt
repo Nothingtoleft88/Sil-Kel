@@ -1,0 +1,9 @@
+PANDUAN DEPLOY v4.3.0
+
+1. Ekstrak ZIP.
+2. GitHub Sil-Kel > Add file > Upload files.
+3. Upload seluruh file hasil ekstrak.
+4. Commit langsung ke main: Upgrade astrologi presisi v4.3.0.
+5. Tunggu Vercel Ready, lalu Ctrl+F5.
+
+Data keluarga tetap berada di Firebase silsilah_v2.

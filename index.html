@@ -13,6 +13,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -119,7 +120,7 @@
       <div class="sidebar-brand">
         <div class="brand-mark">S</div>
         <div class="min-w-0">
-          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.2</span></div>
+          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.3</span></div>
           <p id="app-sub-title" class="mt-1 truncate text-[11px] font-medium text-slate-400">Family Legacy Workspace</p>
         </div>
       </div>
@@ -470,6 +471,63 @@
                 </select>
               </div>
             </div>
+
+            <section class="astrology-precision-section">
+              <div class="astrology-section-heading">
+                <div>
+                  <p class="astrology-kicker"><i class="fa-solid fa-stars mr-1"></i> Astrologi Presisi</p>
+                  <h4>Big Three & Shio berdasarkan data lahir</h4>
+                  <p>Semakin lengkap jam, zona waktu, serta koordinat lahir, semakin tinggi presisinya.</p>
+                </div>
+                <span id="astrology-engine-status" class="astrology-engine-pill">Memeriksa mesin astronomi…</span>
+              </div>
+
+              <div class="astrology-input-grid">
+                <div>
+                  <label>Jam Lahir</label>
+                  <input type="time" id="input-birthtime" step="60" class="pro-input" placeholder="11:45">
+                </div>
+                <div>
+                  <label>Zona Waktu IANA</label>
+                  <input type="text" id="input-birthtimezone" list="birth-timezones" class="pro-input" placeholder="Asia/Jakarta">
+                  <datalist id="birth-timezones">
+                    <option value="Asia/Jakarta"><option value="Asia/Makassar"><option value="Asia/Jayapura">
+                    <option value="Asia/Singapore"><option value="Asia/Kuala_Lumpur"><option value="Asia/Bangkok">
+                    <option value="Asia/Shanghai"><option value="Asia/Tokyo"><option value="Europe/London">
+                    <option value="America/New_York"><option value="Australia/Sydney"><option value="UTC">
+                  </datalist>
+                </div>
+                <div>
+                  <label>UTC Offset Cadangan</label>
+                  <input type="number" id="input-birthutcoffset" min="-12" max="14" step="0.25" class="pro-input" placeholder="7">
+                </div>
+                <div>
+                  <label>Dasar Tahun Shio</label>
+                  <select id="input-chinesezodiacbasis" class="pro-input">
+                    <option value="cny">Tahun Baru Imlek</option>
+                    <option value="lichun">Li Chun / Awal Musim Semi</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Latitude Lahir</label>
+                  <input type="number" id="input-birthlatitude" min="-90" max="90" step="0.000001" class="pro-input" placeholder="-7.257500">
+                </div>
+                <div>
+                  <label>Longitude Lahir</label>
+                  <input type="number" id="input-birthlongitude" min="-180" max="180" step="0.000001" class="pro-input" placeholder="112.752100">
+                </div>
+              </div>
+
+              <div class="astrology-actions edit-only-field">
+                <button type="button" onclick="fillAstrologyCoordinates()" class="pro-secondary-btn"><i class="fa-solid fa-location-crosshairs mr-2"></i>Ambil koordinat</button>
+                <button type="button" onclick="previewAstrologyFromForm()" class="pro-primary-btn"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Hitung ulang</button>
+              </div>
+
+              <div id="astrology-preview" class="astrology-preview" aria-live="polite">
+                <div class="astrology-empty"><i class="fa-solid fa-star-and-crescent"></i><span>Isi tanggal lahir untuk melihat hasil astrologi.</span></div>
+              </div>
+              <p class="astrology-disclaimer">Posisi benda langit dihitung secara astronomis. Makna astrologinya bersifat tradisi interpretatif, bukan diagnosis atau fakta ilmiah tentang kepribadian.</p>
+            </section>
 
             <div>
               <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-book-open mr-1"></i> Biografi / Kisah Hidup</label>

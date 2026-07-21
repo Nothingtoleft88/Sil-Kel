@@ -1,0 +1,10 @@
+QA REPORT v4.3.0
+
+[PASS] JavaScript lulus node --check.
+[PASS] HTML memiliki semua input astrologi baru.
+[PASS] Field baru bersifat opsional dan data v4.2 tetap kompatibel.
+[PASS] Rumus Ascendant diuji silang terhadap Swiss Ephemeris pada sampel Surabaya: selisih < 0,001 derajat.
+[PASS] Kalender Tionghoa menggunakan relatedYear dari Intl Chinese Calendar bila tersedia.
+[PASS] Li Chun memakai SearchSunLongitude(315) dari Astronomy Engine.
+[PASS] Export Web menyertakan Astronomy Engine versi terkunci.
+[INFO] Validasi browser final dilakukan sesudah deployment Vercel.

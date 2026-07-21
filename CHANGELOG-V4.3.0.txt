@@ -1,0 +1,12 @@
+SILSILAH KELUARGA PRO v4.3.0
+
+- Mengganti rentang tanggal zodiak statis dengan longitude Matahari tropikal aktual.
+- Menambahkan Moon sign dan Ascendant.
+- Menambahkan input jam lahir, zona waktu IANA/UTC offset, latitude, longitude.
+- Menambahkan pengambilan koordinat dari URL Google Maps atau nama tempat.
+- Shio memakai kalender Tionghoa melalui Intl/ICU dengan pilihan Tahun Baru Imlek.
+- Menambahkan pilihan Li Chun yang dihitung saat Matahari mencapai 315 derajat.
+- Menambahkan elemen dan Yin/Yang berdasarkan Heavenly Stem.
+- Menambahkan deteksi cusp/batas tanda saat jam lahir tidak tersedia.
+- Menambahkan skor kelengkapan dan status mesin astronomi.
+- Data Firebase lama tidak diubah atau dihapus.
