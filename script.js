@@ -12,13 +12,23 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const APP_VERSION = '4.1.0';
+    const APP_VERSION = '4.2.0';
     const DATA_PATH = 'silsilah_v2';
     const SESSION_KEY = 'silsilah_family_session_v4';
     const CACHE_KEY = 'silsilah_family_cache_v4';
+    const OFFLINE_QUEUE_KEY = 'silsilah_offline_queue_v42';
+    const HISTORY_PATH = 'silsilah_v2_history';
+    const REMINDER_KEY = 'silsilah_reminder_v42';
+    const historyRef = db.ref(HISTORY_PATH);
     let cloudRef = db.ref(DATA_PATH);
     let saveTimer = null;
     let isCloudReady = false;
+    let familyEvents = [];
+    let editingAssets = { gallery: [], documents: [] };
+    let pendingHistoryLabel = "";
+    let calendarCursor = new Date();
+    let presentationPeople = [];
+    let presentationIndex = 0;
 
     function setSyncStatus(state, text, detail = '') {
       const dot = document.getElementById('sync-status-dot');
@@ -31,24 +41,51 @@
       if (loginStatus) loginStatus.className = `status-dot ${state === 'online' ? 'online' : state === 'offline' ? 'offline' : ''}`;
     }
 
-    function persistLocalCache() {
-      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ tree: treeData, settings: appSettings, cachedAt: Date.now() })); } catch (_) {}
+    function persistLocalCache(pending = false) {
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ tree: treeData, settings: appSettings, familyEvents, cachedAt: Date.now(), pending })); } catch (_) {}
     }
 
-    function simpanKeFirebase() {
-      persistLocalCache();
-      setSyncStatus('pending', 'Menyimpan perubahan...', 'Sinkronisasi berjalan');
+    function getCloudPayload() {
+      return { tree: treeData, settings: appSettings, familyEvents, meta: { version: APP_VERSION, updatedAt: firebase.database.ServerValue.TIMESTAMP } };
+    }
+
+    function recordHistory(label = 'Pembaruan data') {
+      if (!label || !treeData) return Promise.resolve();
+      const snapshot = { label, tree: treeData, settings: appSettings, familyEvents, createdAt: firebase.database.ServerValue.TIMESTAMP, version: APP_VERSION };
+      return historyRef.push(snapshot).then(() => historyRef.orderByChild('createdAt').once('value')).then((snap) => {
+        const rows = [];
+        snap.forEach(child => rows.push({ key: child.key, createdAt: child.val()?.createdAt || 0 }));
+        rows.sort((a,b) => b.createdAt-a.createdAt).slice(40).forEach(row => historyRef.child(row.key).remove());
+      }).catch(err => console.warn('History snapshot gagal:', err));
+    }
+
+    function simpanKeFirebase(historyLabel = '') {
+      if (historyLabel) pendingHistoryLabel = historyLabel;
+      persistLocalCache(!navigator.onLine);
+      setSyncStatus('pending', 'Menyimpan perubahan...', navigator.onLine ? 'Sinkronisasi berjalan' : 'Menunggu internet');
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        cloudRef.set({ tree: treeData, settings: appSettings, meta: { version: APP_VERSION, updatedAt: firebase.database.ServerValue.TIMESTAMP } })
-          .then(() => {
+        const payload = getCloudPayload();
+        if (!navigator.onLine) {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify({ ...payload, queuedAt: Date.now(), historyLabel: pendingHistoryLabel }));
+          setSyncStatus('offline', 'Perangkat offline', 'Perubahan masuk antrean sinkronisasi');
+          return;
+        }
+        cloudRef.set(payload)
+          .then(async () => {
             isCloudReady = true;
+            localStorage.removeItem(OFFLINE_QUEUE_KEY);
+            persistLocalCache(false);
+            const label = pendingHistoryLabel; pendingHistoryLabel = '';
+            if (label) await recordHistory(label);
             setSyncStatus('online', 'Tersinkron ke cloud', `Terakhir disimpan ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`);
           })
           .catch((error) => {
             console.error('Firebase write error:', error);
-            setSyncStatus('offline', 'Gagal menyimpan ke cloud', 'Perubahan tetap tersimpan di perangkat');
-            showToast('Cloud tidak dapat menyimpan. Perubahan disimpan sementara di perangkat.', true);
+            localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify({ ...payload, queuedAt: Date.now(), historyLabel: pendingHistoryLabel }));
+            persistLocalCache(true);
+            setSyncStatus('offline', 'Gagal menyimpan ke cloud', 'Perubahan tersimpan di antrean perangkat');
+            showToast('Cloud belum dapat menyimpan. Perubahan aman di perangkat dan akan dikirim saat online.', true);
           });
       }, 450);
     }
@@ -85,7 +122,8 @@
       bgColor: 'bg-slate-100',
       cardStyle: 'default',
       loginTitle: 'Gembok Keluarga',
-      loginDesc: 'Masukkan kode akses untuk membuka arsip dan pohon keluarga.'
+      loginDesc: 'Masukkan kode akses untuk membuka arsip dan pohon keluarga.',
+      reminderDays: 7
     };
     // --- END INITIAL DATA ---
 
@@ -205,16 +243,25 @@
     }
 
     function applyLoadedData(data, source = 'cloud') {
-      if (data?.tree) treeData = data.tree;
-      if (data?.settings) appSettings = { ...initialAppSettings, ...data.settings };
+      let cached = null;
+      try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (_) {}
+      const usePendingLocal = source === 'cloud' && cached?.pending && cached?.cachedAt > Number(data?.meta?.updatedAt || 0);
+      const chosen = usePendingLocal ? cached : data;
+      if (chosen?.tree) treeData = chosen.tree;
+      if (chosen?.settings) appSettings = { ...initialAppSettings, ...chosen.settings };
+      familyEvents = Array.isArray(chosen?.familyEvents) ? chosen.familyEvents : [];
       if (!treeData) treeData = JSON.parse(JSON.stringify(initialTreeData));
       if (!appSettings) appSettings = JSON.parse(JSON.stringify(initialAppSettings));
-      persistLocalCache();
+      const numbersChanged = ensureFamilyNumbers();
+      persistLocalCache(usePendingLocal);
       applySettingsToUI();
       showLogin(false);
       renderTree();
       updateSidebarStats();
       hideBootScreen(source === 'cloud' ? 'Data keluarga siap' : 'Mode lokal siap');
+      if (usePendingLocal) setTimeout(() => simpanKeFirebase('Sinkronisasi perubahan offline'), 700);
+      else if (numbersChanged && source === 'cloud') setTimeout(() => simpanKeFirebase(), 800);
+      setTimeout(() => { openProfileFromURL(); checkCalendarReminders(); ensureDailyHistorySnapshot(); }, 900);
     }
 
     function initApp() {
@@ -342,7 +389,7 @@
       appSettings.loginDesc = document.getElementById('set-login-desc').value || 'Masukkan kode akses untuk membuka arsip dan pohon keluarga.';
       
       applySettingsToUI();
-      simpanKeFirebase(); 
+      simpanKeFirebase('Pengaturan aplikasi diperbarui'); 
       renderTree(); 
       closeSettingsModal();
       showToast('Pengaturan berhasil disimpan!');
@@ -1144,7 +1191,7 @@
     const formFields = [
       'name', 'gender', 'notes', 'otherpartner', 'childstatus', 'photo', 'birthplace', 'blood', 
       'phone', 'occupation', 'address', 'gmap', 'birthdate', 'birthyear', 
-      'deathdate', 'deathyear', 'linkedspouse', 'biography'
+      'deathdate', 'deathyear', 'linkedspouse', 'biography', 'surname', 'marriagedate', 'source', 'familynumber'
     ];
 
     function getFormData() {
@@ -1164,6 +1211,8 @@
           if(f === 'linkedspouse') key = 'linkedSpouseId';
           if(f === 'otherpartner') key = 'otherPartner';
           if(f === 'childstatus') key = 'childStatus';
+          if(f === 'familynumber') key = 'familyNumber';
+          if(f === 'marriagedate') key = 'marriageDate';
           data[key] = el.value;
         }
       });
@@ -1186,6 +1235,8 @@
           if(f === 'linkedspouse') key = 'linkedSpouseId';
           if(f === 'otherpartner') key = 'otherPartner';
           if(f === 'childstatus') key = 'childStatus';
+          if(f === 'familynumber') key = 'familyNumber';
+          if(f === 'marriagedate') key = 'marriageDate';
           
           if(key === 'childStatus' && !data[key]) el.value = 'kandung';
           else el.value = data[key] || '';
@@ -1258,6 +1309,8 @@
       let person = findNodeById(treeData, targetId) || {};
       
       setFormData(person);
+      editingAssets = { gallery: Array.isArray(person.gallery) ? JSON.parse(JSON.stringify(person.gallery)) : [], documents: Array.isArray(person.documents) ? JSON.parse(JSON.stringify(person.documents)) : [] };
+      renderProfileAssets();
 
       if (!spouseId && nodeId !== treeData.id) {
           const parent = findParent(treeData, nodeId);
@@ -1319,7 +1372,7 @@
            if (!node.children) node.children = [];
            node.children.push(newChild);
        }
-       simpanKeFirebase();
+       simpanKeFirebase('Anak ditambahkan');
        renderTree();
        handleNodeClick(newId, null); 
        showToast("Anak berhasil ditambahkan.");
@@ -1339,7 +1392,7 @@
            ...node, spouses: [...(node.spouses || []), newPartner]
        }));
        
-       simpanKeFirebase();
+       simpanKeFirebase('Pasangan ditambahkan');
        renderTree();
        handleNodeClick(selectedNodeId, newId);
        showToast("Pasangan berhasil ditambahkan.");
@@ -1367,7 +1420,7 @@
                parent.children.push(newSibling);
            }
        }
-       simpanKeFirebase();
+       simpanKeFirebase('Saudara ditambahkan');
        renderTree();
        handleNodeClick(newId, null);
        showToast("Saudara berhasil ditambahkan.");
@@ -1412,13 +1465,13 @@
       if(!appSettings.enableEdit) return;
       if(!document.getElementById('input-name').value) { showToast('Nama tidak boleh kosong!', true); return; }
       
-      const newData = getFormData();
+      const newData = { ...getFormData(), gallery: editingAssets.gallery, documents: editingAssets.documents };
       const targetId = selectedSpouseId || selectedNodeId;
       
       treeData = updateTreeData(treeData, targetId, newData);
       
       closeEditorModal();
-      simpanKeFirebase();
+      simpanKeFirebase('Profil anggota diperbarui');
       renderTree();
       showToast('Data berhasil disimpan!');
     };
@@ -1443,7 +1496,7 @@
           treeData = deleteNodeFromTreeData(treeData, targetId);
         }
         closeEditorModal();
-        simpanKeFirebase();
+        simpanKeFirebase('Anggota keluarga dihapus');
         renderTree();
         showToast('Data berhasil dihapus!');
       });
@@ -1588,7 +1641,8 @@
       const exportObject = {
         version: "2.0",
         settings: appSettings,
-        tree: treeData
+        tree: treeData,
+        familyEvents
       };
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject, null, 2));
       const dl = document.createElement('a');
@@ -1608,6 +1662,7 @@
           if (json.version === "2.0" && json.tree && json.settings) {
             treeData = json.tree;
             appSettings = json.settings;
+            familyEvents = Array.isArray(json.familyEvents) ? json.familyEvents : [];
           } 
           else if (json && json.id && json.name) {
             treeData = json;
@@ -1618,7 +1673,7 @@
           applySettingsToUI();
           cameraInitialized = false;
           renderTree();
-          simpanKeFirebase();
+          simpanKeFirebase('Impor data JSON');
           showToast('Data berhasil dimuat dan tampilan disesuaikan!');
         } catch (err) { showToast("Format file JSON tidak valid", true); }
       };
@@ -1926,6 +1981,184 @@ ${bodyClone.innerHTML}
       document.getElementById('map-wrapper').classList.add('hidden');
       setActiveNav('tree');
     };
+
+
+
+    // ========================================================
+    // SILSILAH PRO v4.2 — MODUL PROFESIONAL (NON-AUTH)
+    // ========================================================
+    const deepClone = (value) => JSON.parse(JSON.stringify(value ?? null));
+    const normalizeText = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const getPersonYear = (person, field = 'birth') => {
+      const date = field === 'birth' ? person.birthDate : person.deathDate;
+      const year = field === 'birth' ? person.birthYear : person.deathYear;
+      return Number(date?.slice(0,4) || year || 0);
+    };
+
+    function flattenPeople(root = treeData) {
+      const rows = [];
+      const walk = (person, generation = 1, relation = 'keturunan', parentId = null, hostId = null) => {
+        if (!person) return;
+        rows.push({ person, generation, relation, parentId, hostId });
+        (person.spouses || []).forEach(spouse => {
+          rows.push({ person: spouse, generation, relation: 'pasangan', parentId: person.id, hostId: person.id });
+          (spouse.parents || []).forEach(parent => rows.push({ person: parent, generation: Math.max(1,generation-1), relation: 'besan', parentId: spouse.id, hostId: spouse.id }));
+          (spouse.spouses || []).forEach(other => rows.push({ person: other, generation, relation: 'pasangan-lain', parentId: spouse.id, hostId: spouse.id }));
+        });
+        (person.children || []).forEach(child => walk(child, generation + 1, 'anak', person.id, person.id));
+      };
+      walk(root);
+      return rows;
+    }
+
+    function ensureFamilyNumbers() {
+      if (!treeData) return false;
+      let changed = false;
+      const people = flattenPeople();
+      const used = new Set(people.map(row => row.person.familyNumber).filter(Boolean));
+      let seq = 1;
+      people.forEach(({person}) => {
+        if (!person.id) { person.id = generateId(); changed = true; }
+        if (!person.familyNumber) {
+          while (used.has(`FAM-${String(seq).padStart(4,'0')}`)) seq++;
+          person.familyNumber = `FAM-${String(seq).padStart(4,'0')}`;
+          used.add(person.familyNumber); seq++; changed = true;
+        }
+      });
+      return changed;
+    }
+
+    function validateTreeData() {
+      const issues = [];
+      const people = flattenPeople();
+      const ids = new Map();
+      const numbers = new Map();
+      const fingerprints = new Map();
+      people.forEach(row => {
+        const p = row.person;
+        if (!String(p.name || '').trim()) issues.push({severity:'high', type:'Nama kosong', personId:p.id, message:'Ada profil tanpa nama lengkap.'});
+        if (!p.id) issues.push({severity:'high', type:'ID hilang', personId:null, message:`${p.name || 'Profil'} belum memiliki ID.`});
+        else if (ids.has(p.id)) issues.push({severity:'high', type:'ID ganda', personId:p.id, message:`ID ${p.id} dipakai lebih dari satu profil.`});
+        else ids.set(p.id,p);
+        if (p.familyNumber) {
+          if (numbers.has(p.familyNumber)) issues.push({severity:'medium', type:'Nomor anggota ganda', personId:p.id, message:`Nomor ${p.familyNumber} juga dipakai ${numbers.get(p.familyNumber).name}.`});
+          else numbers.set(p.familyNumber,p);
+        } else issues.push({severity:'low', type:'Nomor anggota kosong', personId:p.id, message:`${p.name || 'Profil'} belum memiliki nomor anggota.`});
+        const fp = `${normalizeText(p.name)}|${p.birthDate || p.birthYear || ''}`;
+        if (normalizeText(p.name) && (p.birthDate || p.birthYear)) {
+          if (fingerprints.has(fp) && fingerprints.get(fp).id !== p.id) issues.push({severity:'medium', type:'Kemungkinan duplikat', personId:p.id, otherId:fingerprints.get(fp).id, message:`${p.name} memiliki nama dan tahun/tanggal lahir yang sama dengan profil lain.`});
+          else fingerprints.set(fp,p);
+        }
+        const by=getPersonYear(p,'birth'), dy=getPersonYear(p,'death');
+        if (by && dy && dy < by) issues.push({severity:'high',type:'Tanggal tidak logis',personId:p.id,message:`Tahun wafat ${p.name} lebih awal dari tahun lahir.`});
+        if (p.linkedSpouseId && !people.some(x=>x.person.id===p.linkedSpouseId)) issues.push({severity:'medium',type:'Relasi pasangan hilang',personId:p.id,message:`Relasi orang tua pasangan untuk ${p.name} tidak ditemukan.`});
+      });
+      people.filter(r=>r.relation==='anak' && r.parentId).forEach(row=>{
+        const parent=people.find(x=>x.person.id===row.parentId)?.person;
+        const py=getPersonYear(parent||{},'birth'), cy=getPersonYear(row.person,'birth');
+        if(py&&cy){const age=cy-py;if(age<12||age>80) issues.push({severity:'medium',type:'Rentang usia orang tua',personId:row.person.id,message:`Usia ${parent.name} saat ${row.person.name} lahir terdeteksi ${age} tahun.`});}
+      });
+      const penalty = issues.reduce((s,i)=>s+(i.severity==='high'?12:i.severity==='medium'?6:2),0);
+      return { issues, score: Math.max(0,100-penalty), people };
+    }
+
+    function openProWorkspace(view, title, subtitle, actionsHtml = '') {
+      document.getElementById('pro-workspace').classList.remove('hidden');
+      document.getElementById('pro-workspace-title').textContent = title;
+      document.getElementById('pro-workspace-subtitle').textContent = subtitle;
+      document.getElementById('pro-workspace-actions').innerHTML = actionsHtml;
+      setActiveNav(view);
+      toggleSidebar(false);
+    }
+    window.closeProWorkspace = function(){ document.getElementById('pro-workspace').classList.add('hidden'); setActiveNav('tree'); };
+
+    window.openDirectoryWorkspace = function() {
+      openProWorkspace('directory','Daftar Anggota','Cari dan saring seluruh anggota lintas generasi.','<button class="pro-secondary-btn" onclick="exportDirectoryCSV()"><i class="fa-solid fa-file-csv mr-2"></i>CSV</button>');
+      const content=document.getElementById('pro-workspace-content');
+      const gens=[...new Set(flattenPeople().map(r=>r.generation))].sort((a,b)=>a-b);
+      const cities=[...new Set(flattenPeople().map(r=>r.person.birthPlace).filter(Boolean))].sort();
+      content.innerHTML=`<div class="filter-row"><input id="directory-search" class="pro-input" placeholder="Cari nama, nomor anggota, pekerjaan, marga..."><select id="directory-generation" class="pro-input"><option value="">Semua generasi</option>${gens.map(g=>`<option value="${g}">Generasi ${g}</option>`).join('')}</select><select id="directory-status" class="pro-input"><option value="">Hidup & wafat</option><option value="alive">Masih hidup</option><option value="deceased">Telah wafat</option></select><select id="directory-gender" class="pro-input"><option value="">Semua gender</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select><select id="directory-city" class="pro-input"><option value="">Semua kota</option>${cities.map(c=>`<option>${escapeHTML(c)}</option>`).join('')}</select></div><p id="directory-count" class="mb-4 text-sm font-bold text-slate-500"></p><div id="directory-list" class="directory-grid"></div>`;
+      ['directory-search','directory-generation','directory-status','directory-gender','directory-city'].forEach(id=>document.getElementById(id).addEventListener('input',renderDirectory));
+      renderDirectory();
+    };
+    function renderDirectory(){
+      const q=normalizeText(document.getElementById('directory-search')?.value), gen=document.getElementById('directory-generation')?.value, status=document.getElementById('directory-status')?.value, gender=document.getElementById('directory-gender')?.value, city=document.getElementById('directory-city')?.value;
+      const rows=flattenPeople().filter(({person,generation})=>{const hay=normalizeText([person.name,person.familyNumber,person.occupation,person.surname,person.birthPlace].join(' ')); const deceased=!!(person.deathDate||person.deathYear); return (!q||hay.includes(q))&&(!gen||String(generation)===gen)&&(!status||(status==='deceased'?deceased:!deceased))&&(!gender||person.gender===gender)&&(!city||person.birthPlace===city);});
+      document.getElementById('directory-count').textContent=`${rows.length} anggota ditemukan`;
+      document.getElementById('directory-list').innerHTML=rows.map(({person,generation,relation})=>`<article class="directory-card" onclick="closeProWorkspace(); openPersonById('${person.id}')"><div class="directory-avatar">${person.photoUrl?`<img src="${sanitizeURL(person.photoUrl)}" class="h-full w-full object-cover">`:'<i class="fa-solid fa-user"></i>'}</div><div class="min-w-0"><div class="flex items-center gap-2"><h3 class="truncate font-black text-slate-900">${escapeHTML(person.name||'Tanpa Nama')}</h3><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">G${generation}</span></div><p class="mt-1 text-xs font-bold text-cyan-700">${escapeHTML(person.familyNumber||'Belum bernomor')}</p><p class="mt-2 truncate text-xs text-slate-500">${escapeHTML([person.occupation,person.birthPlace,person.surname].filter(Boolean).join(' • ')||relation)}</p></div></article>`).join('')||'<div class="module-card p-8 text-center text-slate-500">Tidak ada anggota sesuai filter.</div>';
+    }
+    window.exportDirectoryCSV=function(){const rows=flattenPeople();const esc=v=>`"${String(v||'').replace(/"/g,'""')}"`;const csv=['Nomor,Nama,Gender,Generasi,Status,Tempat Lahir,Pekerjaan,Marga',...rows.map(r=>[r.person.familyNumber,r.person.name,r.person.gender,r.generation,(r.person.deathDate||r.person.deathYear)?'Wafat':'Hidup',r.person.birthPlace,r.person.occupation,r.person.surname].map(esc).join(','))].join('\n');downloadTextFile('daftar-anggota-keluarga.csv','\ufeff'+csv,'text/csv');};
+
+    function collectTimelineEvents(){
+      const events=[];
+      flattenPeople().forEach(({person,generation})=>{
+        if(person.birthDate||person.birthYear) events.push({date:person.birthDate||`${person.birthYear}-01-01`,year:getPersonYear(person,'birth'),type:'birth',title:`Kelahiran ${person.name}`,personId:person.id,detail:person.birthPlace||`Generasi ${generation}`});
+        if(person.marriageDate) events.push({date:person.marriageDate,year:Number(person.marriageDate.slice(0,4)),type:'wedding',title:`Pernikahan ${person.name}`,personId:person.id,detail:person.notes||''});
+        if(person.deathDate||person.deathYear) events.push({date:person.deathDate||`${person.deathYear}-01-01`,year:getPersonYear(person,'death'),type:'death',title:`Wafat ${person.name}`,personId:person.id,detail:person.birthPlace||''});
+        (person.events||[]).forEach(e=>events.push({...e,year:Number((e.date||'').slice(0,4)),personId:person.id,title:e.title||`Peristiwa ${person.name}`}));
+      });
+      familyEvents.forEach(e=>events.push({...e,year:Number((e.date||'').slice(0,4))}));
+      return events.filter(e=>e.year).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    }
+    window.openTimelineWorkspace=function(){openProWorkspace('timeline','Timeline Keluarga','Kronologi kelahiran, pernikahan, peristiwa, dan wafat.','<button class="pro-primary-btn" onclick="openFamilyEventModal()"><i class="fa-solid fa-plus mr-2"></i>Tambah peristiwa</button>');const events=collectTimelineEvents();document.getElementById('pro-workspace-content').innerHTML=`<div class="timeline-list">${events.map(e=>`<div class="timeline-item"><div class="timeline-year">${escapeHTML(e.date||String(e.year))}</div><article class="timeline-card"><p class="text-[10px] font-black uppercase tracking-widest text-cyan-700">${escapeHTML(e.type||'peristiwa')}</p><h3 class="mt-1 font-black text-slate-900">${escapeHTML(e.title)}</h3><p class="mt-2 text-sm text-slate-500">${escapeHTML(e.detail||e.notes||'')}</p></article></div>`).join('')||'<div class="module-card p-8 text-center">Belum ada data kronologi.</div>'}</div>`;};
+
+    function getCalendarEventsForMonth(year,month){
+      const rows=[]; flattenPeople().forEach(({person})=>{if(person.birthDate&&!person.deathDate&&!person.deathYear){const [y,m,d]=person.birthDate.split('-').map(Number);if(m===month+1)rows.push({date:`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,title:`Ultah ${person.name}`,type:'birthday',personId:person.id});}if(person.marriageDate){const [,m,d]=person.marriageDate.split('-').map(Number);if(m===month+1)rows.push({date:`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,title:`Anniversary ${person.name}`,type:'wedding',personId:person.id});}}); familyEvents.forEach(e=>{const dt=new Date(`${e.date}T00:00:00`);if(dt.getFullYear()===year&&dt.getMonth()===month)rows.push(e)});return rows;}
+    window.openCalendarWorkspace=function(){openProWorkspace('calendar','Kalender Keluarga','Ulang tahun, anniversary, reuni, dan pengingat keluarga.','<button class="pro-secondary-btn" onclick="enableCalendarReminders()"><i class="fa-solid fa-bell mr-2"></i>Aktifkan pengingat</button><button class="pro-primary-btn" onclick="openFamilyEventModal()"><i class="fa-solid fa-plus mr-2"></i>Tambah acara</button>');renderCalendar();};
+    function renderCalendar(){const year=calendarCursor.getFullYear(),month=calendarCursor.getMonth(),events=getCalendarEventsForMonth(year,month),first=new Date(year,month,1),start=new Date(year,month,1-first.getDay());const names=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];let cells='';for(let i=0;i<42;i++){const date=new Date(start);date.setDate(start.getDate()+i);const iso=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;const dayEvents=events.filter(e=>e.date===iso);cells+=`<div class="calendar-cell ${date.getMonth()!==month?'muted':''}"><span class="calendar-date">${date.getDate()}</span>${dayEvents.map(e=>`<button class="calendar-event" title="${escapeHTML(e.title)}">${escapeHTML(e.title)}</button>`).join('')}</div>`;}document.getElementById('pro-workspace-content').innerHTML=`<div class="module-card"><div class="module-card-body"><div class="calendar-toolbar"><button class="pro-secondary-btn" onclick="moveCalendar(-1)"><i class="fa-solid fa-chevron-left"></i></button><h3 class="text-xl font-black text-slate-900">${calendarCursor.toLocaleDateString('id-ID',{month:'long',year:'numeric'})}</h3><button class="pro-secondary-btn" onclick="moveCalendar(1)"><i class="fa-solid fa-chevron-right"></i></button></div><div class="calendar-grid">${names.map(n=>`<div class="calendar-day-name">${n}</div>`).join('')}${cells}</div></div></div><div class="mt-5 module-card"><div class="module-card-header"><h3 class="font-black">Daftar acara bulan ini</h3></div><div class="module-card-body grid gap-2">${events.sort((a,b)=>a.date.localeCompare(b.date)).map(e=>`<div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"><div><p class="font-black text-slate-900">${escapeHTML(e.title)}</p><p class="text-xs text-slate-500">${escapeHTML(e.date)} • ${escapeHTML(e.notes||e.type||'')}</p></div>${e.id?`<button onclick="deleteFamilyEvent('${e.id}')" class="text-rose-600"><i class="fa-solid fa-trash"></i></button>`:''}</div>`).join('')||'<p class="text-sm text-slate-500">Tidak ada acara bulan ini.</p>'}</div></div>`;}
+    window.moveCalendar=function(delta){calendarCursor=new Date(calendarCursor.getFullYear(),calendarCursor.getMonth()+delta,1);renderCalendar();};
+    window.openFamilyEventModal=function(){const modal=document.getElementById('family-event-modal');modal.classList.remove('hidden');modal.classList.add('flex');const sel=document.getElementById('event-person');sel.innerHTML='<option value="">— Tidak terkait profil tertentu —</option>'+flattenPeople().map(r=>`<option value="${r.person.id}">${escapeHTML(r.person.name||'Tanpa Nama')}</option>`).join('');document.getElementById('event-date').value=new Date().toISOString().slice(0,10);};
+    window.closeFamilyEventModal=function(){const m=document.getElementById('family-event-modal');m.classList.add('hidden');m.classList.remove('flex');};
+    window.saveFamilyEvent=function(){const title=document.getElementById('event-title').value.trim(),date=document.getElementById('event-date').value;if(!title||!date)return showToast('Judul dan tanggal acara wajib diisi.',true);familyEvents.push({id:generateId(),title,date,type:document.getElementById('event-type').value,personId:document.getElementById('event-person').value,notes:document.getElementById('event-notes').value.trim(),createdAt:Date.now()});closeFamilyEventModal();simpanKeFirebase('Acara keluarga ditambahkan');openCalendarWorkspace();showToast('Acara keluarga disimpan.');};
+    window.deleteFamilyEvent=function(id){customConfirm('Hapus acara','Acara ini akan dihapus dari kalender keluarga.',()=>{familyEvents=familyEvents.filter(e=>e.id!==id);simpanKeFirebase('Acara keluarga dihapus');renderCalendar();});};
+    window.enableCalendarReminders=async function(){if(!('Notification'in window))return showToast('Browser ini tidak mendukung notifikasi.',true);const permission=await Notification.requestPermission();if(permission==='granted'){localStorage.setItem(REMINDER_KEY,'enabled');showToast('Pengingat kalender aktif.');checkCalendarReminders();}else showToast('Izin notifikasi belum diberikan.',true);};
+    function checkCalendarReminders(){if(localStorage.getItem(REMINDER_KEY)!=='enabled'||Notification.permission!=='granted')return;const today=new Date();today.setHours(0,0,0,0);const limit=new Date(today);limit.setDate(limit.getDate()+Number(appSettings.reminderDays||7));const events=[];for(let m=0;m<2;m++)events.push(...getCalendarEventsForMonth(today.getFullYear(),today.getMonth()+m));const upcoming=events.filter(e=>{const d=new Date(`${e.date}T00:00:00`);return d>=today&&d<=limit});const key=`silsilah-reminded-${today.toISOString().slice(0,10)}`;if(upcoming.length&&localStorage.getItem(key)!=='yes'){new Notification('Agenda keluarga mendatang',{body:upcoming.slice(0,3).map(e=>`${e.date.slice(5)} ${e.title}`).join(' • ')});localStorage.setItem(key,'yes');}};
+
+    window.openArchiveWorkspace=function(){openProWorkspace('archive','Arsip & Galeri','Seluruh foto dan dokumen keluarga dalam satu tempat.');const photos=[],docs=[];flattenPeople().forEach(({person})=>{(person.gallery||[]).forEach(x=>photos.push({...x,owner:person.name,personId:person.id}));(person.documents||[]).forEach(x=>docs.push({...x,owner:person.name,personId:person.id}));});document.getElementById('pro-workspace-content').innerHTML=`<div class="metric-grid mb-5"><div class="metric-card"><span>${photos.length}</span><small>Foto galeri</small></div><div class="metric-card"><span>${docs.length}</span><small>Dokumen</small></div><div class="metric-card"><span>${new Set([...photos,...docs].map(x=>x.personId)).size}</span><small>Profil berarsip</small></div><div class="metric-card"><span>${formatBytes([...photos,...docs].reduce((s,x)=>s+Number(x.size||0),0))}</span><small>Total arsip</small></div></div><section class="module-card mb-5"><div class="module-card-header"><h3 class="font-black">Galeri keluarga</h3></div><div class="module-card-body archive-grid">${photos.map(x=>`<article class="archive-item"><a href="${x.dataUrl}" target="_blank"><img src="${x.dataUrl}" alt="${escapeHTML(x.name||'Foto')}"></a><div class="archive-item-body"><p class="truncate font-black text-slate-900">${escapeHTML(x.name||'Foto')}</p><p class="mt-1 text-xs text-slate-500">${escapeHTML(x.owner||'')}</p></div></article>`).join('')||'<p class="text-sm text-slate-500">Belum ada foto galeri.</p>'}</div></section><section class="module-card"><div class="module-card-header"><h3 class="font-black">Dokumen keluarga</h3></div><div class="module-card-body grid gap-2">${docs.map(x=>`<a href="${x.dataUrl}" download="${escapeHTML(x.name||'dokumen')}" class="profile-document-item"><span class="doc-icon"><i class="fa-solid fa-file"></i></span><span class="min-w-0 flex-1"><b class="block truncate text-sm">${escapeHTML(x.name)}</b><small class="text-slate-500">${escapeHTML(x.owner)} • ${formatBytes(x.size)}</small></span><i class="fa-solid fa-download text-slate-400"></i></a>`).join('')||'<p class="text-sm text-slate-500">Belum ada dokumen.</p>'}</div></section>`;};
+
+    window.openQualityWorkspace=function(){const result=validateTreeData();openProWorkspace('quality','Kualitas Data','Deteksi kesalahan, relasi tidak logis, dan kemungkinan profil ganda.','<button class="pro-secondary-btn" onclick="repairSafeDataIssues()"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Perbaiki yang aman</button>');document.getElementById('pro-workspace-content').innerHTML=`<div class="module-card mb-5"><div class="module-card-body flex flex-wrap items-center gap-8"><div class="quality-score" style="--score:${result.score}%"><span>${result.score}</span></div><div><h3 class="text-2xl font-black text-slate-900">${result.score>=90?'Data sangat rapi':result.score>=70?'Data cukup baik':'Perlu pemeriksaan'}</h3><p class="mt-2 text-sm text-slate-500">${result.people.length} profil diperiksa • ${result.issues.length} catatan ditemukan.</p></div></div></div><div class="grid gap-3">${result.issues.map(i=>`<article class="issue-card ${i.severity}"><div class="mt-1"><i class="fa-solid ${i.severity==='high'?'fa-circle-exclamation text-rose-600':i.severity==='medium'?'fa-triangle-exclamation text-amber-600':'fa-circle-info text-blue-600'}"></i></div><div class="flex-1"><div class="flex items-center gap-2"><h4 class="font-black text-slate-900">${escapeHTML(i.type)}</h4><span class="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black uppercase text-slate-500">${i.severity}</span></div><p class="mt-1 text-sm text-slate-600">${escapeHTML(i.message)}</p></div>${i.personId?`<button onclick="closeProWorkspace(); openPersonById('${i.personId}')" class="pro-secondary-btn">Buka</button>`:''}</article>`).join('')||'<div class="module-card p-8 text-center"><i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i><h3 class="mt-3 font-black">Tidak ada masalah terdeteksi</h3></div>'}</div>`;};
+    window.repairSafeDataIssues=function(){const changed=ensureFamilyNumbers();if(changed){simpanKeFirebase('Perbaikan otomatis ID dan nomor anggota');renderTree();openQualityWorkspace();showToast('ID dan nomor anggota yang kosong telah diperbaiki.');}else showToast('Tidak ada perbaikan otomatis yang diperlukan.');};
+    window.openPersonById=function(id){const row=flattenPeople().find(x=>x.person.id===id);if(!row)return showToast('Profil tidak ditemukan.',true);if(row.relation==='pasangan'||row.relation==='pasangan-lain')handleNodeClick(row.hostId||row.parentId,id);else handleNodeClick(id,null);};
+
+    window.openHistoryWorkspace=function(){openProWorkspace('history','Riwayat Versi','Pulihkan kondisi data sebelum perubahan atau dari snapshot harian.','<button class="pro-primary-btn" onclick="recordHistory(\'Snapshot manual\').then(openHistoryWorkspace)"><i class="fa-solid fa-camera mr-2"></i>Snapshot sekarang</button>');const content=document.getElementById('pro-workspace-content');content.innerHTML='<div class="module-card p-8 text-center text-slate-500"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat riwayat...</div>';historyRef.orderByChild('createdAt').limitToLast(40).once('value').then(snap=>{const rows=[];snap.forEach(c=>rows.push({id:c.key,...c.val()}));rows.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));content.innerHTML=`<div class="grid gap-3">${rows.map(r=>`<article class="history-item"><div class="history-icon"><i class="fa-solid fa-clock-rotate-left"></i></div><div class="min-w-0 flex-1"><h3 class="truncate font-black text-slate-900">${escapeHTML(r.label||'Versi data')}</h3><p class="mt-1 text-xs text-slate-500">${new Date(r.createdAt||Date.now()).toLocaleString('id-ID')} • v${escapeHTML(r.version||'')}</p></div><button onclick="restoreHistoryVersion('${r.id}')" class="pro-secondary-btn"><i class="fa-solid fa-rotate-left mr-2"></i>Pulihkan</button></article>`).join('')||'<div class="module-card p-8 text-center text-slate-500">Belum ada riwayat versi.</div>'}</div>`;}).catch(()=>content.innerHTML='<div class="module-card p-8 text-center text-rose-600">Riwayat tidak dapat dibaca. Pastikan Firebase Rules mengizinkan path riwayat.</div>');};
+    window.restoreHistoryVersion=function(id){customConfirm('Pulihkan versi','Data sekarang akan disimpan sebagai snapshot, lalu diganti dengan versi yang dipilih.',()=>{historyRef.child(id).once('value').then(async snap=>{const v=snap.val();if(!v?.tree)throw new Error('Snapshot tidak valid');await recordHistory('Sebelum pemulihan versi');treeData=deepClone(v.tree);appSettings={...initialAppSettings,...deepClone(v.settings||{})};familyEvents=deepClone(v.familyEvents||[]);ensureFamilyNumbers();applySettingsToUI();cameraInitialized=false;renderTree();simpanKeFirebase('Versi lama dipulihkan');closeProWorkspace();showToast('Versi data berhasil dipulihkan.');}).catch(()=>showToast('Versi tidak dapat dipulihkan.',true));});};
+    function ensureDailyHistorySnapshot(){if(!isCloudReady)return;const key=`silsilah-daily-snapshot-${new Date().toISOString().slice(0,10)}`;if(localStorage.getItem(key))return;recordHistory('Snapshot harian otomatis').then(()=>localStorage.setItem(key,'yes'));}
+
+    function aggregateCounts(values){const map={};values.filter(Boolean).forEach(v=>map[v]=(map[v]||0)+1);return Object.entries(map).sort((a,b)=>b[1]-a[1]);}
+    function renderBars(rows,total){return `<div class="bar-list">${rows.slice(0,10).map(([label,count])=>`<div class="bar-row"><span class="truncate font-bold text-slate-600">${escapeHTML(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(4,(count/Math.max(1,total))*100)}%"></div></div><b>${count}</b></div>`).join('')||'<p class="text-sm text-slate-500">Belum ada data.</p>'}</div>`;}
+    const originalOpenStatsModal=window.openStatsModal;
+    window.openStatsModal=function(){const rows=flattenPeople(),stats=calculateStats(treeData),cities=aggregateCounts(rows.map(r=>r.person.birthPlace)),jobs=aggregateCounts(rows.map(r=>r.person.occupation)),surnames=aggregateCounts(rows.map(r=>r.person.surname));openProWorkspace('stats','Statistik Keluarga','Demografi, persebaran, generasi, dan kelengkapan arsip.','<button class="pro-primary-btn" onclick="exportFamilyBookPDF()"><i class="fa-solid fa-book-open mr-2"></i>Buku PDF</button>');document.getElementById('pro-workspace-content').innerHTML=`<div class="metric-grid mb-5"><div class="metric-card"><span>${stats.total}</span><small>Total anggota</small></div><div class="metric-card"><span>${stats.maxDepth}</span><small>Generasi</small></div><div class="metric-card"><span>${stats.male}/${stats.female}</span><small>Laki-laki / perempuan</small></div><div class="metric-card"><span>${rows.filter(r=>(r.person.gallery||[]).length||(r.person.documents||[]).length).length}</span><small>Profil berarsip</small></div></div><div class="grid gap-5 lg:grid-cols-3"><section class="module-card"><div class="module-card-header"><h3 class="font-black">Kota kelahiran</h3></div><div class="module-card-body">${renderBars(cities,rows.length)}</div></section><section class="module-card"><div class="module-card-header"><h3 class="font-black">Pekerjaan</h3></div><div class="module-card-body">${renderBars(jobs,rows.length)}</div></section><section class="module-card"><div class="module-card-header"><h3 class="font-black">Marga / cabang</h3></div><div class="module-card-body">${renderBars(surnames,rows.length)}</div></section></div>`;};
+
+    function formatBytes(bytes=0){if(!bytes)return '0 KB';const units=['B','KB','MB'];let n=Number(bytes),i=0;while(n>=1024&&i<2){n/=1024;i++}return `${n.toFixed(i?1:0)} ${units[i]}`;}
+    function readFileAsDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
+    async function compressImageFile(file,max=1200,quality=.78){const data=await readFileAsDataURL(file);return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(Math.max(w,h)>max){const ratio=max/Math.max(w,h);w=Math.round(w*ratio);h=Math.round(h*ratio)}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',quality));};img.onerror=reject;img.src=data;});}
+    function renderProfileAssets(){const gallery=document.getElementById('profile-gallery-list'),docs=document.getElementById('profile-document-list');if(!gallery||!docs)return;gallery.innerHTML=editingAssets.gallery.map((x,i)=>`<div class="profile-gallery-item"><a href="${x.dataUrl}" target="_blank"><img src="${x.dataUrl}" alt="${escapeHTML(x.name||'Foto')}"></a>${appSettings.enableEdit?`<button type="button" class="asset-delete" onclick="removeEditingAsset('gallery',${i})"><i class="fa-solid fa-trash"></i></button>`:''}</div>`).join('')||'<p class="col-span-full py-3 text-center text-xs text-slate-400">Belum ada foto galeri.</p>';docs.innerHTML=editingAssets.documents.map((x,i)=>`<div class="profile-document-item"><span class="doc-icon"><i class="fa-solid fa-file"></i></span><a href="${x.dataUrl}" download="${escapeHTML(x.name||'dokumen')}" class="min-w-0 flex-1"><b class="block truncate text-xs text-slate-800">${escapeHTML(x.name)}</b><small class="text-slate-500">${formatBytes(x.size)}</small></a>${appSettings.enableEdit?`<button type="button" class="text-rose-600" onclick="removeEditingAsset('documents',${i})"><i class="fa-solid fa-trash"></i></button>`:''}</div>`).join('')||'<p class="py-3 text-center text-xs text-slate-400">Belum ada dokumen.</p>';}
+    window.removeEditingAsset=function(type,index){editingAssets[type].splice(index,1);renderProfileAssets();};
+    document.getElementById('input-gallery-files')?.addEventListener('change',async e=>{for(const file of [...e.target.files]){try{const dataUrl=await compressImageFile(file);editingAssets.gallery.push({id:generateId(),name:file.name,type:'image/jpeg',size:Math.round(dataUrl.length*.75),dataUrl,createdAt:Date.now()});}catch(_){showToast(`Foto ${file.name} gagal diproses.`,true)}}renderProfileAssets();e.target.value='';});
+    document.getElementById('input-document-files')?.addEventListener('change',async e=>{for(const file of [...e.target.files]){if(file.size>1200000){showToast(`${file.name} melebihi batas 1,2 MB.`,true);continue}try{const dataUrl=file.type.startsWith('image/')?await compressImageFile(file,1400,.8):await readFileAsDataURL(file);editingAssets.documents.push({id:generateId(),name:file.name,type:file.type||'application/octet-stream',size:file.size,dataUrl,createdAt:Date.now()});}catch(_){showToast(`Dokumen ${file.name} gagal diproses.`,true)}}renderProfileAssets();e.target.value='';});
+
+    window.openProfileShare=function(){const id=selectedSpouseId||selectedNodeId,person=findNodeById(treeData,id);if(!person)return;const url=`${location.origin}${location.pathname}?person=${encodeURIComponent(id)}`;document.getElementById('profile-share-name').textContent=person.name||'Bagikan profil';document.getElementById('profile-share-url').value=url;const box=document.getElementById('profile-qr-code');box.innerHTML='';if(window.QRCode)new QRCode(box,{text:url,width:220,height:220,colorDark:'#0f172a',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});document.getElementById('profile-share-modal').classList.remove('hidden');document.getElementById('profile-share-modal').classList.add('flex');};
+    window.closeProfileShare=function(){const m=document.getElementById('profile-share-modal');m.classList.add('hidden');m.classList.remove('flex');};
+    window.copyProfileShareLink=async function(){const value=document.getElementById('profile-share-url').value;try{await navigator.clipboard.writeText(value);showToast('Tautan profil disalin.');}catch(_){document.getElementById('profile-share-url').select();document.execCommand('copy');}};
+    function openProfileFromURL(){const id=new URLSearchParams(location.search).get('person');if(!id||!treeData||!hasStoredSession())return;setTimeout(()=>openPersonById(id),400);}
+
+    window.openPresentationMode=function(){presentationPeople=flattenPeople().map(r=>r.person);if(!presentationPeople.length)return;presentationIndex=0;const m=document.getElementById('presentation-mode');m.classList.remove('hidden');renderPresentation();document.documentElement.requestFullscreen?.().catch(()=>{});};
+    function renderPresentation(){const p=presentationPeople[presentationIndex];document.getElementById('presentation-counter').textContent=`${presentationIndex+1} / ${presentationPeople.length}`;document.getElementById('presentation-content').innerHTML=`<div class="presentation-card"><div class="presentation-photo">${p.photoUrl?`<img src="${sanitizeURL(p.photoUrl)}">`:'<i class="fa-solid fa-user"></i>'}</div><div class="presentation-copy"><p class="text-xs font-black uppercase tracking-[.28em] text-cyan-300">${escapeHTML(p.familyNumber||'Profil keluarga')}</p><h2 class="mt-4">${escapeHTML(p.name||'Tanpa Nama')}</h2><div class="presentation-meta">${[p.birthPlace,p.occupation,p.surname,p.birthDate||p.birthYear].filter(Boolean).map(x=>`<span class="presentation-chip">${escapeHTML(x)}</span>`).join('')}</div><p>${escapeHTML(p.biography||p.notes||'Belum ada biografi untuk profil ini.')}</p></div></div>`;}
+    window.presentationNext=function(){presentationIndex=(presentationIndex+1)%presentationPeople.length;renderPresentation();};window.presentationPrevious=function(){presentationIndex=(presentationIndex-1+presentationPeople.length)%presentationPeople.length;renderPresentation();};window.closePresentationMode=function(){document.getElementById('presentation-mode').classList.add('hidden');if(document.fullscreenElement)document.exitFullscreen?.();};
+
+    window.exportFamilyBookPDF=async function(){if(!window.jspdf)return showToast('Library PDF tidak tersedia.',true);showToast('Menyusun buku keluarga PDF...');const {jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4'}),rows=flattenPeople();const pageW=210,pageH=297,margin=16;const addWrapped=(text,x,y,maxWidth,size=10,line=5)=>{pdf.setFontSize(size);const lines=pdf.splitTextToSize(String(text||''),maxWidth);pdf.text(lines,x,y);return y+lines.length*line};pdf.setFillColor(9,17,31);pdf.rect(0,0,pageW,pageH,'F');pdf.setTextColor(255);pdf.setFontSize(28);pdf.text(appSettings.appTitle||'Silsilah Keluarga',margin,70);pdf.setFontSize(12);pdf.setTextColor(180,205,220);pdf.text('Buku Warisan Keluarga',margin,82);pdf.text(`${rows.length} anggota • ${calculateStats(treeData).maxDepth} generasi • dibuat ${new Date().toLocaleDateString('id-ID')}`,margin,94);for(let i=0;i<rows.length;i++){const p=rows[i].person;if(i||true)pdf.addPage();pdf.setTextColor(15,23,42);pdf.setFontSize(9);pdf.text(`${p.familyNumber||''} • Generasi ${rows[i].generation}`,margin,18);pdf.setFontSize(22);pdf.setFont(undefined,'bold');pdf.text(String(p.name||'Tanpa Nama'),margin,32);pdf.setFont(undefined,'normal');let y=45;if(p.photoUrl&&p.photoUrl.startsWith('data:image')){try{pdf.addImage(p.photoUrl,'JPEG',margin,y,45,55);y+=62}catch(_){}}const meta=[['Lahir',p.birthDate||p.birthYear],['Wafat',p.deathDate||p.deathYear],['Tempat lahir',p.birthPlace],['Pekerjaan',p.occupation],['Marga',p.surname],['Golongan darah',p.bloodType]].filter(x=>x[1]);meta.forEach(([k,v])=>{pdf.setFont(undefined,'bold');pdf.text(`${k}:`,margin,y);pdf.setFont(undefined,'normal');pdf.text(String(v),margin+34,y);y+=6});y+=4;if(p.biography){pdf.setFont(undefined,'bold');pdf.text('Biografi',margin,y);pdf.setFont(undefined,'normal');y=addWrapped(p.biography,margin,y+7,pageW-margin*2,10,5);}if(p.source){y+=5;pdf.setFont(undefined,'bold');pdf.text('Sumber',margin,y);pdf.setFont(undefined,'normal');addWrapped(p.source,margin,y+7,pageW-margin*2,9,4.5);}pdf.setDrawColor(226,232,240);pdf.line(margin,pageH-18,pageW-margin,pageH-18);pdf.setFontSize(8);pdf.setTextColor(100);pdf.text(`${i+1}/${rows.length}`,pageW-margin,pageH-11,{align:'right'});}pdf.save(`Buku_Keluarga_${new Date().toISOString().slice(0,10)}.pdf`);showToast('Buku keluarga PDF berhasil dibuat.');};
+
+    function gedDate(dateOrYear){if(!dateOrYear)return'';if(/^\d{4}$/.test(String(dateOrYear)))return String(dateOrYear);const d=new Date(`${dateOrYear}T00:00:00`);if(isNaN(d))return String(dateOrYear);return `${d.getDate()} ${['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()]} ${d.getFullYear()}`;}
+    window.exportGEDCOM=function(){const rows=flattenPeople(),idMap=new Map(rows.map((r,i)=>[r.person.id,`I${i+1}`]));let lines=['0 HEAD','1 SOUR SILSILAH-PRO','1 CHAR UTF-8','1 GEDC','2 VERS 5.5.1'];rows.forEach(({person})=>{const id=idMap.get(person.id);lines.push(`0 @${id}@ INDI`,`1 NAME ${person.name||'Tanpa Nama'}`);if(person.surname)lines.push(`2 SURN ${person.surname}`);lines.push(`1 SEX ${person.gender==='P'?'F':'M'}`);if(person.birthDate||person.birthYear){lines.push('1 BIRT',`2 DATE ${gedDate(person.birthDate||person.birthYear)}`);if(person.birthPlace)lines.push(`2 PLAC ${person.birthPlace}`)}if(person.deathDate||person.deathYear){lines.push('1 DEAT',`2 DATE ${gedDate(person.deathDate||person.deathYear)}`)}if(person.occupation)lines.push(`1 OCCU ${person.occupation}`);if(person.biography)lines.push(`1 NOTE ${person.biography.replace(/\n/g,' ')}`);if(person.familyNumber)lines.push(`1 REFN ${person.familyNumber}`)});let famSeq=1;const walk=node=>{(node.spouses||[]).forEach(sp=>{const fam=`F${famSeq++}`;lines.push(`0 @${fam}@ FAM`,node.gender==='P'?`1 WIFE @${idMap.get(node.id)}@`:`1 HUSB @${idMap.get(node.id)}@`,sp.gender==='P'?`1 WIFE @${idMap.get(sp.id)}@`:`1 HUSB @${idMap.get(sp.id)}@`);if(sp.marriageDate||node.marriageDate)lines.push('1 MARR',`2 DATE ${gedDate(sp.marriageDate||node.marriageDate)}`);(node.children||[]).filter(c=>!c.linkedSpouseId||c.linkedSpouseId===sp.id).forEach(c=>lines.push(`1 CHIL @${idMap.get(c.id)}@`));});(node.children||[]).forEach(walk)};walk(treeData);lines.push('0 TRLR');downloadTextFile('silsilah-keluarga.ged',lines.join('\r\n'),'text/plain');showToast('GEDCOM berhasil diekspor.');};
+    function parseGedDate(value){const parts=String(value||'').trim().split(/\s+/);if(parts.length===1&&/^\d{4}$/.test(parts[0]))return{year:parts[0],date:''};if(parts.length>=3){const months={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,JUN:6,JUL:7,AUG:8,SEP:9,OCT:10,NOV:11,DEC:12};return{year:parts[2],date:`${parts[2]}-${String(months[parts[1].toUpperCase()]||1).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`}}return{year:'',date:''};}
+    function importGEDCOMText(text){const lines=text.split(/\r?\n/),individuals={},families={};let current=null,section='';for(const raw of lines){const m=raw.match(/^(\d+)\s+(?:@([^@]+)@\s+)?([A-Z0-9_]+)(?:\s+(.*))?$/);if(!m)continue;const level=Number(m[1]),xref=m[2],tag=m[3],value=m[4]||'';if(level===0&&tag==='INDI'){current=individuals[xref]={id:generateId(),name:'Tanpa Nama',gender:'L',spouses:[],children:[],isCollapsed:false};section='INDI';continue}if(level===0&&tag==='FAM'){current=families[xref]={children:[]};section='FAM';continue}if(section==='INDI'&&current){if(tag==='NAME')current.name=value.replace(/\//g,'').trim();else if(tag==='SEX')current.gender=value==='F'?'P':'L';else if(tag==='BIRT')current._event='birth';else if(tag==='DEAT')current._event='death';else if(tag==='DATE'){const d=parseGedDate(value);if(current._event==='birth'){current.birthDate=d.date;current.birthYear=d.year}else if(current._event==='death'){current.deathDate=d.date;current.deathYear=d.year}}else if(tag==='PLAC'&&current._event==='birth')current.birthPlace=value;else if(tag==='OCCU')current.occupation=value;else if(tag==='NOTE')current.biography=value;else if(tag==='REFN')current.familyNumber=value}else if(section==='FAM'&&current){const ref=(value.match(/@([^@]+)@/)||[])[1];if(tag==='HUSB')current.husb=ref;else if(tag==='WIFE')current.wife=ref;else if(tag==='CHIL'&&ref)current.children.push(ref);else if(tag==='MARR')current._event='marriage';else if(tag==='DATE'&&current._event==='marriage')current.marriageDate=parseGedDate(value).date}}const childRefs=new Set(Object.values(families).flatMap(f=>f.children));const rootRef=Object.keys(individuals).find(id=>!childRefs.has(id))||Object.keys(individuals)[0];const build=id=>{const base=deepClone(individuals[id]);if(!base)return null;const fam=Object.values(families).find(f=>f.husb===id||f.wife===id);if(fam){const spouseRef=fam.husb===id?fam.wife:fam.husb;if(spouseRef&&individuals[spouseRef])base.spouses=[{...deepClone(individuals[spouseRef]),marriageDate:fam.marriageDate||''}];base.children=fam.children.map(build).filter(Boolean);if(base.spouses[0])base.children.forEach(c=>c.linkedSpouseId=base.spouses[0].id)}return base};const root=build(rootRef);if(!root)throw new Error('Tidak ada individu');return root;}
+    function bindGedcomInput(id){document.getElementById(id)?.addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{const imported=importGEDCOMText(r.result);customConfirm('Impor GEDCOM','Pohon saat ini akan disimpan ke riwayat, lalu diganti dengan hasil impor GEDCOM.',async()=>{await recordHistory('Sebelum impor GEDCOM');treeData=imported;ensureFamilyNumbers();cameraInitialized=false;renderTree();simpanKeFirebase('Impor GEDCOM');showToast('GEDCOM berhasil diimpor.');});}catch(err){console.error(err);showToast('GEDCOM tidak dapat dibaca.',true)}};r.readAsText(file);e.target.value='';});}bindGedcomInput('gedcom-input');bindGedcomInput('gedcom-input-export');
+
+    function downloadTextFile(name,content,type='text/plain'){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+    async function flushOfflineQueue(){const raw=localStorage.getItem(OFFLINE_QUEUE_KEY);if(!raw||!navigator.onLine)return;try{const queued=JSON.parse(raw);treeData=queued.tree||treeData;appSettings={...initialAppSettings,...(queued.settings||{})};familyEvents=queued.familyEvents||familyEvents;await cloudRef.set(getCloudPayload());localStorage.removeItem(OFFLINE_QUEUE_KEY);persistLocalCache(false);if(queued.historyLabel)await recordHistory(queued.historyLabel);setSyncStatus('online','Perubahan offline tersinkron','Antrean selesai dikirim');showToast('Perubahan offline berhasil disinkronkan.');}catch(err){console.warn('Antrean offline belum terkirim',err)}}
+    window.addEventListener('online',()=>setTimeout(flushOfflineQueue,500));
+    document.addEventListener('keydown',e=>{if(document.getElementById('presentation-mode')?.classList.contains('hidden'))return;if(e.key==='ArrowRight')presentationNext();if(e.key==='ArrowLeft')presentationPrevious();if(e.key==='Escape')closePresentationMode();});
+
 
     // --- MULAI APLIKASI ---
     initApp();

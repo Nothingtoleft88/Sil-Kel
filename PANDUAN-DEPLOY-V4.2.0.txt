@@ -1,0 +1,9 @@
+DEPLOY VIA BROWSER GITHUB
+
+1. Buka repository Sil-Kel di GitHub, pilih main, lalu Add file > Upload files.
+2. Upload seluruh isi folder v4.2.0 (bukan ZIP).
+3. Commit langsung ke main dengan judul: Upgrade Silsilah Keluarga Pro v4.2.0
+4. Tunggu deployment Vercel berstatus Ready.
+5. Buka sil-kel.vercel.app lalu tekan Ctrl+F5.
+
+Data lama tidak perlu diimpor ulang.

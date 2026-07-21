@@ -1,0 +1,10 @@
+SILSILAH KELUARGA PRO v4.2.0
+
+- Menambahkan riwayat versi, snapshot harian, pemulihan versi, dan antrean offline.
+- Menambahkan pemeriksaan kualitas data, duplikat, tanggal tidak logis, dan relasi hilang.
+- Menambahkan galeri foto dan dokumen per anggota.
+- Menambahkan daftar anggota, filter, ekspor CSV, timeline, kalender, dan notifikasi.
+- Menambahkan statistik distribusi kota, pekerjaan, marga, dan kelengkapan arsip.
+- Menambahkan buku keluarga PDF, mode presentasi, tautan profil, QR code, GEDCOM impor/ekspor.
+- Menambahkan nomor anggota otomatis tanpa mengubah data pribadi yang sudah tersimpan.
+- Sistem login/gembok keluarga tidak diubah.

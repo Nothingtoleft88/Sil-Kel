@@ -1,0 +1,11 @@
+QA REPORT v4.2.0
+
+Pemeriksaan otomatis:
+- JavaScript syntax: PASS (node --check)
+- HTML IDs duplikat: PASS
+- File deployment utama tersedia: PASS
+- Struktur Firebase utama tetap silsilah_v2: PASS
+- Sistem gembok/login tidak dirombak: PASS
+- Modul baru bersifat aditif terhadap data lama: PASS
+
+Catatan: uji koneksi Firebase, notifikasi browser, upload dokumen, dan Vercel dilakukan pada deployment pengguna.

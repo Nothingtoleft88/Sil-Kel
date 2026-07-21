@@ -1,40 +1,16 @@
-# Silsilah Keluarga Pro v4.1.0
+# Silsilah Keluarga Pro v4.2.0
 
-Versi profesional aplikasi silsilah keluarga berbasis HTML/CSS/JavaScript dan Firebase Realtime Database.
+Ruang kerja arsip keluarga profesional berbasis HTML/CSS/JavaScript dan Firebase Realtime Database.
 
-## Pembaruan utama v4.1
-- Mesin kamera kanvas ditulis ulang agar zoom tidak bergeser diagonal atau terasa miring.
-- Zoom mouse/trackpad kini berpusat tepat pada posisi kursor.
-- Pinch zoom HP/tablet memakai Pointer Events dan mempertahankan titik di antara dua jari.
-- Tombol **Fit** menyesuaikan seluruh ukuran pohon secara otomatis.
-- Tombol persentase zoom dapat mengembalikan tampilan ke 100%.
-- Panning, resize jendela, dan perubahan sidebar lebih stabil.
-- Ekspor proyek web diperbaiki agar membawa data aktif ke paket hasil ekspor.
-- Alur impor JSON diperbaiki agar langsung merender dan menyesuaikan pohon.
+## Modul baru v4.2
+- Riwayat versi, snapshot harian, dan pemulihan data.
+- Pemeriksaan kualitas data dan deteksi kemungkinan duplikat.
+- Galeri foto dan dokumen per profil.
+- Timeline dan kalender keluarga dengan notifikasi opsional.
+- Daftar anggota dengan filter, CSV, statistik persebaran, dan marga.
+- Buku keluarga PDF, mode presentasi, tautan/QR profil.
+- Impor/ekspor GEDCOM.
+- Antrean offline dan sinkronisasi otomatis saat internet kembali.
+- Nomor anggota otomatis.
 
-## Data tetap kompatibel
-Versi ini tetap memakai konfigurasi Firebase dan lokasi data yang sama:
-
-```text
-silsilah_v2
-├── tree
-├── settings
-└── meta
-```
-
-Tidak ada perubahan nama node, struktur profil, relasi, isi pohon, kode akses, atau data anggota keluarga.
-
-## Kontrol kanvas
-- Gulir mouse/trackpad: zoom pada posisi kursor
-- Geser area kosong: memindahkan kanvas
-- Cubit dua jari: zoom di HP/tablet
-- Klik dua kali area kosong: muat seluruh pohon
-- `+` / `-`: zoom
-- `0` atau `F`: muat seluruh pohon
-- `1`: kembali ke 100%
-
-## Deploy ke Vercel
-Unggah seluruh isi folder ini ke repository GitHub yang terhubung ke Vercel. Pastikan `index.html`, `style.css`, `script.js`, dan `vercel.json` berada di root repository.
-
-## Catatan keamanan
-Kode akses tetap kompatibel dengan `silsilah_v2/settings/accessCode`. Untuk keamanan tingkat produksi, Firebase Authentication dan Rules berbasis pengguna tetap direkomendasikan.
+Data lama tetap menggunakan `silsilah_v2`. Riwayat disimpan terpisah pada `silsilah_v2_history`. Tidak ada perubahan pada sistem gembok/login.
