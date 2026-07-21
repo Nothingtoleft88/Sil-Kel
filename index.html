@@ -118,7 +118,7 @@
       <div class="sidebar-brand">
         <div class="brand-mark">S</div>
         <div class="min-w-0">
-          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.0</span></div>
+          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.1</span></div>
           <p id="app-sub-title" class="mt-1 truncate text-[11px] font-medium text-slate-400">Family Legacy Workspace</p>
         </div>
       </div>
@@ -187,14 +187,15 @@
           <div class="canvas-legend"><span><i class="legend-line child"></i>Keturunan</span><span><i class="legend-line spouse"></i>Pasangan</span></div>
         </div>
 
-        <div id="tree-transform" class="absolute left-1/2 top-28 h-max w-max">
+        <div id="tree-transform" class="absolute left-0 top-0 h-max w-max">
           <div class="family-tree px-10 pb-40"><ul id="tree-container" class="transition-all duration-500 ease-in-out"></ul></div>
         </div>
 
-        <div class="canvas-tools zoom-controls">
-          <button onclick="adjustZoom(0.1)" title="Perbesar"><i class="fa-solid fa-plus"></i></button>
-          <button onclick="resetZoom()" title="Sesuaikan"><i class="fa-solid fa-crosshairs"></i></button>
-          <button onclick="adjustZoom(-0.1)" title="Perkecil"><i class="fa-solid fa-minus"></i></button>
+        <div class="canvas-tools zoom-controls" data-no-pan>
+          <button onclick="adjustZoom(0.1)" title="Perbesar (+)"><i class="fa-solid fa-plus"></i></button>
+          <button onclick="resetZoom()" title="Muat seluruh pohon (0 / F)"><i class="fa-solid fa-expand"></i></button>
+          <button onclick="adjustZoom(-0.1)" title="Perkecil (-)"><i class="fa-solid fa-minus"></i></button>
+          <button id="zoom-level" class="zoom-level" onclick="setZoom100()" title="Kembali ke 100% (1)">100%</button>
           <span></span>
           <button onclick="expandAll()" title="Buka semua cabang"><i class="fa-solid fa-folder-open"></i></button>
           <button onclick="collapseAll()" title="Tutup semua cabang"><i class="fa-solid fa-folder-closed"></i></button>
@@ -202,7 +203,7 @@
 
         <div class="canvas-help">
           <div class="help-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-          <div><p class="font-black text-slate-800">Navigasi kanvas</p><p id="help-text-edit" class="mt-1 text-xs leading-5 text-slate-500">Geser kanvas, cubit atau gulir untuk zoom. Klik kartu untuk mengelola profil dan hubungan keluarga.</p></div>
+          <div><p class="font-black text-slate-800">Navigasi kanvas</p><p id="help-text-edit" class="mt-1 text-xs leading-5 text-slate-500">Geser kanvas dengan stabil, arahkan kursor lalu gulir untuk zoom tepat pada titik tersebut. Klik dua kali area kosong untuk memuat seluruh pohon.</p></div>
           <button onclick="this.parentElement.classList.add('hidden')" aria-label="Tutup panduan"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </main>

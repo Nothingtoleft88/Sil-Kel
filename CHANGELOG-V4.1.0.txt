@@ -1,0 +1,25 @@
+SILSILAH KELUARGA PRO v4.1.0
+============================
+
+PERBAIKAN UTAMA
+- Mengganti total mesin transformasi zoom lama yang memakai translate(-50%).
+- Menghilangkan drift diagonal/miring saat zoom in dan zoom out.
+- Zoom mouse/trackpad sekarang mempertahankan titik di bawah kursor.
+- Pinch zoom dua jari sekarang stabil dan mengikuti titik tengah jari.
+- Panning mouse, touch, dan stylus disatukan dengan Pointer Events.
+- Tombol reset kini benar-benar melakukan Fit to Screen sesuai ukuran pohon.
+- Menambahkan indikator persentase zoom dan tombol kembali ke 100%.
+- Menambahkan shortcut keyboard dan double-click untuk Fit to Screen.
+- Tampilan tetap stabil ketika ukuran jendela atau sidebar berubah.
+
+PERBAIKAN SISTEM
+- Memperbaiki ekspor Proyek Web agar initial data hasil ekspor benar-benar memakai data aktif.
+- Memperbaiki impor JSON agar pohon langsung dirender dan disesuaikan.
+- Mengurangi transform blur dengan translate3d, origin 0 0, dan rendering RAF.
+- Menambah dukungan prefers-reduced-motion.
+
+KOMPATIBILITAS DATA
+- Firebase project tetap sama.
+- DATA_PATH tetap silsilah_v2.
+- Struktur tree dan settings tidak diubah.
+- Isi data anggota, relasi, foto, catatan, dan kode akses tidak diubah.

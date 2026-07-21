@@ -12,7 +12,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const APP_VERSION = '4.0.0';
+    const APP_VERSION = '4.1.0';
     const DATA_PATH = 'silsilah_v2';
     const SESSION_KEY = 'silsilah_family_session_v4';
     const CACHE_KEY = 'silsilah_family_cache_v4';
@@ -57,6 +57,7 @@
     const bdayYear = parseInt(todayStr.split('-')[0]) - 30; 
     const demoBday = `${bdayYear}-${todayStr.split('-')[1]}-${todayStr.split('-')[2]}`;
 
+    // --- BEGIN INITIAL DATA ---
     const initialTreeData = {
       id: 'root-1', name: 'Budi Santoso', gender: 'L', birthYear: '1945', birthDate: '', deathYear: '', notes: 'Kakek Buyut', photoUrl: '', birthPlace: 'Surabaya', gmapUrl: 'https://maps.app.goo.gl/example1?q=-7.2504,112.7688', address: 'Jl. Merdeka No. 45', phone: '081234567890', bloodType: 'O', occupation: 'Pensiunan PNS', isCollapsed: false,
       spouses: [{ id: 'spouse-1', name: 'Siti Aminah', gender: 'P', birthYear: '1948', deathYear: '2015', photoUrl: '', birthPlace: 'Malang', gmapUrl: 'https://www.google.com/maps/place/Malang/@-7.9666,112.6326,12z' }],
@@ -86,17 +87,24 @@
       loginTitle: 'Gembok Keluarga',
       loginDesc: 'Masukkan kode akses untuk membuka arsip dan pohon keluarga.'
     };
+    // --- END INITIAL DATA ---
 
     let treeData;
     let appSettings;
     
-    let scale = window.innerWidth < 768 ? 0.6 : 1; 
+    // Kamera kanvas v4.1: koordinat viewport yang stabil, tanpa translate(-50%).
+    // Data pohon/Firebase tidak disentuh; hanya cara kanvas ditampilkan yang dirombak.
+    let scale = 1;
     let position = { x: 0, y: 0 };
-    let isDragging = false;
-    let dragStart = { x: 0, y: 0 };
     let searchQuery = '';
-    
     let isRenderPending = false;
+    let cameraInitialized = false;
+    let lastViewportSize = { width: 0, height: 0 };
+    const CAMERA_MIN_SCALE = 0.18;
+    const CAMERA_MAX_SCALE = 2.75;
+    const CAMERA_SIDE_PADDING = 56;
+    const CAMERA_TOP_PADDING = 112;
+    const CAMERA_BOTTOM_PADDING = 72;
     
     let modalMode = 'edit'; 
     let selectedNodeId = null;
@@ -720,176 +728,270 @@
       return html;
     }
 
+    // =============================================================
+    // CANVAS CAMERA ENGINE v4.1
+    // Model transform: screen = position + (world * scale).
+    // Dengan origin (0,0), titik di bawah kursor selalu tetap di tempatnya
+    // saat zoom, sehingga pohon tidak lagi bergeser diagonal/miring.
+    // =============================================================
+    function clampScale(value) {
+      return Math.min(Math.max(value, CAMERA_MIN_SCALE), CAMERA_MAX_SCALE);
+    }
+
+    function getViewportPoint(clientX, clientY) {
+      const rect = mainArea.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function updateZoomIndicator() {
+      const label = document.getElementById('zoom-level');
+      if (label) label.textContent = `${Math.round(scale * 100)}%`;
+    }
+
     function executeTransformRAF() {
-       transformDiv.style.transform = `translate(${Math.round(position.x)}px, ${Math.round(position.y)}px) scale(${scale}) translate(-50%, 0)`;
-       isRenderPending = false;
+      transformDiv.style.transform = `translate3d(${position.x.toFixed(2)}px, ${position.y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
+      updateZoomIndicator();
+      isRenderPending = false;
     }
 
     function requestTransformUpdate(useSmooth = false) {
-       if (useSmooth) {
-         transformDiv.classList.add('smooth-transform');
-         setTimeout(() => transformDiv.classList.remove('smooth-transform'), 310);
-         transformDiv.style.transform = `translate(${Math.round(position.x)}px, ${Math.round(position.y)}px) scale(${scale}) translate(-50%, 0)`;
-         return;
-       }
-       
-       if (!isRenderPending) {
-           isRenderPending = true;
-           requestAnimationFrame(executeTransformRAF);
-       }
+      if (useSmooth) {
+        transformDiv.classList.add('smooth-transform');
+        window.clearTimeout(requestTransformUpdate.smoothTimer);
+        requestTransformUpdate.smoothTimer = window.setTimeout(() => transformDiv.classList.remove('smooth-transform'), 280);
+      }
+      if (!isRenderPending) {
+        isRenderPending = true;
+        requestAnimationFrame(executeTransformRAF);
+      }
     }
+
+    function zoomAt(nextScale, focalPoint, useSmooth = false) {
+      const clampedScale = clampScale(nextScale);
+      if (!Number.isFinite(clampedScale) || Math.abs(clampedScale - scale) < 0.0001) return;
+
+      // Koordinat dunia yang tepat berada di bawah titik fokus sebelum zoom.
+      const worldX = (focalPoint.x - position.x) / scale;
+      const worldY = (focalPoint.y - position.y) / scale;
+
+      scale = clampedScale;
+      // Kembalikan koordinat dunia tadi ke titik layar yang sama sesudah zoom.
+      position.x = focalPoint.x - (worldX * scale);
+      position.y = focalPoint.y - (worldY * scale);
+      requestTransformUpdate(useSmooth);
+    }
+
+    function getTreeNaturalSize() {
+      return {
+        width: Math.max(transformDiv.offsetWidth, transformDiv.scrollWidth, 1),
+        height: Math.max(transformDiv.offsetHeight, transformDiv.scrollHeight, 1)
+      };
+    }
+
+    function fitTreeToViewport(useSmooth = true) {
+      if (!treeData || !mainArea.clientWidth || !mainArea.clientHeight) return;
+      const treeSize = getTreeNaturalSize();
+      const availableWidth = Math.max(240, mainArea.clientWidth - (CAMERA_SIDE_PADDING * 2));
+      const availableHeight = Math.max(220, mainArea.clientHeight - CAMERA_TOP_PADDING - CAMERA_BOTTOM_PADDING);
+      const fitScale = clampScale(Math.min(availableWidth / treeSize.width, availableHeight / treeSize.height, 1.15));
+
+      scale = fitScale;
+      position.x = (mainArea.clientWidth - (treeSize.width * scale)) / 2;
+      position.y = CAMERA_TOP_PADDING + Math.max(0, (availableHeight - (treeSize.height * scale)) / 2);
+      cameraInitialized = true;
+      requestTransformUpdate(useSmooth);
+    }
+
+    // Kompatibel dengan tombol HTML lama: angka positif memperbesar, negatif memperkecil.
+    window.adjustZoom = function(delta) {
+      const focal = { x: mainArea.clientWidth / 2, y: mainArea.clientHeight / 2 };
+      const factor = delta > 0 ? 1.18 : (1 / 1.18);
+      zoomAt(scale * factor, focal, true);
+    };
+
+    window.resetZoom = function() {
+      fitTreeToViewport(true);
+    };
+
+    window.setZoom100 = function() {
+      const focal = { x: mainArea.clientWidth / 2, y: mainArea.clientHeight / 2 };
+      zoomAt(1, focal, true);
+    };
 
     function renderTree() {
       if (!treeData) return;
-      
-      let rootHasSpouseParents = treeData.spouses && treeData.spouses.some(s => s.parents && s.parents.length > 0);
-      let extraPt = rootHasSpouseParents ? 'margin-top: 260px;' : '';
-      treeContainer.style.cssText = extraPt;
 
+      const rootHasSpouseParents = treeData.spouses && treeData.spouses.some(s => s.parents && s.parents.length > 0);
+      treeContainer.style.cssText = rootHasSpouseParents ? 'margin-top: 260px;' : '';
       treeContainer.innerHTML = buildNodeHTML(treeData, 1);
-      requestTransformUpdate(false);
       updateSidebarStats();
+
+      // Tunggu layout final agar ukuran pohon benar sebelum auto-fit pertama.
+      requestAnimationFrame(() => {
+        if (!cameraInitialized) fitTreeToViewport(false);
+        else requestTransformUpdate(false);
+      });
     }
 
-    function adjustZoom(delta) {
-      const oldScale = scale;
-      scale = Math.min(Math.max(0.15, scale + delta), 3);
-      const ratio = scale / oldScale;
-
-      const focalX = mainArea.clientWidth / 2;
-      const focalY = mainArea.clientHeight / 2;
-
-      const originX = (mainArea.clientWidth / 2) + position.x;
-      const originY = 112 + position.y;
-
-      position.x -= (focalX - originX) * (ratio - 1);
-      position.y -= (focalY - originY) * (ratio - 1);
-
-      requestTransformUpdate(true); 
-    }
-    
-    function resetZoom() {
-      scale = window.innerWidth < 768 ? 0.6 : 1; 
-      position = { x: 0, y: 0 };
-      requestTransformUpdate(true);
-    }
-
-    mainArea.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const delta = e.deltaY * -0.001;
-      
-      const oldScale = scale;
-      scale = Math.min(Math.max(0.15, scale + delta), 3);
-      const ratio = scale / oldScale;
-
-      const rect = mainArea.getBoundingClientRect();
-      const focalX = e.clientX - rect.left;
-      const focalY = e.clientY - rect.top;
-
-      const originX = (mainArea.clientWidth / 2) + position.x;
-      const originY = 112 + position.y;
-
-      position.x -= (focalX - originX) * (ratio - 1);
-      position.y -= (focalY - originY) * (ratio - 1);
-
-      requestTransformUpdate(false);
+    // Scroll/trackpad: zoom eksponensial terasa konsisten pada mouse dan touchpad.
+    mainArea.addEventListener('wheel', (event) => {
+      if (event.target.closest('input, textarea, select')) return;
+      event.preventDefault();
+      const focal = getViewportPoint(event.clientX, event.clientY);
+      const factor = Math.exp(-event.deltaY * 0.0015);
+      zoomAt(scale * factor, focal, false);
     }, { passive: false });
 
-    let initialDistance = 0;
-    let initialScale = 1;
-    let pinchCenter = { x: 0, y: 0 };
+    // Pointer Events menyatukan mouse, pena, dan sentuhan.
+    const activePointers = new Map();
+    const interactiveTouchPointers = new Set();
+    let panGesture = null;
+    let pinchGesture = null;
+    let suppressNextCanvasClick = false;
 
-    mainArea.addEventListener('mousedown', (e) => {
-      if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a')) return;
-      isDragging = true;
-      dragStart = { x: e.clientX - position.x, y: e.clientY - position.y };
-      mainArea.classList.add('cursor-grabbing');
+    function isInteractiveTarget(target) {
+      return Boolean(target.closest('button, a, input, textarea, select, label, .cursor-pointer, [data-no-pan]'));
+    }
+
+    function distanceBetween(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function midpointBetween(a, b) {
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+
+    function beginPinchGesture() {
+      const points = [...activePointers.values()].slice(0, 2);
+      if (points.length < 2) return;
+      const midpoint = midpointBetween(points[0], points[1]);
+      pinchGesture = {
+        startDistance: Math.max(distanceBetween(points[0], points[1]), 1),
+        startScale: scale,
+        worldAnchor: {
+          x: (midpoint.x - position.x) / scale,
+          y: (midpoint.y - position.y) / scale
+        }
+      };
+      panGesture = null;
+    }
+
+    mainArea.addEventListener('pointerdown', (event) => {
+      const interactive = isInteractiveTarget(event.target);
+      // Mouse/stylus pada kartu tetap menjadi klik biasa. Sentuhan disimpan agar
+      // pinch dua jari tetap dapat dimulai walaupun jari pertama berada di kartu.
+      if (interactive && event.pointerType !== 'touch') return;
+
+      const point = getViewportPoint(event.clientX, event.clientY);
+      activePointers.set(event.pointerId, point);
+      if (interactive) interactiveTouchPointers.add(event.pointerId);
       transformDiv.classList.remove('smooth-transform');
-    });
 
-    window.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      position.x = e.clientX - dragStart.x;
-      position.y = e.clientY - dragStart.y;
-      requestTransformUpdate(false);
-    });
-
-    window.addEventListener('mouseup', () => {
-      isDragging = false;
-      mainArea.classList.remove('cursor-grabbing');
-    });
-
-    mainArea.addEventListener('touchstart', (e) => {
-      if (e.target.closest('button') || e.target.closest('.cursor-pointer') || e.target.closest('a') || e.target.closest('input')) return;
-      
-      transformDiv.classList.remove('smooth-transform'); 
-      
-      if (e.touches.length === 1) {
-        isDragging = true;
-        dragStart = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
-        mainArea.classList.add('cursor-grabbing');
-      } else if (e.touches.length === 2) {
-        isDragging = false; 
-        initialDistance = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        initialScale = scale;
-        
-        const rect = mainArea.getBoundingClientRect();
-        pinchCenter = {
-          x: ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left,
-          y: ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top
+      if (activePointers.size === 1) {
+        if (interactive) return;
+        try { mainArea.setPointerCapture(event.pointerId); } catch (_) {}
+        panGesture = {
+          pointerId: event.pointerId,
+          startPoint: point,
+          startPosition: { ...position }
         };
-      }
-    }, { passive: false });
-
-    mainArea.addEventListener('touchmove', (e) => {
-      if (e.cancelable) e.preventDefault(); 
-      
-      if (isDragging && e.touches.length === 1) {
-        position.x = e.touches[0].clientX - dragStart.x;
-        position.y = e.touches[0].clientY - dragStart.y;
-        requestTransformUpdate(false);
-      } else if (e.touches.length === 2) {
-        const currentDistance = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        
-        const oldScale = scale;
-        const distanceRatio = currentDistance / initialDistance;
-        scale = Math.min(Math.max(0.15, initialScale * distanceRatio), 3); 
-        const ratio = scale / oldScale;
-        
-        const rect = mainArea.getBoundingClientRect();
-        const focalX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
-        const focalY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
-        
-        const originX = (mainArea.clientWidth / 2) + position.x;
-        const originY = 112 + position.y;
-
-        position.x -= (focalX - originX) * (ratio - 1);
-        position.y -= (focalY - originY) * (ratio - 1);
-        
-        position.x += (focalX - pinchCenter.x);
-        position.y += (focalY - pinchCenter.y);
-        
-        pinchCenter = { x: focalX, y: focalY };
-
-        requestTransformUpdate(false);
-      }
-    }, { passive: false });
-
-    mainArea.addEventListener('touchend', (e) => {
-      isDragging = false;
-      mainArea.classList.remove('cursor-grabbing');
-      
-      if (e.touches.length === 1) {
-        isDragging = true;
-        dragStart = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
+        mainArea.classList.add('cursor-grabbing', 'is-gesturing');
+      } else if (activePointers.size === 2) {
+        for (const pointerId of activePointers.keys()) {
+          try { mainArea.setPointerCapture(pointerId); } catch (_) {}
+        }
+        suppressNextCanvasClick = true;
+        beginPinchGesture();
+        mainArea.classList.add('cursor-grabbing', 'is-gesturing');
       }
     });
+
+    mainArea.addEventListener('pointermove', (event) => {
+      if (!activePointers.has(event.pointerId)) return;
+      const point = getViewportPoint(event.clientX, event.clientY);
+      activePointers.set(event.pointerId, point);
+
+      if (activePointers.size >= 2 && pinchGesture) {
+        const points = [...activePointers.values()].slice(0, 2);
+        const midpoint = midpointBetween(points[0], points[1]);
+        const currentDistance = Math.max(distanceBetween(points[0], points[1]), 1);
+        scale = clampScale(pinchGesture.startScale * (currentDistance / pinchGesture.startDistance));
+        position.x = midpoint.x - (pinchGesture.worldAnchor.x * scale);
+        position.y = midpoint.y - (pinchGesture.worldAnchor.y * scale);
+        suppressNextCanvasClick = true;
+        requestTransformUpdate(false);
+      } else if (activePointers.size === 1 && panGesture && panGesture.pointerId === event.pointerId) {
+        position.x = panGesture.startPosition.x + (point.x - panGesture.startPoint.x);
+        position.y = panGesture.startPosition.y + (point.y - panGesture.startPoint.y);
+        requestTransformUpdate(false);
+      }
+    });
+
+    function finishPointer(event) {
+      activePointers.delete(event.pointerId);
+      interactiveTouchPointers.delete(event.pointerId);
+      try { mainArea.releasePointerCapture(event.pointerId); } catch (_) {}
+
+      if (activePointers.size === 1) {
+        const [pointerId, point] = activePointers.entries().next().value;
+        pinchGesture = null;
+        panGesture = { pointerId, startPoint: point, startPosition: { ...position } };
+      } else if (activePointers.size === 0) {
+        panGesture = null;
+        pinchGesture = null;
+        mainArea.classList.remove('cursor-grabbing', 'is-gesturing');
+      } else {
+        beginPinchGesture();
+      }
+    }
+
+    mainArea.addEventListener('pointerup', finishPointer);
+    mainArea.addEventListener('pointercancel', finishPointer);
+    mainArea.addEventListener('lostpointercapture', (event) => {
+      if (activePointers.has(event.pointerId)) finishPointer(event);
+    });
+
+    // Cegah klik profil yang tidak disengaja setelah gerakan pinch.
+    mainArea.addEventListener('click', (event) => {
+      if (!suppressNextCanvasClick) return;
+      suppressNextCanvasClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+
+    // Klik dua kali area kosong = rapikan dan muat seluruh pohon.
+    mainArea.addEventListener('dblclick', (event) => {
+      if (isInteractiveTarget(event.target)) return;
+      fitTreeToViewport(true);
+    });
+
+    // Pintasan desktop: +/− untuk zoom, 0/F untuk fit, 1 untuk 100%.
+    window.addEventListener('keydown', (event) => {
+      if (event.target.matches('input, textarea, select')) return;
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); window.adjustZoom(1); }
+      else if (event.key === '-') { event.preventDefault(); window.adjustZoom(-1); }
+      else if (event.key === '0' || event.key.toLowerCase() === 'f') { event.preventDefault(); fitTreeToViewport(true); }
+      else if (event.key === '1') { event.preventDefault(); window.setZoom100(); }
+    });
+
+    // Saat ukuran jendela/sidebar berubah, pertahankan pusat visual pengguna.
+    const resizeObserver = new ResizeObserver(() => {
+      const next = { width: mainArea.clientWidth, height: mainArea.clientHeight };
+      if (!next.width || !next.height) return;
+      if (!lastViewportSize.width) {
+        lastViewportSize = next;
+        return;
+      }
+      const deltaX = (next.width - lastViewportSize.width) / 2;
+      const deltaY = (next.height - lastViewportSize.height) / 2;
+      lastViewportSize = next;
+      if (cameraInitialized) {
+        position.x += deltaX;
+        position.y += deltaY;
+        requestTransformUpdate(false);
+      }
+    });
+    resizeObserver.observe(mainArea);
 
     function setAllCollapse(node, state) {
       if (!node) return;
@@ -901,16 +1003,18 @@
     
     window.expandAll = function() {
       setAllCollapse(treeData, false);
+      cameraInitialized = false;
       renderTree();
       simpanKeFirebase();
-      showToast('Semua cabang silsilah dibuka!');
+      showToast('Semua cabang dibuka dan tampilan disesuaikan.');
     };
     
     window.collapseAll = function() {
       setAllCollapse(treeData, true);
+      cameraInitialized = false;
       renderTree();
       simpanKeFirebase();
-      showToast('Semua cabang silsilah ditutup!');
+      showToast('Semua cabang ditutup dan tampilan disesuaikan.');
     };
 
     searchInput.addEventListener('input', (e) => {
@@ -1511,10 +1615,11 @@
             throw new Error("Format Tidak Dikenal");
           }
           
-          resetZoom();
           applySettingsToUI();
+          cameraInitialized = false;
+          renderTree();
           simpanKeFirebase();
-          showToast('Data berhasil dimuat!');
+          showToast('Data berhasil dimuat dan tampilan disesuaikan!');
         } catch (err) { showToast("Format file JSON tidak valid", true); }
       };
       reader.readAsText(file);
@@ -1594,1293 +1699,9 @@ ${bodyClone.innerHTML}
       jsContent = jsContent.replace(
         /\/\/ --- BEGIN INITIAL DATA ---[\s\S]*?\/\/ --- END INITIAL DATA ---/,
         `// --- BEGIN INITIAL DATA ---
-    const initialTreeData = {
-  "address": "",
-  "birthDate": "",
-  "birthPlace": "",
-  "birthYear": "",
-  "bloodType": "O",
-  "childStatus": "kandung",
-  "children": [
-    {
-      "address": "",
-      "birthDate": "",
-      "birthPlace": "",
-      "birthYear": "",
-      "bloodType": "",
-      "children": [
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "children": [
-                {
-                  "address": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "dc9dlaxx2",
-                  "isCollapsed": false,
-                  "name": "Tegar",
-                  "notes": "",
-                  "occupation": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "u1wvd3or8",
-              "isCollapsed": false,
-              "linkedSpouseId": "3fep48zcw",
-              "name": "Ana",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "x2sz037d9",
-                  "name": "Maryanto",
-                  "notes": "",
-                  "occupation": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ]
-            },
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "children": [
-                {
-                  "address": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "bwpb86k6e",
-                  "isCollapsed": false,
-                  "name": "Arif Fadil Amsyura",
-                  "notes": "",
-                  "occupation": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "y9dfi6mq5",
-              "isCollapsed": false,
-              "linkedSpouseId": "3fep48zcw",
-              "name": "Dewi",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "bjy151ci2",
-                  "name": "Arvan",
-                  "notes": "",
-                  "occupation": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ]
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "u2le72ydo",
-          "isCollapsed": false,
-          "linkedSpouseId": "spouse-2",
-          "name": "Suryani",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "3fep48zcw",
-              "name": "Supono",
-              "notes": "",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        },
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "children": [
-                {
-                  "address": "",
-                  "biography": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "tiri",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "474ehinyr",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "e0i1egs1y",
-                  "name": "Elia Fitria Lucyan",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "tkdqf5go6",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "mgc9yuxwn",
-                  "name": "Felicia Fitria Lucyan",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "k4udp0q3c",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "mgc9yuxwn",
-                  "name": "Zera Fitria Lucyan",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "biography": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "u1zylen1j",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "mgc9yuxwn",
-                  "name": "Zahra Fitria Lucyan",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "klqi50r1r",
-              "isCollapsed": false,
-              "name": "Irul (bobby)",
-              "notes": "",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "mgc9yuxwn",
-                  "linkedSpouseId": "",
-                  "name": "Fitria Lucyan",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": "",
-                  "spouses": [
-                    {
-                      "address": "",
-                      "biography": "",
-                      "birthDate": "",
-                      "birthPlace": "",
-                      "birthYear": "",
-                      "bloodType": "",
-                      "childStatus": "kandung",
-                      "deathDate": "",
-                      "deathYear": "",
-                      "gender": "L",
-                      "gmapUrl": "",
-                      "id": "e0i1egs1y",
-                      "linkedSpouseId": "",
-                      "name": "Pasangan Baru",
-                      "notes": "",
-                      "occupation": "",
-                      "otherPartner": "",
-                      "phone": "",
-                      "photoUrl": ""
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "children": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "l7ra6gf2n",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "1l54o1q47",
-                  "name": "Bernita Elvaretta",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "0z29h4npd",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "e418yxr9k",
-                  "name": "jhonson",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "2nw9xfgcf",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "e418yxr9k",
-                  "name": "Kenzo",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "db2w4gnn2",
-              "isCollapsed": false,
-              "name": "Wiwit (cintya)",
-              "notes": "",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "1l54o1q47",
-                  "linkedSpouseId": "",
-                  "name": "1",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "e418yxr9k",
-                  "linkedSpouseId": "",
-                  "name": "Sendi ",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ]
-            },
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "3u8h5rg8v",
-              "isCollapsed": false,
-              "name": "Dedik",
-              "notes": "",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "gender": "P",
-                  "id": "edsja2jgq",
-                  "name": "Pasangan Baru"
-                }
-              ]
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "prbazy8ob",
-          "isCollapsed": false,
-          "linkedSpouseId": "spouse-2",
-          "name": "Sri ah",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "s1ruawhx4",
-              "name": "??????",
-              "notes": "",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        },
-        {
-          "address": "",
-          "biography": "",
-          "birthDate": "1960-06-07",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "Jl Raya Kemiri No 88, Sidoarjo",
-              "biography": "",
-              "birthDate": "1988-10-21",
-              "birthPlace": "Surabaya",
-              "birthYear": "1988",
-              "bloodType": "O",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "s9dkbrg39",
-              "isCollapsed": false,
-              "linkedSpouseId": "wasx4ed34",
-              "name": "Aynur Rofiq Charisna Aqmal",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            },
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "1990-09-30",
-              "birthPlace": "",
-              "birthYear": "1990",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "children": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "m97efttm4",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "nawd4mpnu",
-                  "name": "Maulidina Mutia Charisna Huda",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "mz2ao2rmt",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "nawd4mpnu",
-                  "name": "Ken Arsenio Charisna Huda",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "h5e2ixmqg",
-              "isCollapsed": false,
-              "linkedSpouseId": "wasx4ed34",
-              "name": "Nurul Ufiana Charisna Aqmal",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthDate": "1983-06-25",
-                  "birthPlace": "Sidoarjo",
-                  "birthYear": "1983",
-                  "bloodType": "O",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "nawd4mpnu",
-                  "linkedSpouseId": "",
-                  "name": "Syamsul Huda",
-                  "notes": "Suami ke 1",
-                  "occupation": "Karyawan Swasta",
-                  "otherPartner": "",
-                  "phone": "082133554464",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "biography": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "h8stsmx5f",
-                  "linkedSpouseId": "",
-                  "name": "?????",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ]
-            },
-            {
-              "address": "Jl. Gubeng Jaya II No.56, Airlangga, Kec. Gubeng, Surabaya, Jawa Timur 60281",
-              "biography": "",
-              "birthDate": "1995-08-16",
-              "birthPlace": "Surabaya",
-              "birthYear": "1995",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "https://maps.app.goo.gl/iSYck3JeY6LRCxjZ8",
-              "id": "8wnslrwrf",
-              "isCollapsed": false,
-              "linkedSpouseId": "wasx4ed34",
-              "name": "Zainal Abidin Charisna Akmal",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "085233007604",
-              "photoUrl": ""
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "2023",
-          "gender": "L",
-          "gmapUrl": "",
-          "id": "sctg50mtu",
-          "isCollapsed": false,
-          "linkedSpouseId": "spouse-2",
-          "name": "Sutrisno",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "1965-01-05",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "2019",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "wasx4ed34",
-              "linkedSpouseId": "",
-              "name": "Muslichah",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        },
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "",
-              "birthDate": "1982-08-12",
-              "birthPlace": "",
-              "birthYear": "1982",
-              "bloodType": "A",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "i2a9a7iav",
-              "isCollapsed": false,
-              "linkedSpouseId": "rkkrtgam8",
-              "name": "Fina Agustina",
-              "notes": "Anak Ke-1",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            },
-            {
-              "address": "",
-              "birthDate": "1990-06-21",
-              "birthPlace": "Blitar",
-              "birthYear": "1990",
-              "bloodType": "O",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "ga9xklhvt",
-              "isCollapsed": false,
-              "linkedSpouseId": "rkkrtgam8",
-              "name": "Vindri Ciptaningsari",
-              "notes": "Anak Ke-2",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": ""
-            },
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "1991-07-30",
-              "birthPlace": "Blitar",
-              "birthYear": "1991",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "b80jlpbtf",
-              "isCollapsed": false,
-              "linkedSpouseId": "rkkrtgam8",
-              "name": "Via Ciptalia",
-              "notes": "Anak Ke-3",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ],
-          "deathDate": "1994-11-08",
-          "deathYear": "1990",
-          "gender": "L",
-          "gmapUrl": "",
-          "id": "iv1u3hy2",
-          "isCollapsed": false,
-          "linkedSpouseId": "spouse-2",
-          "name": "Handi Sucipto",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "1994-10-08",
-              "deathYear": "1994",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "rkkrtgam8",
-              "linkedSpouseId": "",
-              "name": "Marpinatun",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        },
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "tiri",
-              "children": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "c8pdtau6d",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "ds1edre4h",
-                  "name": "Orvala",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "P",
-                  "gmapUrl": "",
-                  "id": "5l9mgp0fp",
-                  "isCollapsed": false,
-                  "linkedSpouseId": "lofm94ojt",
-                  "name": "Ashley Julietta Wang",
-                  "notes": "",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ],
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "54p2i31gq",
-              "isCollapsed": false,
-              "linkedSpouseId": "",
-              "name": "Yuli",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": "",
-              "spouses": [
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "ds1edre4h",
-                  "linkedSpouseId": "",
-                  "name": "1",
-                  "notes": "Suami ke 1",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                },
-                {
-                  "address": "",
-                  "birthDate": "",
-                  "birthPlace": "",
-                  "birthYear": "",
-                  "bloodType": "",
-                  "childStatus": "kandung",
-                  "deathDate": "",
-                  "deathYear": "",
-                  "gender": "L",
-                  "gmapUrl": "",
-                  "id": "lofm94ojt",
-                  "linkedSpouseId": "",
-                  "name": "2",
-                  "notes": "Suami ke-2",
-                  "occupation": "",
-                  "otherPartner": "",
-                  "phone": "",
-                  "photoUrl": ""
-                }
-              ]
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "2023",
-          "gender": "L",
-          "gmapUrl": "",
-          "id": "r93o3ei9q",
-          "isCollapsed": false,
-          "linkedSpouseId": "spouse-2",
-          "name": "Suwandi",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "2026",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "7pcx0cu7k",
-              "linkedSpouseId": "",
-              "name": "????",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        }
-      ],
-      "deathDate": "",
-      "deathYear": "",
-      "gender": "L",
-      "gmapUrl": "",
-      "id": "child-1",
-      "isCollapsed": false,
-      "linkedSpouseId": "",
-      "name": "Mulyani",
-      "notes": "Anak Pertama",
-      "occupation": "",
-      "phone": "081199998888",
-      "photoUrl": "",
-      "spouses": [
-        {
-          "address": "",
-          "biography": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "1970",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "spouse-2",
-          "linkedSpouseId": "",
-          "name": "Sumiatun",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "kyfa52188",
-              "linkedSpouseId": "",
-              "name": "????",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "address": "",
-      "birthDate": "",
-      "birthPlace": "",
-      "birthYear": "",
-      "bloodType": "",
-      "childStatus": "kandung",
-      "children": [
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "hk532iaf8",
-              "isCollapsed": false,
-              "linkedSpouseId": "5lr56d5nz",
-              "name": "Ogi Arga Widiyanto",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            },
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "2009-12-19",
-              "birthPlace": "",
-              "birthYear": "2009",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "P",
-              "gmapUrl": "",
-              "id": "2e8tbqcwa",
-              "isCollapsed": false,
-              "linkedSpouseId": "pxln1jng1",
-              "name": "Devina Mulya Tjahjana",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "grandchild-3",
-          "isCollapsed": false,
-          "linkedSpouseId": "",
-          "name": "Sundari",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "5lr56d5nz",
-              "name": "??????",
-              "notes": "Suami Pertama",
-              "occupation": "",
-              "phone": "",
-              "photoUrl": ""
-            },
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "pxln1jng1",
-              "linkedSpouseId": "",
-              "name": "Wiyana Tjahjana",
-              "notes": "Suami ke 2",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        },
-        {
-          "address": "",
-          "biography": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "children": [
-            {
-              "gender": "L",
-              "id": "mqci55ugt",
-              "isCollapsed": false,
-              "name": "Anak Baru"
-            },
-            {
-              "gender": "L",
-              "id": "soilhp32e",
-              "isCollapsed": false,
-              "name": "Saudara Baru"
-            },
-            {
-              "gender": "L",
-              "id": "316347ckw",
-              "isCollapsed": false,
-              "name": "Saudara Baru"
-            }
-          ],
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "4ible1ln8",
-          "isCollapsed": false,
-          "linkedSpouseId": "",
-          "name": "Suciati",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": "",
-          "spouses": [
-            {
-              "address": "",
-              "biography": "",
-              "birthDate": "",
-              "birthPlace": "",
-              "birthYear": "",
-              "bloodType": "",
-              "childStatus": "kandung",
-              "deathDate": "",
-              "deathYear": "",
-              "gender": "L",
-              "gmapUrl": "",
-              "id": "nlohac18l",
-              "linkedSpouseId": "",
-              "name": "????",
-              "notes": "",
-              "occupation": "",
-              "otherPartner": "",
-              "phone": "",
-              "photoUrl": ""
-            }
-          ]
-        }
-      ],
-      "deathDate": "",
-      "deathYear": "",
-      "gender": "L",
-      "gmapUrl": "",
-      "id": "child-2",
-      "isCollapsed": false,
-      "linkedSpouseId": "",
-      "name": "Sumeh",
-      "notes": "Anak Kedua",
-      "occupation": "",
-      "otherPartner": "",
-      "phone": "",
-      "photoUrl": "",
-      "spouses": [
-        {
-          "address": "",
-          "birthDate": "",
-          "birthPlace": "",
-          "birthYear": "",
-          "bloodType": "",
-          "childStatus": "kandung",
-          "deathDate": "",
-          "deathYear": "",
-          "gender": "P",
-          "gmapUrl": "",
-          "id": "spouse-3",
-          "linkedSpouseId": "",
-          "name": "Sumini",
-          "notes": "",
-          "occupation": "",
-          "otherPartner": "",
-          "phone": "",
-          "photoUrl": ""
-        }
-      ]
-    }
-  ],
-  "deathDate": "",
-  "deathYear": "",
-  "gender": "L",
-  "gmapUrl": "",
-  "id": "root-1",
-  "isCollapsed": false,
-  "linkedSpouseId": "",
-  "name": "Muhammad",
-  "notes": "Kakek Buyut",
-  "occupation": "",
-  "otherPartner": "",
-  "phone": "",
-  "photoUrl": "",
-  "spouses": [
-    {
-      "address": "",
-      "birthDate": "",
-      "birthPlace": "Malang",
-      "birthYear": "",
-      "bloodType": "",
-      "childStatus": "kandung",
-      "deathDate": "",
-      "deathYear": "",
-      "gender": "P",
-      "gmapUrl": "",
-      "id": "spouse-1",
-      "linkedSpouseId": "",
-      "name": "Somirah",
-      "notes": "",
-      "occupation": "Ibu Rumah Tangga",
-      "otherPartner": "",
-      "phone": "",
-      "photoUrl": ""
-    }
-  ]
-};
+    const initialTreeData = ${newTreeStr};
 
-    const initialAppSettings = {
-  "autoSave": true,
-  "accessCode": "9889",
-  "appTitle": "Silsilah Keluarga",
-  "appSubtitle": "",
-  "enableEdit": true,
-  "bgColor": "bg-slate-100",
-  "cardStyle": "default",
-  "loginTitle": "Gembok Keluarga",
-  "loginDesc": "Silakan masukkan kode akses untuk melihat data silsilah keluarga."
-};
+    const initialAppSettings = ${newSetStr};
     // --- END INITIAL DATA ---`
       );
 

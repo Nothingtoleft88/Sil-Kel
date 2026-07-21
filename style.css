@@ -109,11 +109,13 @@ button, label { -webkit-user-select: none; user-select: none; }
 .canvas-tools button { width:38px; height:38px; display:grid; place-items:center; border:0; border-radius:11px; background:transparent; color:#475569; cursor:pointer; }
 .canvas-tools button:hover { color:#0e7490; background:#ecfeff; }
 .canvas-tools span { height:1px; margin:5px 3px; background:#e2e8f0; }
+.canvas-tools .zoom-level { width:38px; height:28px; color:#0e7490; background:#ecfeff; font-size:9px; font-weight:900; letter-spacing:-.02em; }
+.canvas-tools .zoom-level:hover { color:#155e75; background:#cffafe; }
 .canvas-help { position:absolute; z-index:20; left:22px; bottom:20px; max-width:410px; display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:12px; padding:14px; border:1px solid rgba(203,213,225,.92); border-radius:18px; background:rgba(255,255,255,.9); box-shadow:0 18px 40px rgba(15,23,42,.1); backdrop-filter:blur(16px); }
 .help-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; color:#0e7490; background:#cffafe; }
 .canvas-help > button { border:0; background:transparent; color:#94a3b8; cursor:pointer; }
-#tree-transform { transform-origin:50% 0%; will-change:transform; }
-.smooth-transform { transition:transform .3s cubic-bezier(.25,1,.5,1); }
+#tree-transform { transform-origin:0 0; will-change:transform; contain:layout style; backface-visibility:hidden; }
+.smooth-transform { transition:transform .26s cubic-bezier(.22,1,.36,1); }
 .cursor-grab { cursor:grab; }
 .cursor-grabbing { cursor:grabbing !important; }
 
@@ -178,9 +180,15 @@ button, label { -webkit-user-select: none; user-select: none; }
   .canvas-tools { right:12px; top:auto; bottom:16px; transform:none; flex-direction:row; }
   .canvas-tools span { width:1px; height:28px; margin:5px; }
   .canvas-help { display:none; }
-  #tree-transform { top:96px!important; }
   .family-tree li { padding-left:10px; padding-right:10px; }
   .login-shell { border-radius:24px; }
+}
+
+/* Canvas stability and accessibility */
+.canvas-area.is-gesturing .family-tree .cursor-pointer { pointer-events:none; }
+#tree-transform, #tree-transform * { -webkit-font-smoothing:antialiased; }
+@media (prefers-reduced-motion: reduce) {
+  .smooth-transform, .family-tree li, .family-tree .cursor-pointer { transition:none!important; }
 }
 
 /* Export/print */

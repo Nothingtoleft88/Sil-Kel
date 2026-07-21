@@ -1,0 +1,11 @@
+PANDUAN DEPLOY v4.1.0 VIA BROWSER GITHUB
+========================================
+
+1. Buka repository GitHub Sil-Kel dan pilih branch main.
+2. Klik Add file > Upload files.
+3. Upload semua file dari paket ini, bukan file ZIP-nya.
+4. Isi commit: Fix canvas and upgrade Silsilah Pro v4.1.0
+5. Commit langsung ke main, lalu tunggu deployment Vercel berstatus Ready.
+
+Setelah Ready, buka sil-kel.vercel.app lalu tekan Ctrl+F5.
+Data keluarga tidak perlu diimpor ulang karena tetap memakai Firebase silsilah_v2.
