@@ -1,20 +1,15 @@
-# Silsilah Keluarga Pro v4.3.0
+# Silsilah Keluarga Pro v4.4.0
 
-Versi ini mempertahankan seluruh data lama pada Firebase `silsilah_v2`, lalu meningkatkan fitur zodiak dan astrologi menjadi berbasis posisi astronomis.
+Versi pematangan relasi, ekspor dokumen, cetak buku, serta kompatibilitas HP/tablet.
 
-## Astrologi Presisi
-- Matahari tropikal dihitung dari longitude ekliptika sebenarnya.
-- Bulan dihitung dari posisi geosentrik pada waktu lahir.
-- Ascendant dihitung dari Greenwich Apparent Sidereal Time, longitude, latitude, dan obliquity.
-- Shio dapat memakai batas Tahun Baru Imlek atau Li Chun.
-- Elemen dan polaritas tahun Tionghoa dihitung dari Heavenly Stem.
-- Tanggal tanpa jam tidak dipaksa menjadi hasil palsu: aplikasi menampilkan dua kemungkinan saat melewati batas tanda.
-- Skor kelengkapan data menjelaskan tingkat presisi hasil.
+## Perubahan utama
 
-## Data baru opsional
-`birthTime`, `birthTimezone`, `birthUtcOffset`, `birthLatitude`, `birthLongitude`, dan `chineseZodiacBasis`. Data profil lama tetap kompatibel.
-
-## Mesin astronomi
-Astronomy Engine 2.1.19 dipanggil dari CDN versi terkunci. Jika CDN tidak tersedia, aplikasi memakai rumus cadangan lokal dan menandai statusnya.
-
-Astrologi adalah tradisi interpretatif; posisi astronomis dapat dihitung dengan presisi, tetapi makna kepribadian tidak merupakan fakta ilmiah.
+- Toolbar relasi selalu terlihat di bagian atas editor profil.
+- Tombol **Tambah Pasangan** dipulihkan dan dijadikan aksi utama.
+- Aksi Orang Tua, Saudara, Pasangan, Anak, Bagikan, dan Hapus memiliki status konteks yang jelas.
+- Bagan PDF memakai A3 lanskap dan otomatis membagi halaman bila pohon sangat lebar/besar.
+- PNG memakai skala adaptif agar tetap tajam tanpa membuat browser HP kehabisan memori.
+- Buku keluarga PDF berisi sampul, ringkasan, kronologi, relasi, astrologi data lahir, profil, biografi, dan sumber.
+- Pratinjau cetak buku A4 ditambahkan.
+- Editor profil menjadi bottom sheet penuh pada HP, aman terhadap notch/safe area, keyboard, rotasi, dan split-screen.
+- Data lama tetap dibaca dari Firebase node `silsilah_v2`; tidak ada migrasi atau reset isi.

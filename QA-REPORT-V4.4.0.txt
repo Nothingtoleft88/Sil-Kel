@@ -1,0 +1,13 @@
+QA REPORT v4.4.0
+
+Pemeriksaan yang dilakukan:
+- JavaScript lulus node --check.
+- ID toolbar relasi dan fungsi aksi tersedia.
+- Tambah Pasangan, Anak, Saudara, dan Orang Tua tetap terhubung ke model lama.
+- Firebase tetap memakai silsilah_v2.
+- Export PNG/PDF memiliki penanganan error dan pembersihan memori.
+- PDF bagan mendukung satu dan multi-halaman.
+- Buku keluarga PDF dan print preview tersedia.
+- CSS responsif mencakup 420px, 760px, tablet lanskap, dynamic viewport, dan safe area.
+
+Pengujian akhir koneksi Firebase dan hasil cetak dilakukan setelah deploy karena membutuhkan browser dan data produksi pengguna.

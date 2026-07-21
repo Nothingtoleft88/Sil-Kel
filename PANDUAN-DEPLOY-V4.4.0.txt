@@ -1,0 +1,9 @@
+PANDUAN DEPLOY v4.4.0
+
+1. Ekstrak ZIP ini.
+2. GitHub Sil-Kel > Add file > Upload files.
+3. Upload semua file hasil ekstrak, bukan ZIP.
+4. Commit langsung ke main: Upgrade Silsilah Keluarga Pro v4.4.0.
+5. Tunggu Vercel Ready, buka web, lalu Ctrl+F5.
+
+Data Firebase lama tidak perlu diimpor ulang.

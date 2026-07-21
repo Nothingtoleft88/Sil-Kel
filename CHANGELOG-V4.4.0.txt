@@ -1,0 +1,8 @@
+SILSILAH KELUARGA PRO v4.4.0
+
+- Memulihkan dan mematangkan toolbar aksi relasi termasuk Tambah Pasangan.
+- Memperbaiki konteks aksi untuk profil utama, pasangan, anak, dan besan.
+- Ekspor PNG adaptif dan PDF bagan A3 multi-halaman.
+- Buku keluarga PDF premium dan pratinjau cetak A4.
+- Optimasi editor, kanvas, safe area, keyboard, rotasi, dan layar HP/tablet.
+- Firebase node silsilah_v2 dan struktur data lama dipertahankan.

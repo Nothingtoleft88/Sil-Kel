@@ -12,7 +12,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const APP_VERSION = '4.3.0';
+    const APP_VERSION = '4.4.0';
     const DATA_PATH = 'silsilah_v2';
     const SESSION_KEY = 'silsilah_family_session_v4';
     const CACHE_KEY = 'silsilah_family_cache_v4';
@@ -1370,6 +1370,25 @@
     });
     resizeObserver.observe(mainArea);
 
+
+    // Dynamic viewport pada HP/tablet: keyboard, rotasi, split-screen, dan browser bar.
+    let viewportTimer = null;
+    function reconcileMobileViewport() {
+      window.clearTimeout(viewportTimer);
+      viewportTimer = window.setTimeout(() => {
+        const vv = window.visualViewport;
+        if (vv) document.documentElement.style.setProperty('--visual-viewport-height', `${vv.height}px`);
+        if (!mainArea.clientWidth || !mainArea.clientHeight) return;
+        lastViewportSize = {width:mainArea.clientWidth,height:mainArea.clientHeight};
+        if (cameraInitialized) requestTransformUpdate(false);
+      }, 120);
+    }
+    window.visualViewport?.addEventListener('resize', reconcileMobileViewport);
+    window.visualViewport?.addEventListener('scroll', reconcileMobileViewport);
+    window.addEventListener('orientationchange', () => {
+      window.setTimeout(() => { cameraInitialized = false; fitTreeToViewport(false); reconcileMobileViewport(); }, 320);
+    });
+
     function setAllCollapse(node, state) {
       if (!node) return;
       node.isCollapsed = state;
@@ -1646,6 +1665,38 @@
       reader.readAsDataURL(file);
     });
 
+
+
+    function setQuickActionState(id, enabled, reason = '') {
+      const button = document.getElementById(id);
+      if (!button) return;
+      button.disabled = !enabled;
+      button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+      if (reason) button.title = reason;
+    }
+
+    function updateQuickActions(person, isEditAllowed) {
+      const panel = document.getElementById('quick-actions-panel');
+      if (!panel) return;
+      panel.classList.toggle('hidden', !isEditAllowed);
+      const context = document.getElementById('relation-action-context');
+      if (context) context.textContent = person?.name ? `Kelola relasi ${person.name}` : 'Pilih tindakan untuk anggota ini';
+      if (!isEditAllowed) return;
+      const spouseParent = isSpouseParent(treeData, selectedNodeId);
+      const isRoot = !selectedSpouseId && selectedNodeId === treeData?.id;
+      const isSpouse = modalMode === 'editSpouse';
+      setQuickActionState('quick-action-parents', isSpouse || isRoot,
+        isSpouse ? 'Tambah ayah dan ibu untuk pasangan ini' : isRoot ? 'Tambah generasi leluhur di atas profil utama' : 'Orang tua profil ini sudah ditentukan oleh cabang pohon');
+      setQuickActionState('quick-action-sibling', !isSpouse && !spouseParent,
+        isSpouse ? 'Saudara pasangan dikelola melalui cabang keluarganya' : 'Tambah saudara pada generasi yang sama');
+      setQuickActionState('quick-action-partner', !spouseParent,
+        spouseParent ? 'Penambahan pasangan pada profil besan belum didukung' : 'Tambah suami, istri, atau pasangan');
+      setQuickActionState('quick-action-child', !spouseParent,
+        spouseParent ? 'Anak tidak dapat ditambahkan dari profil besan' : 'Tambah anak dan kaitkan dengan pasangan yang dipilih');
+      setQuickActionState('quick-action-share', true, 'Bagikan profil atau tampilkan kode QR');
+      setQuickActionState('quick-action-delete', true, 'Hapus profil dengan konfirmasi');
+    }
+
     window.handleNodeClick = function(nodeId, spouseId) {
       selectedNodeId = nodeId;
       selectedSpouseId = spouseId;
@@ -1673,7 +1724,7 @@
       document.getElementById('modal-title-text').innerText = isEditAllowed ? 'Edit Profil' : 'Detail Profil';
       document.getElementById('modal-title-icon').className = isEditAllowed ? 'fa-solid fa-pen-to-square mr-2 text-blue-600' : 'fa-solid fa-address-card mr-2 text-blue-600';
       
-      document.getElementById('quick-actions-panel').style.display = isEditAllowed ? 'block' : 'none';
+      updateQuickActions(person, isEditAllowed);
       document.getElementById('btn-save').style.display = isEditAllowed ? 'block' : 'none';
       document.getElementById('btn-cancel').innerText = isEditAllowed ? 'Batal' : 'Tutup';
 
@@ -1694,6 +1745,8 @@
       if (chineseBasis) chineseBasis.disabled = !isEditAllowed;
 
       modal.classList.remove('hidden');
+      const editorScroll = modal.querySelector('.editor-scroll');
+      if (editorScroll) editorScroll.scrollTop = 0;
     };
 
     window.actionAddChild = function() {
@@ -1728,22 +1781,28 @@
 
     window.actionAddPartner = function() {
        if (isSpouseParent(treeData, selectedNodeId)) {
-           showToast("Penambahan pasangan pada profil ini belum didukung.", true);
+           showToast("Penambahan pasangan pada profil besan belum didukung.", true);
            return;
        }
-       
+       const current = findNodeById(treeData, selectedSpouseId || selectedNodeId) || {};
        const newId = generateId();
-       const newPartner = { id: newId, name: 'Pasangan Baru', gender: 'P' };
-       
-       let targetId = selectedSpouseId || selectedNodeId;
+       const newPartner = {
+         id: newId,
+         name: 'Pasangan Baru',
+         gender: current.gender === 'P' ? 'L' : 'P',
+         children: [],
+         spouses: [],
+         isCollapsed: false
+       };
+       const targetId = selectedSpouseId || selectedNodeId;
        treeData = updateTreeData(treeData, targetId, node => ({
-           ...node, spouses: [...(node.spouses || []), newPartner]
+           ...node,
+           spouses: [...(Array.isArray(node.spouses) ? node.spouses : []), newPartner]
        }));
-       
        simpanKeFirebase('Pasangan ditambahkan');
        renderTree();
        handleNodeClick(selectedNodeId, newId);
-       showToast("Pasangan berhasil ditambahkan.");
+       showToast("Pasangan baru berhasil ditambahkan. Lengkapi profil lalu simpan.");
     };
 
     window.actionAddSibling = function() {
@@ -1901,88 +1960,128 @@
     };
     window.closeStatsModal = function() { statsModal.classList.add('hidden'); setActiveNav('tree'); };
 
-    // --- FITUR EXPORT PNG & PDF TINGKAT LANJUT (ANTI BERANTAKAN) ---
-    window.openExportModal = function() {
-       document.getElementById('export-modal').classList.remove('hidden');
-    };
-    window.closeExportModal = function() {
-       document.getElementById('export-modal').classList.add('hidden');
-    };
+    // ========================================================
+    // EXPORT ENGINE v4.4 — HIGH RES, A3 MULTI-PAGE, MOBILE SAFE
+    // ========================================================
+    window.openExportModal = function() { document.getElementById('export-modal').classList.remove('hidden'); };
+    window.closeExportModal = function() { document.getElementById('export-modal').classList.add('hidden'); };
 
-    window.executeExport = function(format) {
-      closeExportModal();
-      
-      if (typeof html2canvas === 'undefined') {
-        showToast("Sistem render gagal dimuat.", true);
-        return;
-      }
-      
-      showToast('Menyiapkan dokumen ' + format.toUpperCase() + ' (Harap tunggu)...', false);
-      
+    function waitForImages(root) {
+      const images = [...root.querySelectorAll('img')];
+      return Promise.all(images.map(img => img.complete ? Promise.resolve() : new Promise(resolve => {
+        const done = () => resolve(); img.addEventListener('load', done, {once:true}); img.addEventListener('error', done, {once:true});
+        setTimeout(done, 8000);
+      })));
+    }
+
+    function downloadBlob(filename, blob) {
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function captureFamilyTreeCanvas() {
+      if (typeof html2canvas === 'undefined') throw new Error('Library html2canvas tidak tersedia');
       const treeElement = document.querySelector('.family-tree');
-      
-      const printContainer = document.createElement('div');
-      printContainer.style.position = 'absolute';
-      printContainer.style.top = '0';
-      printContainer.style.left = '0';
-      printContainer.style.width = 'max-content';
-      printContainer.style.height = 'max-content';
-      printContainer.style.backgroundColor = '#f8fafc';
-      printContainer.style.padding = '80px';
-      printContainer.style.zIndex = '-9999';
-      
-      const clonedTree = treeElement.cloneNode(true);
-      
-      clonedTree.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.remove());
-      
-      clonedTree.querySelectorAll('*').forEach(el => {
-          el.style.transition = 'none';
-          el.style.animation = 'none';
-      });
-
-      printContainer.appendChild(clonedTree);
-      document.body.appendChild(printContainer);
-      
-      setTimeout(() => {
-        html2canvas(printContainer, {
-          backgroundColor: '#f8fafc',
-          scale: 2, 
-          useCORS: true, 
-          allowTaint: true,
-          logging: false
-        }).then(canvas => {
-          document.body.removeChild(printContainer);
-          
-          if (format === 'png') {
-              const link = document.createElement('a');
-              link.download = `Silsilah_Keluarga_${new Date().getTime()}.png`;
-              link.href = canvas.toDataURL('image/png');
-              link.click();
-              showToast('Gambar PNG berhasil diunduh!');
-          } else if (format === 'pdf') {
-              if (typeof window.jspdf === 'undefined') {
-                  showToast('Library PDF gagal dimuat', true);
-                  return;
-              }
-              const { jsPDF } = window.jspdf;
-              
-              const pdfOrientation = canvas.width > canvas.height ? 'l' : 'p';
-              let pdf = new jsPDF({
-                  orientation: pdfOrientation,
-                  unit: 'px',
-                  format: [canvas.width, canvas.height]
-              });
-              
-              pdf.addImage(canvas.toDataURL('image/png', 1.0), 'PNG', 0, 0, canvas.width, canvas.height);
-              pdf.save(`Silsilah_Keluarga_${new Date().getTime()}.pdf`);
-              showToast('Dokumen PDF berhasil diunduh!');
-          }
-        }).catch(err => {
-          console.error("html2canvas error:", err);
-          document.body.removeChild(printContainer);
-          showToast('Gagal merender gambar.', true);
+      if (!treeElement) throw new Error('Pohon keluarga tidak ditemukan');
+      await document.fonts?.ready?.catch?.(() => {});
+      const host = document.createElement('div');
+      host.className = 'export-capture-host';
+      host.style.padding = '72px';
+      host.style.width = 'max-content';
+      host.style.height = 'max-content';
+      const clone = treeElement.cloneNode(true);
+      clone.style.padding = '0'; clone.style.margin = '0'; clone.style.transform = 'none'; clone.style.width = 'max-content';
+      clone.querySelectorAll('[data-html2canvas-ignore], button').forEach(el => el.remove());
+      clone.querySelectorAll('*').forEach(el => { el.style.animation = 'none'; el.style.transition = 'none'; });
+      host.appendChild(clone); document.body.appendChild(host);
+      try {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await waitForImages(host);
+        const width = Math.max(host.scrollWidth, host.offsetWidth, 1);
+        const height = Math.max(host.scrollHeight, host.offsetHeight, 1);
+        const mobile = Math.min(window.innerWidth, window.innerHeight) < 760;
+        const desired = mobile ? 1.45 : 2;
+        const maxPixels = mobile ? 18000000 : 32000000;
+        const maxDimension = mobile ? 10000 : 15000;
+        const scaleByPixels = Math.sqrt(maxPixels / Math.max(width * height, 1));
+        const scaleByDimension = Math.min(maxDimension / width, maxDimension / height);
+        const renderScale = Math.max(.7, Math.min(desired, scaleByPixels, scaleByDimension));
+        return await html2canvas(host, {
+          backgroundColor:'#f8fafc', scale:renderScale, useCORS:true, allowTaint:false,
+          logging:false, imageTimeout:15000, width, height, windowWidth:width, windowHeight:height,
+          scrollX:0, scrollY:0
         });
-      }, 800); 
+      } finally { host.remove(); }
+    }
+
+    function addPdfHeaderFooter(pdf, title, pageNumber, totalPages, pageW, pageH) {
+      pdf.setFillColor(248,250,252); pdf.rect(0,0,pageW,14,'F');
+      pdf.setTextColor(15,23,42); pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.text(title,10,9);
+      pdf.setDrawColor(226,232,240); pdf.line(10,pageH-11,pageW-10,pageH-11);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(100,116,139); pdf.setFontSize(7.5);
+      pdf.text(`Halaman ${pageNumber} dari ${totalPages}`,pageW-10,pageH-6,{align:'right'});
+      pdf.text(new Date().toLocaleDateString('id-ID'),10,pageH-6);
+    }
+
+    async function exportTreeAsPdf(canvas) {
+      if (!window.jspdf) throw new Error('Library PDF tidak tersedia');
+      const { jsPDF } = window.jspdf;
+      const pageW = 420, pageH = 297, marginX = 10, top = 18, bottom = 15;
+      const contentW = pageW - marginX*2, contentH = pageH - top - bottom;
+      const pageAspect = contentW / contentH;
+      const canvasAspect = canvas.width / canvas.height;
+      let cols = 1, rows = 1;
+      if (!(canvasAspect <= pageAspect * 1.25 && canvas.height <= canvas.width * 1.8)) {
+        const pixelsPerPage = Math.max(1300, Math.min(2600, canvas.width));
+        cols = Math.max(1, Math.ceil(canvas.width / pixelsPerPage));
+        const tileW = canvas.width / cols;
+        const tileH = tileW / pageAspect;
+        rows = Math.max(1, Math.ceil(canvas.height / tileH));
+      }
+      const total = cols * rows;
+      const pdf = new jsPDF({orientation:'landscape', unit:'mm', format:'a3', compress:true});
+      const overlap = 10;
+      let pageNo = 0;
+      for (let row=0; row<rows; row++) {
+        for (let col=0; col<cols; col++) {
+          if (pageNo) pdf.addPage('a3','landscape'); pageNo++;
+          const nominalW = canvas.width / cols, nominalH = canvas.height / rows;
+          const sx = Math.max(0, Math.floor(col*nominalW - (col ? overlap : 0)));
+          const sy = Math.max(0, Math.floor(row*nominalH - (row ? overlap : 0)));
+          const sw = Math.min(canvas.width - sx, Math.ceil(nominalW + (col ? overlap : 0) + (col<cols-1 ? overlap : 0)));
+          const sh = Math.min(canvas.height - sy, Math.ceil(nominalH + (row ? overlap : 0) + (row<rows-1 ? overlap : 0)));
+          const tile = document.createElement('canvas'); tile.width = sw; tile.height = sh;
+          tile.getContext('2d').drawImage(canvas,sx,sy,sw,sh,0,0,sw,sh);
+          const ratio = Math.min(contentW/sw, contentH/sh);
+          const drawW = sw*ratio, drawH = sh*ratio;
+          const x = (pageW-drawW)/2, y = top + (contentH-drawH)/2;
+          pdf.addImage(tile.toDataURL('image/jpeg',.94),'JPEG',x,y,drawW,drawH,undefined,'FAST');
+          addPdfHeaderFooter(pdf, appSettings.appTitle || 'Silsilah Keluarga', pageNo, total, pageW, pageH);
+          tile.width = tile.height = 1;
+        }
+      }
+      pdf.save(`Bagan_Silsilah_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    window.executeExport = async function(format) {
+      closeExportModal();
+      showToast(`Menyiapkan ${format === 'png' ? 'gambar' : 'PDF'} profesional...`);
+      try {
+        const canvas = await captureFamilyTreeCanvas();
+        if (format === 'png') {
+          const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
+          if (!blob) throw new Error('Gagal membuat gambar PNG');
+          downloadBlob(`Bagan_Silsilah_${new Date().toISOString().slice(0,10)}.png`,blob);
+          showToast(`PNG berhasil dibuat (${canvas.width} × ${canvas.height}px).`);
+        } else {
+          await exportTreeAsPdf(canvas);
+          showToast('PDF bagan berhasil dibuat. Halaman disusun otomatis.');
+        }
+        canvas.width = canvas.height = 1;
+      } catch (error) {
+        console.error('Export error:',error); showToast(error.message || 'Ekspor gagal diproses.',true);
+      }
     };
 
     window.exportJSON = function() {
@@ -2495,7 +2594,95 @@ ${bodyClone.innerHTML}
     function renderPresentation(){const p=presentationPeople[presentationIndex];document.getElementById('presentation-counter').textContent=`${presentationIndex+1} / ${presentationPeople.length}`;document.getElementById('presentation-content').innerHTML=`<div class="presentation-card"><div class="presentation-photo">${p.photoUrl?`<img src="${sanitizeURL(p.photoUrl)}">`:'<i class="fa-solid fa-user"></i>'}</div><div class="presentation-copy"><p class="text-xs font-black uppercase tracking-[.28em] text-cyan-300">${escapeHTML(p.familyNumber||'Profil keluarga')}</p><h2 class="mt-4">${escapeHTML(p.name||'Tanpa Nama')}</h2><div class="presentation-meta">${[p.birthPlace,p.occupation,p.surname,p.birthDate||p.birthYear].filter(Boolean).map(x=>`<span class="presentation-chip">${escapeHTML(x)}</span>`).join('')}</div><p>${escapeHTML(p.biography||p.notes||'Belum ada biografi untuk profil ini.')}</p></div></div>`;}
     window.presentationNext=function(){presentationIndex=(presentationIndex+1)%presentationPeople.length;renderPresentation();};window.presentationPrevious=function(){presentationIndex=(presentationIndex-1+presentationPeople.length)%presentationPeople.length;renderPresentation();};window.closePresentationMode=function(){document.getElementById('presentation-mode').classList.add('hidden');if(document.fullscreenElement)document.exitFullscreen?.();};
 
-    window.exportFamilyBookPDF=async function(){if(!window.jspdf)return showToast('Library PDF tidak tersedia.',true);showToast('Menyusun buku keluarga PDF...');const {jsPDF}=window.jspdf,pdf=new jsPDF({unit:'mm',format:'a4'}),rows=flattenPeople();const pageW=210,pageH=297,margin=16;const addWrapped=(text,x,y,maxWidth,size=10,line=5)=>{pdf.setFontSize(size);const lines=pdf.splitTextToSize(String(text||''),maxWidth);pdf.text(lines,x,y);return y+lines.length*line};pdf.setFillColor(9,17,31);pdf.rect(0,0,pageW,pageH,'F');pdf.setTextColor(255);pdf.setFontSize(28);pdf.text(appSettings.appTitle||'Silsilah Keluarga',margin,70);pdf.setFontSize(12);pdf.setTextColor(180,205,220);pdf.text('Buku Warisan Keluarga',margin,82);pdf.text(`${rows.length} anggota • ${calculateStats(treeData).maxDepth} generasi • dibuat ${new Date().toLocaleDateString('id-ID')}`,margin,94);for(let i=0;i<rows.length;i++){const p=rows[i].person;if(i||true)pdf.addPage();pdf.setTextColor(15,23,42);pdf.setFontSize(9);pdf.text(`${p.familyNumber||''} • Generasi ${rows[i].generation}`,margin,18);pdf.setFontSize(22);pdf.setFont(undefined,'bold');pdf.text(String(p.name||'Tanpa Nama'),margin,32);pdf.setFont(undefined,'normal');let y=45;if(p.photoUrl&&p.photoUrl.startsWith('data:image')){try{pdf.addImage(p.photoUrl,'JPEG',margin,y,45,55);y+=62}catch(_){}}const meta=[['Lahir',p.birthDate||p.birthYear],['Wafat',p.deathDate||p.deathYear],['Tempat lahir',p.birthPlace],['Pekerjaan',p.occupation],['Marga',p.surname],['Golongan darah',p.bloodType]].filter(x=>x[1]);meta.forEach(([k,v])=>{pdf.setFont(undefined,'bold');pdf.text(`${k}:`,margin,y);pdf.setFont(undefined,'normal');pdf.text(String(v),margin+34,y);y+=6});y+=4;if(p.biography){pdf.setFont(undefined,'bold');pdf.text('Biografi',margin,y);pdf.setFont(undefined,'normal');y=addWrapped(p.biography,margin,y+7,pageW-margin*2,10,5);}if(p.source){y+=5;pdf.setFont(undefined,'bold');pdf.text('Sumber',margin,y);pdf.setFont(undefined,'normal');addWrapped(p.source,margin,y+7,pageW-margin*2,9,4.5);}pdf.setDrawColor(226,232,240);pdf.line(margin,pageH-18,pageW-margin,pageH-18);pdf.setFontSize(8);pdf.setTextColor(100);pdf.text(`${i+1}/${rows.length}`,pageW-margin,pageH-11,{align:'right'});}pdf.save(`Buku_Keluarga_${new Date().toISOString().slice(0,10)}.pdf`);showToast('Buku keluarga PDF berhasil dibuat.');};
+    function buildRelationshipIndex() {
+      const index = new Map();
+      const ensure = id => { if (!index.has(id)) index.set(id,{parents:[],partners:[],children:[]}); return index.get(id); };
+      const walk = (node, parent = null) => {
+        if (!node) return;
+        const rel = ensure(node.id);
+        if (parent) { rel.parents.push(parent); ensure(parent.id).children.push(node); }
+        (node.spouses || []).forEach(spouse => {
+          rel.partners.push(spouse); ensure(spouse.id).partners.push(node);
+          (spouse.parents || []).forEach(p => { ensure(spouse.id).parents.push(p); ensure(p.id).children.push(spouse); });
+          (spouse.spouses || []).forEach(other => { ensure(spouse.id).partners.push(other); ensure(other.id).partners.push(spouse); });
+        });
+        (node.children || []).forEach(child => walk(child,node));
+      };
+      walk(treeData); return index;
+    }
+
+    function bookTimelineRows() {
+      const rows = [];
+      flattenPeople().forEach(({person}) => {
+        if (person.birthDate || person.birthYear) rows.push({date:person.birthDate || `${person.birthYear}-01-01`, label:`Kelahiran ${person.name}`, type:'Lahir'});
+        if (person.marriageDate) rows.push({date:person.marriageDate, label:`Pernikahan ${person.name}`, type:'Pernikahan'});
+        if (person.deathDate || person.deathYear) rows.push({date:person.deathDate || `${person.deathYear}-01-01`, label:`Wafat ${person.name}`, type:'Wafat'});
+      });
+      familyEvents.forEach(e => rows.push({date:e.date,label:e.title || 'Acara keluarga',type:e.type || 'Acara'}));
+      return rows.filter(x=>x.date).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    }
+
+    function formatBookDate(value) {
+      if (!value) return '';
+      if (/^\d{4}$/.test(String(value))) return String(value);
+      const d = new Date(`${String(value).slice(0,10)}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    }
+
+    function astrologyBookText(person) {
+      const a = getAstrologyProfile(person);
+      const sun = a.sun ? (a.sun.uncertain ? a.sun.candidates.map(x=>x.name).join(' / ') : a.sun.name) : '';
+      const moon = a.moon ? (a.moon.uncertain ? a.moon.candidates.map(x=>x.name).join(' / ') : a.moon.name) : '';
+      const rising = a.ascendant?.name || '';
+      const chinese = a.chinese?.label || '';
+      return [sun && `Matahari ${sun}`, moon && `Bulan ${moon}`, rising && `Ascendant ${rising}`, chinese && `Shio ${chinese}`].filter(Boolean).join(' • ');
+    }
+
+    function createFamilyBookHTML() {
+      const rows = flattenPeople(); const stats = calculateStats(treeData); const relIndex = buildRelationshipIndex();
+      const timeline = bookTimelineRows().slice(0,80);
+      const esc = escapeHTML;
+      const profileHtml = rows.map(({person,generation},i) => {
+        const rel = relIndex.get(person.id) || {parents:[],partners:[],children:[]};
+        const photo = person.photoUrl ? `<img src="${sanitizeURL(person.photoUrl)}" alt="${esc(person.name)}">` : '<div class="photo-fallback">S</div>';
+        const meta = [
+          ['Nomor anggota',person.familyNumber],['Generasi',generation],['Lahir',formatBookDate(person.birthDate || person.birthYear)],['Wafat',formatBookDate(person.deathDate || person.deathYear)],
+          ['Tempat lahir',person.birthPlace],['Pekerjaan',person.occupation],['Marga / cabang',person.surname],['Golongan darah',person.bloodType]
+        ].filter(x=>x[1]);
+        const astrology = astrologyBookText(person);
+        return `<section class="book-page profile-page"><div class="profile-head"><div><small>${esc(person.familyNumber||`ANG-${i+1}`)} • GENERASI ${generation}</small><h2>${esc(person.name||'Tanpa Nama')}</h2></div><span>${i+1}/${rows.length}</span></div><div class="profile-grid"><div class="profile-photo">${photo}</div><div class="meta-grid">${meta.map(([k,v])=>`<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')}</div></div><div class="relation-box"><div><b>Orang tua</b><span>${esc(rel.parents.map(x=>x.name).join(', ')||'—')}</span></div><div><b>Pasangan</b><span>${esc(rel.partners.map(x=>x.name).join(', ')||'—')}</span></div><div><b>Anak</b><span>${esc(rel.children.map(x=>x.name).join(', ')||'—')}</span></div></div>${astrology?`<div class="astro-box"><b>Astrologi data lahir</b><span>${esc(astrology)}</span></div>`:''}${person.biography?`<div class="book-copy"><h3>Biografi / Kisah Hidup</h3><p>${esc(person.biography).replace(/\n/g,'<br>')}</p></div>`:''}${person.source?`<div class="source-box"><b>Sumber informasi</b><p>${esc(person.source).replace(/\n/g,'<br>')}</p></div>`:''}</section>`;
+      }).join('');
+      return `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Buku Keluarga</title><style>@page{size:A4;margin:14mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#0f172a;background:#fff}.book-page{page-break-after:always;min-height:267mm;position:relative}.cover{display:flex;flex-direction:column;justify-content:center;padding:22mm;background:linear-gradient(145deg,#07111f,#164e63 58%,#4c1d95);color:#fff}.cover small{font-weight:700;letter-spacing:.2em}.cover h1{font-size:34pt;line-height:1.05;margin:12mm 0 4mm}.cover p{color:#cbd5e1}.cover .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin-top:20mm}.cover .stats div{border:1px solid rgba(255,255,255,.18);border-radius:4mm;padding:5mm;background:rgba(255,255,255,.08)}.cover .stats b{display:block;font-size:22pt}.overview h2,.profile-page h2{margin:0;font-size:25pt}.overview-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5mm;margin-top:8mm}.overview-card{padding:6mm;border:1px solid #dbe5ef;border-radius:5mm;background:#f8fafc}.overview-card b{display:block;font-size:21pt}.timeline{margin-top:8mm;border-left:2px solid #0891b2;padding-left:6mm}.timeline-item{margin:0 0 4mm}.timeline-item b{display:block}.profile-head{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:5mm;border-bottom:1px solid #dbe5ef}.profile-head small{font-weight:700;color:#0891b2}.profile-head>span{font-size:9pt;color:#64748b}.profile-grid{display:grid;grid-template-columns:45mm 1fr;gap:8mm;margin-top:7mm}.profile-photo{width:45mm;height:56mm;border-radius:5mm;overflow:hidden;background:#e2e8f0;display:flex;align-items:center;justify-content:center}.profile-photo img{width:100%;height:100%;object-fit:cover}.photo-fallback{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#164e63,#4f46e5);color:#fff;font-size:28pt;font-weight:bold}.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm}.meta-grid div{padding:3.5mm;border-radius:3mm;background:#f8fafc;border:1px solid #e2e8f0}.meta-grid b,.meta-grid span{display:block}.meta-grid b{font-size:7.5pt;text-transform:uppercase;color:#64748b}.meta-grid span{margin-top:1.5mm;font-size:10pt;font-weight:700}.relation-box{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:6mm}.relation-box div,.astro-box,.source-box{padding:4mm;border:1px solid #dbe5ef;border-radius:4mm;background:#fff}.relation-box b,.relation-box span,.astro-box b,.astro-box span{display:block}.relation-box b,.astro-box b,.source-box b{font-size:8pt;text-transform:uppercase;color:#64748b}.relation-box span,.astro-box span{margin-top:2mm;font-size:9pt}.astro-box{margin-top:4mm;background:#f5f3ff;border-color:#ddd6fe}.book-copy{margin-top:7mm}.book-copy h3{font-size:12pt;margin:0 0 3mm}.book-copy p,.source-box p{font-size:9.5pt;line-height:1.55;margin:0}.source-box{margin-top:5mm;background:#f8fafc}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><section class="book-page cover"><small>BUKU WARISAN KELUARGA</small><h1>${esc(appSettings.appTitle||'Silsilah Keluarga')}</h1><p>${esc(appSettings.appSubtitle||'Arsip keluarga lintas generasi')}</p><div class="stats"><div><b>${rows.length}</b><span>Anggota</span></div><div><b>${stats.maxDepth}</b><span>Generasi</span></div><div><b>${timeline.length}</b><span>Peristiwa</span></div></div><p style="margin-top:auto">Dibuat ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</p></section><section class="book-page overview"><h2>Ringkasan Keluarga</h2><div class="overview-grid"><div class="overview-card"><b>${stats.male}</b>Laki-laki</div><div class="overview-card"><b>${stats.female}</b>Perempuan</div><div class="overview-card"><b>${stats.deceased}</b>Telah wafat</div><div class="overview-card"><b>${rows.filter(r=>(r.person.gallery||[]).length||(r.person.documents||[]).length).length}</b>Profil berarsip</div></div><h3 style="margin-top:10mm">Kronologi utama</h3><div class="timeline">${timeline.slice(0,24).map(x=>`<div class="timeline-item"><b>${esc(formatBookDate(x.date))}</b><span>${esc(x.label)}</span></div>`).join('')||'<p>Belum ada kronologi.</p>'}</div></section>${profileHtml}</body></html>`;
+    }
+
+    window.printFamilyBook = function() {
+      const popup = window.open('', '_blank');
+      if (!popup) return showToast('Izinkan pop-up browser untuk membuka pratinjau cetak.',true);
+      popup.document.open(); popup.document.write(createFamilyBookHTML()); popup.document.close();
+      popup.addEventListener('load',()=>setTimeout(()=>popup.print(),700),{once:true});
+    };
+
+    window.exportFamilyBookPDF = async function() {
+      if (!window.jspdf) return showToast('Library PDF tidak tersedia.',true);
+      showToast('Menyusun buku keluarga profesional...');
+      try {
+        const {jsPDF}=window.jspdf, rows=flattenPeople(), stats=calculateStats(treeData), relIndex=buildRelationshipIndex();
+        const timeline=bookTimelineRows(); const pdf=new jsPDF({unit:'mm',format:'a4',compress:true});
+        const W=210,H=297,M=15, footerY=286;
+        const pageTitle=(title,subtitle='')=>{pdf.setFillColor(9,17,31);pdf.rect(0,0,W,22,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(13);pdf.text(title,M,13);if(subtitle){pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(186,230,253);pdf.text(subtitle,W-M,13,{align:'right'});}};
+        const footer=(n,total)=>{pdf.setDrawColor(226,232,240);pdf.line(M,footerY-3,W-M,footerY-3);pdf.setTextColor(100,116,139);pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.text(appSettings.appTitle||'Silsilah Keluarga',M,footerY+2);pdf.text(`${n} / ${total}`,W-M,footerY+2,{align:'right'});};
+        const wrap=(text,x,y,width,size=9,line=4.6)=>{pdf.setFontSize(size);const lines=pdf.splitTextToSize(String(text||''),width);pdf.text(lines,x,y);return y+lines.length*line;};
+        // Cover
+        pdf.setFillColor(7,17,31);pdf.rect(0,0,W,H,'F');pdf.setFillColor(8,145,178);pdf.circle(178,35,42,'F');pdf.setFillColor(79,70,229);pdf.circle(190,258,58,'F');pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.text('BUKU WARISAN KELUARGA',M,76);pdf.setFontSize(30);let coverY=94;coverY=wrap(appSettings.appTitle||'Silsilah Keluarga',M,coverY,160,30,12);pdf.setFont('helvetica','normal');pdf.setTextColor(203,213,225);pdf.setFontSize(11);pdf.text(appSettings.appSubtitle||'Arsip keluarga lintas generasi',M,coverY+5);pdf.setTextColor(255);pdf.setFont('helvetica','bold');pdf.setFontSize(22);pdf.text(String(rows.length),M,178);pdf.text(String(stats.maxDepth),72,178);pdf.text(String(timeline.length),126,178);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(203,213,225);pdf.text('ANGGOTA',M,185);pdf.text('GENERASI',72,185);pdf.text('PERISTIWA',126,185);pdf.text(`Dibuat ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}`,M,270);
+        // Overview
+        pdf.addPage();pageTitle('Ringkasan Keluarga','Statistik & kronologi');pdf.setTextColor(15,23,42);pdf.setFont('helvetica','bold');pdf.setFontSize(22);pdf.text('Gambaran Umum',M,38);const cards=[['Total anggota',rows.length],['Laki-laki',stats.male],['Perempuan',stats.female],['Generasi',stats.maxDepth],['Telah wafat',stats.deceased],['Profil berarsip',rows.filter(r=>(r.person.gallery||[]).length||(r.person.documents||[]).length).length]];cards.forEach((c,i)=>{const x=M+(i%3)*59,y=50+Math.floor(i/3)*28;pdf.setFillColor(248,250,252);pdf.roundedRect(x,y,54,21,3,3,'F');pdf.setFontSize(17);pdf.setFont('helvetica','bold');pdf.text(String(c[1]),x+5,y+9);pdf.setFontSize(7.5);pdf.setFont('helvetica','normal');pdf.setTextColor(100,116,139);pdf.text(c[0],x+5,y+16);pdf.setTextColor(15,23,42)});pdf.setFont('helvetica','bold');pdf.setFontSize(13);pdf.text('Kronologi Utama',M,117);let ty=127;timeline.slice(0,28).forEach(x=>{if(ty>272)return;pdf.setFillColor(8,145,178);pdf.circle(M+2,ty-1.5,1.4,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.text(formatBookDate(x.date),M+7,ty);pdf.setFont('helvetica','normal');pdf.setTextColor(71,85,105);pdf.text(pdf.splitTextToSize(x.label,120),M+45,ty);pdf.setTextColor(15,23,42);ty+=7});
+        const totalPages=2+rows.length;
+        footer(2,totalPages);
+        // Profiles
+        rows.forEach(({person,generation},i)=>{pdf.addPage();pageTitle(person.name||'Tanpa Nama',`${person.familyNumber||''} • Generasi ${generation}`);let y=34;const photoX=M,photoY=y,photoW=44,photoH=54;pdf.setFillColor(226,232,240);pdf.roundedRect(photoX,photoY,photoW,photoH,4,4,'F');if(person.photoUrl){try{const fmt=/png/i.test(person.photoUrl.slice(0,40))?'PNG':'JPEG';pdf.addImage(person.photoUrl,fmt,photoX,photoY,photoW,photoH,undefined,'FAST')}catch(_){pdf.setTextColor(100);pdf.setFontSize(8);pdf.text('Foto tidak tersedia',photoX+photoW/2,photoY+28,{align:'center'})}}else{pdf.setTextColor(100);pdf.setFontSize(8);pdf.text('Tanpa foto',photoX+photoW/2,photoY+28,{align:'center'})}const meta=[['Lahir',formatBookDate(person.birthDate||person.birthYear)],['Wafat',formatBookDate(person.deathDate||person.deathYear)],['Tempat lahir',person.birthPlace],['Pekerjaan',person.occupation],['Marga / cabang',person.surname],['Golongan darah',person.bloodType]].filter(x=>x[1]);let my=y+3;meta.forEach(([k,v])=>{pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(100,116,139);pdf.text(k.toUpperCase(),66,my);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(15,23,42);const val=pdf.splitTextToSize(String(v),122);pdf.text(val,66,my+4);my+=8+(val.length-1)*4});y=Math.max(photoY+photoH+8,my+2);const rel=relIndex.get(person.id)||{parents:[],partners:[],children:[]};pdf.setFillColor(248,250,252);pdf.roundedRect(M,y,W-M*2,31,3,3,'F');[['Orang tua',rel.parents],['Pasangan',rel.partners],['Anak',rel.children]].forEach((entry,j)=>{const x=M+5+j*59;pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(100,116,139);pdf.text(entry[0].toUpperCase(),x,y+7);pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(15,23,42);pdf.text(pdf.splitTextToSize(entry[1].map(p=>p.name).join(', ')||'—',52),x,y+13)});y+=39;const astro=astrologyBookText(person);if(astro){pdf.setFillColor(245,243,255);pdf.roundedRect(M,y,W-M*2,17,3,3,'F');pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(109,40,217);pdf.text('ASTROLOGI DATA LAHIR',M+5,y+6);pdf.setFont('helvetica','normal');pdf.setTextColor(71,85,105);pdf.setFontSize(8);pdf.text(pdf.splitTextToSize(astro,W-M*2-10),M+5,y+12);y+=23}if(person.biography){pdf.setFont('helvetica','bold');pdf.setTextColor(15,23,42);pdf.setFontSize(11);pdf.text('Biografi / Kisah Hidup',M,y);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(51,65,85);const maxLines=Math.max(1,Math.floor((footerY-y-12)/4.6));const lines=pdf.splitTextToSize(person.biography,W-M*2).slice(0,maxLines);pdf.text(lines,M,y+7);y+=7+lines.length*4.6}if(person.source&&y<footerY-18){pdf.setFont('helvetica','bold');pdf.setFontSize(8);pdf.setTextColor(100,116,139);pdf.text('SUMBER INFORMASI',M,y+5);pdf.setFont('helvetica','normal');pdf.setTextColor(71,85,105);pdf.text(pdf.splitTextToSize(person.source,W-M*2),M,y+10)}footer(i+3,totalPages)});
+        pdf.save(`Buku_Keluarga_${new Date().toISOString().slice(0,10)}.pdf`);showToast('Buku keluarga PDF berhasil dibuat.');
+      } catch(error) { console.error(error); showToast('Buku keluarga gagal dibuat: '+(error.message||'error'),true); }
+    };
 
     function gedDate(dateOrYear){if(!dateOrYear)return'';if(/^\d{4}$/.test(String(dateOrYear)))return String(dateOrYear);const d=new Date(`${dateOrYear}T00:00:00`);if(isNaN(d))return String(dateOrYear);return `${d.getDate()} ${['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()]} ${d.getFullYear()}`;}
     window.exportGEDCOM=function(){const rows=flattenPeople(),idMap=new Map(rows.map((r,i)=>[r.person.id,`I${i+1}`]));let lines=['0 HEAD','1 SOUR SILSILAH-PRO','1 CHAR UTF-8','1 GEDC','2 VERS 5.5.1'];rows.forEach(({person})=>{const id=idMap.get(person.id);lines.push(`0 @${id}@ INDI`,`1 NAME ${person.name||'Tanpa Nama'}`);if(person.surname)lines.push(`2 SURN ${person.surname}`);lines.push(`1 SEX ${person.gender==='P'?'F':'M'}`);if(person.birthDate||person.birthYear){lines.push('1 BIRT',`2 DATE ${gedDate(person.birthDate||person.birthYear)}`);if(person.birthPlace)lines.push(`2 PLAC ${person.birthPlace}`)}if(person.deathDate||person.deathYear){lines.push('1 DEAT',`2 DATE ${gedDate(person.deathDate||person.deathYear)}`)}if(person.occupation)lines.push(`1 OCCU ${person.occupation}`);if(person.biography)lines.push(`1 NOTE ${person.biography.replace(/\n/g,' ')}`);if(person.familyNumber)lines.push(`1 REFN ${person.familyNumber}`)});let famSeq=1;const walk=node=>{(node.spouses||[]).forEach(sp=>{const fam=`F${famSeq++}`;lines.push(`0 @${fam}@ FAM`,node.gender==='P'?`1 WIFE @${idMap.get(node.id)}@`:`1 HUSB @${idMap.get(node.id)}@`,sp.gender==='P'?`1 WIFE @${idMap.get(sp.id)}@`:`1 HUSB @${idMap.get(sp.id)}@`);if(sp.marriageDate||node.marriageDate)lines.push('1 MARR',`2 DATE ${gedDate(sp.marriageDate||node.marriageDate)}`);(node.children||[]).filter(c=>!c.linkedSpouseId||c.linkedSpouseId===sp.id).forEach(c=>lines.push(`1 CHIL @${idMap.get(c.id)}@`));});(node.children||[]).forEach(walk)};walk(treeData);lines.push('0 TRLR');downloadTextFile('silsilah-keluarga.ged',lines.join('\r\n'),'text/plain');showToast('GEDCOM berhasil diekspor.');};
