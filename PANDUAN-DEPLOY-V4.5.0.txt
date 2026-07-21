@@ -1,0 +1,5 @@
+1. Ekstrak ZIP.
+2. GitHub Sil-Kel > Add file > Upload files.
+3. Upload seluruh file hasil ekstrak dan commit langsung ke main.
+4. Tunggu Vercel Ready.
+5. Buka web lalu Ctrl+F5.

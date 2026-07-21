@@ -1,0 +1,8 @@
+SILSILAH KELUARGA PRO v4.5.0
+
+- Mendesain ulang konektor pohon keluarga.
+- Menghilangkan garis horizontal campur warna dan titik persimpangan besar.
+- Menjaga warna cabang pada garis vertikal yang tepat.
+- Menyamakan konektor pasangan dan konektor besan.
+- Memperhalus kartu, grid, jarak generasi, desktop, HP, tablet, cetak, dan ekspor.
+- Data Firebase dan isi keluarga tidak diubah.

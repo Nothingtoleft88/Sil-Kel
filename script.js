@@ -1,5 +1,5 @@
 
-    const branchColors = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#0ea5e9', '#f43f5e', '#06b6d4'];
+    const branchColors = ['#db2777', '#7c3aed', '#059669', '#d97706', '#0284c7', '#e11d48', '#0891b2'];
 
     const firebaseConfig = {
       apiKey: "AIzaSyDZ-XP6H_yE-uZBupOgrLrjnHd1CbAEXjA",
@@ -12,7 +12,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const APP_VERSION = '4.4.0';
+    const APP_VERSION = '4.5.0';
     const DATA_PATH = 'silsilah_v2';
     const SESSION_KEY = 'silsilah_family_session_v4';
     const CACHE_KEY = 'silsilah_family_cache_v4';
@@ -1054,14 +1054,14 @@
                      ${spouse.parents.map((p, i) => `
                        <div class="relative flex flex-col items-center px-4">
                          ${buildPersonCard(p, false, false, false, level-1, spouse.id)}
-                         <div class="w-[4px] h-6 bg-slate-400 relative z-10 pointer-events-none"></div>
+                         <div class="w-[3px] h-7 bg-slate-400/80 rounded-full relative z-10 pointer-events-none"></div>
                          ${spouse.parents.length > 1 ? `
-                            <div class="absolute bottom-0 ${i === 0 ? 'right-0 w-[50%]' : 'left-0 w-[50%]'} h-[4px] bg-slate-400 pointer-events-none"></div>
+                            <div class="absolute bottom-0 ${i === 0 ? 'right-0 w-[50%]' : 'left-0 w-[50%]'} h-[3px] bg-slate-400/80 pointer-events-none"></div>
                          ` : ''}
                        </div>
                      `).join('')}
                  </div>
-                 <div class="w-[4px] h-6 bg-slate-400 pointer-events-none"></div>
+                 <div class="w-[3px] h-7 bg-slate-400/80 rounded-full pointer-events-none"></div>
               </div>`;
           }
 

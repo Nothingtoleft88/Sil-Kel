@@ -245,3 +245,123 @@ html,body,.app-root,.app-shell{height:100%;height:100dvh;min-height:100%;min-hei
 }
 @media(min-width:761px) and (max-width:1180px) and (orientation:landscape){.editor-dialog{height:92dvh;max-height:92dvh}.editor-scroll{padding:18px!important}.relation-toolbar{padding:10px 14px}.relation-action{min-height:44px}.astrology-input-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:420px){.relation-action{flex-basis:86px;min-width:86px}.editor-header h2{font-size:16px}.editor-footer-actions{gap:8px!important}.editor-footer-actions button{padding-left:10px!important;padding-right:10px!important}.export-dialog>div:first-child{padding-left:18px!important;padding-right:18px!important}.export-options{padding:16px!important}.export-icon{width:40px;height:40px;flex-basis:40px}}
+
+
+/* =========================================================
+   SILSILAH PRO v4.5 — CLEAN CONNECTOR SYSTEM
+   ========================================================= */
+:root{
+  --tree-line:#aab7c6;
+  --tree-line-soft:#c5cfda;
+  --tree-line-width:3px;
+  --tree-level-gap:54px;
+  --tree-corner:15px;
+}
+.canvas-area{background:#f1f5f9}
+.canvas-grid{
+  opacity:.34;
+  background-size:32px 32px;
+  background-image:linear-gradient(rgba(100,116,139,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(100,116,139,.10) 1px,transparent 1px);
+}
+.family-tree{isolation:isolate}
+.family-tree ul{
+  padding-top:var(--tree-level-gap);
+}
+.family-tree ul::before{
+  height:var(--tree-level-gap);
+  transform:translateX(-1.5px);
+  border-left:var(--tree-line-width) solid var(--tree-line);
+}
+/* The old large junction ring made the connector look like a UI control.
+   A professional genealogy diagram uses a clean uninterrupted stem instead. */
+.family-tree ul::after{display:none!important}
+.family-tree li{
+  padding-top:var(--tree-level-gap);
+  padding-left:20px;
+  padding-right:20px;
+}
+.family-tree li::before,.family-tree li::after{
+  height:var(--tree-level-gap);
+  border-top:var(--tree-line-width) solid var(--tree-line);
+}
+.family-tree li::after{
+  border-left:var(--tree-line-width) solid var(--tree-line);
+}
+.family-tree li:last-child::before{
+  border-right:var(--tree-line-width) solid var(--tree-line);
+  border-radius:0 var(--tree-corner) 0 0;
+}
+.family-tree li:first-child::after{
+  border-radius:var(--tree-corner) 0 0 0;
+}
+/* Keep the shared sibling rail one coherent neutral line. Only the drop from
+   that rail to a child receives the spouse/branch colour. */
+.family-tree li.has-branch-color::before{
+  border-top-color:var(--tree-line)!important;
+}
+.family-tree li.has-branch-color::after{
+  border-top-color:var(--tree-line)!important;
+  border-left-color:var(--branch-color)!important;
+}
+.family-tree li:last-child.has-branch-color::before{
+  border-top-color:var(--tree-line)!important;
+  border-right-color:var(--branch-color)!important;
+}
+.family-tree li:only-child.has-branch-color::after{
+  display:block!important;
+  top:calc(-1 * var(--tree-level-gap));
+  left:50%;
+  width:0;
+  height:var(--tree-level-gap);
+  border:0!important;
+  border-left:var(--tree-line-width) solid var(--branch-color)!important;
+  border-radius:0!important;
+}
+.family-tree li.has-branch-color::after{
+  filter:drop-shadow(0 0 1px rgba(255,255,255,.7));
+}
+.spouse-connector{
+  height:var(--tree-line-width);
+  background:var(--tree-line);
+  box-shadow:none;
+}
+.spouse-connector::after{
+  width:17px;
+  height:17px;
+  border:2px solid #fff;
+  background:#fff;
+  color:#e11d48;
+  box-shadow:0 3px 9px rgba(15,23,42,.12);
+  font-size:8px;
+}
+.family-tree .cursor-pointer{
+  border-color:#d8e1eb!important;
+  box-shadow:0 12px 30px rgba(15,23,42,.10)!important;
+}
+.family-tree .cursor-pointer:hover{
+  box-shadow:0 18px 42px rgba(15,23,42,.15)!important;
+}
+.family-tree .cursor-pointer .h-2{
+  height:4px!important;
+  background:linear-gradient(90deg,#06b6d4,#6366f1)!important;
+}
+/* Extended in-law branches must inherit the new gap without changing data/layout logic. */
+.family-tree ul.extend-ul{padding-top:288px}
+.family-tree ul.extend-ul::before{height:288px}
+.family-tree ul.extend-li>li{padding-top:288px}
+.family-tree ul.extend-li>li::before,.family-tree ul.extend-li>li::after{height:288px}
+
+@media(max-width:760px){
+  :root{--tree-line-width:2px;--tree-level-gap:44px;--tree-corner:12px}
+  .family-tree ul::before{transform:translateX(-1px)}
+  .family-tree li{padding-left:12px;padding-right:12px}
+  .family-tree .cursor-pointer{box-shadow:0 9px 23px rgba(15,23,42,.10)!important}
+  .canvas-grid{opacity:.27;background-size:28px 28px}
+}
+
+@media print{
+  .family-tree li::before,.family-tree li::after,.family-tree ul::before{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+}

@@ -1,0 +1,20 @@
+QA REPORT — SILSILAH KELUARGA PRO v4.5.0
+
+[PASS] APP version
+[PASS] Firebase data path unchanged
+[PASS] No reset of tree data path
+[PASS] Neutral sibling rail rule
+[PASS] Colored vertical drop rule
+[PASS] Old junction ring disabled
+[PASS] Mobile connector override
+[PASS] Add partner still present
+[PASS] Export PDF still present
+[PASS] Family book still present
+[PASS] Astrology still present
+[PASS] No duplicate HTML ids
+[PASS] HTML click handlers resolve
+[PASS] Chromium visual regression: 3 coloured branches
+[PASS] Chromium visual regression: single child desktop
+[PASS] Chromium visual regression: single child mobile
+
+Catatan: pemeriksaan browser nyata tetap disarankan setelah deployment karena data Firebase produksi dan ukuran pohon tiap keluarga berbeda.
