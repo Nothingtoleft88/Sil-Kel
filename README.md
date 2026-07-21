@@ -15,3 +15,5 @@ Unggah seluruh isi folder ini ke repository GitHub yang terhubung ke Vercel. Pas
 
 ## Catatan keamanan
 Kode akses pada versi ini tetap kompatibel dengan database lama (`silsilah_v2/settings/accessCode`). Untuk keamanan tingkat produksi, gunakan Firebase Authentication dan Rules berbasis `auth != null`; kode akses sisi klien bukan pengganti autentikasi server.
+
+Deployment refresh v4.0.0
