@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#09111f">
+  <meta name="theme-color" content="#0b1324">
   <meta name="description" content="Ruang kerja profesional untuk mengelola silsilah, profil, dan warisan keluarga.">
-  <title>Silsilah Keluarga — Family Legacy Workspace</title>
+  <title>Silsilah Keluarga: Family Legacy Workspace</title>
   
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -21,641 +23,1013 @@
 </head>
 <body class="app-root">
 
-
-  <!-- Notifikasi Toast -->
-  <div id="toast-notification" class="fixed bottom-5 right-5 translate-y-20 opacity-0 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl transform transition-all duration-300 z-[700] flex items-center">
-    <i class="fa-solid fa-circle-check mr-2"></i>
-    <span id="toast-message">Tersimpan</span>
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast-notification" class="toast-banner" role="alert" aria-live="polite">
+    <i class="fa-solid fa-circle-check"></i>
+    <span id="toast-message">Perubahan tersimpan</span>
   </div>
 
-  <!-- Custom Confirm Modal -->
-  <div id="custom-confirm-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[400] p-4 opacity-0 transition-opacity duration-300">
-    <div id="custom-confirm-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center transform scale-95 transition-transform duration-300">
-      <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-        <i class="fa-solid fa-triangle-exclamation"></i>
+  <!-- CUSTOM CONFIRM MODAL -->
+  <div id="custom-confirm-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true" aria-labelledby="custom-confirm-title">
+    <div id="custom-confirm-box" class="modal-dialog-shell" style="max-width: 400px; text-align: center;">
+      <div class="modal-body-scroll" style="padding: 28px 24px 20px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #fee2e2; color: #dc2626; display: grid; place-items: center; margin: 0 auto 16px; font-size: 24px;">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 id="custom-confirm-title" style="font-size: 18px; font-weight: 800; margin-bottom: 8px;">Konfirmasi Tindakan</h3>
+        <p id="custom-confirm-message" style="font-size: 13px; color: var(--ink-muted); line-height: 1.5;">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
       </div>
-      <h3 id="custom-confirm-title" class="text-xl font-bold text-slate-800 mb-2">Konfirmasi</h3>
-      <p id="custom-confirm-message" class="text-sm text-slate-500 mb-6">Apakah Anda yakin?</p>
-      <div class="flex gap-3 justify-center">
-        <button id="custom-confirm-cancel" class="px-5 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-bold transition">Batal</button>
-        <button id="custom-confirm-ok" class="px-5 py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-xl text-sm font-bold shadow-md transition">Ya, Lanjutkan</button>
+      <div class="modal-footer-bar" style="justify-content: center; background: #fff; padding: 16px 24px 24px;">
+        <button id="custom-confirm-cancel" class="ui-btn" type="button">Batal</button>
+        <button id="custom-confirm-ok" class="ui-btn ui-btn-primary" style="background: #dc2626; border-color: #dc2626;" type="button">Ya, Lanjutkan</button>
       </div>
     </div>
   </div>
 
   <!-- BOOT SCREEN -->
-  <div id="boot-screen" class="fixed inset-0 z-[600] flex items-center justify-center bg-[#09111f] text-white transition-opacity duration-500">
-    <div class="text-center px-6">
-      <div class="brand-orbit mx-auto mb-6"><span class="brand-mark">S</span></div>
-      <h1 class="text-2xl font-black tracking-tight">Silsilah Keluarga</h1>
-      <p id="boot-message" class="mt-2 text-sm text-slate-400">Menghubungkan data keluarga...</p>
-      <div class="loading-line mt-6 mx-auto"><span></span></div>
+  <div id="boot-screen" style="position: fixed; inset: 0; z-index: 999; background: #070d18; display: flex; align-items: center; justify-content: center; color: #fff; transition: opacity 0.4s ease;">
+    <div style="text-align: center; max-width: 320px; padding: 24px;">
+      <div class="brand-icon-box" style="width: 54px; height: 54px; margin: 0 auto 16px; font-size: 24px;">S</div>
+      <h2 style="font-size: 20px; font-weight: 800; color: #fff;">Silsilah Keluarga</h2>
+      <p id="boot-message" style="font-size: 12px; color: #94a3b8; margin-top: 6px;">Menghubungkan data silsilah...</p>
+      <div style="width: 140px; height: 3px; background: rgba(255, 255, 255, 0.1); border-radius: 999px; margin: 18px auto 0; overflow: hidden; position: relative;">
+        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 45%; background: #38bdf8; border-radius: inherit; animation: bootSlide 1.2s ease-in-out infinite;"></div>
+      </div>
     </div>
   </div>
+  <style>
+    @keyframes bootSlide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
+  </style>
 
-  <!-- HALAMAN LOGIN PREMIUM -->
-  <div id="login-screen" class="fixed inset-0 z-[500] flex items-center justify-center overflow-y-auto bg-[#09111f] p-4 transition-all duration-500">
-    <div class="login-aurora login-aurora-one"></div>
-    <div class="login-aurora login-aurora-two"></div>
-    <div class="login-shell relative z-10 grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-white/95 shadow-2xl lg:grid-cols-[1.05fr_.95fr]">
-      <section class="login-story hidden min-h-[650px] flex-col justify-between p-12 text-white lg:flex">
-        <div>
-          <div class="inline-flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-xl">
-            <div class="brand-mark small">S</div>
-            <div>
-              <p class="text-sm font-black tracking-wide">SILSILAH</p>
-              <p class="text-[11px] text-white/65">Family Legacy Workspace</p>
-            </div>
-          </div>
-          <div class="mt-20 max-w-lg">
-            <p class="mb-4 text-xs font-black uppercase tracking-[.32em] text-cyan-300">Warisan keluarga, tersusun rapi</p>
-            <h2 class="text-5xl font-black leading-[1.05] tracking-tight">Jaga cerita keluarga tetap hidup lintas generasi.</h2>
-            <p class="mt-6 max-w-md text-base leading-7 text-white/70">Kelola hubungan keluarga, profil anggota, jejak tempat, foto, dan dokumen silsilah dalam satu ruang kerja yang elegan.</p>
+  <!-- LOGIN VAULT SCREEN -->
+  <div id="login-screen" class="hidden" style="position: fixed; inset: 0; z-index: 800; background: #070d18; display: flex; align-items: center; justify-content: center; padding: 20px;">
+    <div style="width: 100%; max-width: 440px; background: #ffffff; border-radius: 24px; padding: 36px 32px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4); text-align: center;">
+      <div style="width: 50px; height: 50px; border-radius: 14px; background: #0f172a; color: #fff; display: grid; place-items: center; margin: 0 auto 16px; font-size: 20px;">
+        <i class="fa-solid fa-vault"></i>
+      </div>
+      <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-cyan);">Akses Terproteksi</span>
+      <h2 id="login-title-text" style="font-size: 22px; font-weight: 800; color: var(--ink-primary); margin-top: 4px;">Gembok Keluarga</h2>
+      <p id="login-desc-text" style="font-size: 13px; color: var(--ink-muted); margin-top: 6px; line-height: 1.5;">Masukkan kode akses untuk membuka arsip dan pohon keluarga.</p>
+
+      <form onsubmit="event.preventDefault(); attemptLogin();" style="margin-top: 24px; text-align: left;">
+        <div class="form-field-group">
+          <label class="form-label" for="login-input">Kode Akses</label>
+          <div style="position: relative;">
+            <input type="password" id="login-input" inputmode="numeric" placeholder="Masukkan kode sandi" class="form-input-text" style="padding-right: 44px; letter-spacing: 0.15em; font-weight: 700; font-size: 16px;">
+            <button type="button" onclick="togglePasswordVisibility()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-subtle); padding: 4px;" aria-label="Tampilkan kode">
+              <i class="fa-regular fa-eye"></i>
+            </button>
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-3">
-          <div class="login-feature"><i class="fa-solid fa-diagram-project"></i><span>Pohon visual</span></div>
-          <div class="login-feature"><i class="fa-solid fa-cloud-arrow-up"></i><span>Sinkron cloud</span></div>
-          <div class="login-feature"><i class="fa-solid fa-file-export"></i><span>Ekspor lengkap</span></div>
-        </div>
-      </section>
 
-      <section class="flex min-h-[650px] items-center p-7 sm:p-12">
-        <div class="mx-auto w-full max-w-md">
-          <div class="mb-9 lg:hidden">
-            <div class="inline-flex items-center gap-3"><div class="brand-mark small">S</div><div><p class="font-black text-slate-900">Silsilah</p><p class="text-xs text-slate-500">Family Legacy Workspace</p></div></div>
-          </div>
-          <div class="mb-8">
-            <div class="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-950 text-xl text-white shadow-xl"><i class="fa-solid fa-fingerprint"></i></div>
-            <p class="text-xs font-extrabold uppercase tracking-[.24em] text-cyan-700">Ruang keluarga pribadi</p>
-            <h2 id="login-title-text" class="mt-3 text-3xl font-black tracking-tight text-slate-950">Gembok Keluarga</h2>
-            <p id="login-desc-text" class="mt-3 text-sm leading-6 text-slate-500">Masukkan kode akses untuk membuka arsip dan pohon keluarga.</p>
-          </div>
-
-          <div class="space-y-4">
-            <label class="block">
-              <span class="mb-2 block text-xs font-black uppercase tracking-wider text-slate-500">Kode akses</span>
-              <div class="login-input-wrap">
-                <i class="fa-solid fa-key"></i>
-                <input type="password" id="login-input" inputmode="numeric" autocomplete="current-password" placeholder="Masukkan kode akses" class="w-full border-0 bg-transparent px-3 py-4 text-lg font-bold tracking-[.22em] text-slate-950 outline-none placeholder:text-sm placeholder:font-medium placeholder:tracking-normal placeholder:text-slate-400">
-                <button type="button" id="toggle-password" onclick="togglePasswordVisibility()" class="login-eye" aria-label="Tampilkan kode"><i class="fa-regular fa-eye"></i></button>
-              </div>
-            </label>
-            <div class="flex items-center justify-between gap-4">
-              <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-600"><input id="remember-session" type="checkbox" checked class="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"><span>Tetap masuk di perangkat ini</span></label>
-              <span id="login-connection-status" class="inline-flex items-center gap-2 text-xs font-bold text-slate-400"><span class="status-dot"></span>Cloud</span>
-            </div>
-            <button onclick="attemptLogin()" class="premium-primary w-full"><span>Buka Ruang Keluarga</span><i class="fa-solid fa-arrow-right"></i></button>
-            <p id="login-error" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-center text-sm font-bold text-rose-700">Kode akses salah. Periksa kembali dan coba lagi.</p>
-          </div>
-          <div class="mt-9 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-500"><i class="fa-solid fa-shield-halved mr-2 text-cyan-700"></i>Sesi hanya disimpan pada perangkat ini dan dapat diakhiri melalui tombol Keluar.</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; font-size: 12px; color: var(--ink-secondary);">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="remember-session" checked style="accent-color: var(--accent-cyan);">
+            <span>Ingat perangkat ini</span>
+          </label>
+          <span id="login-connection-status" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink-muted);">
+            <span class="status-dot-indicator online"></span> Online
+          </span>
         </div>
-      </section>
+
+        <button type="submit" class="ui-btn ui-btn-primary" style="width: 100%; padding: 12px; font-size: 14px;">
+          <span>Buka Ruang Keluarga</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <p id="login-error" class="hidden" style="margin-top: 14px; padding: 10px; border-radius: 8px; background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; font-size: 12px; font-weight: 600; text-align: center;">
+          Kode akses tidak sesuai. Silakan periksa kembali.
+        </p>
+      </form>
     </div>
   </div>
 
   <!-- APPLICATION SHELL -->
-  <div id="app-shell" class="app-shell">
+  <div class="app-root" id="app-shell">
+    
+    <!-- SIDEBAR -->
     <aside id="app-sidebar" class="app-sidebar">
       <div class="sidebar-brand">
-        <div class="brand-mark">S</div>
-        <div class="min-w-0">
-          <div class="flex items-center gap-2"><h1 id="app-main-title" class="truncate text-base font-black text-white">Silsilah Keluarga</h1><span id="app-version" class="version-pill">v4.6</span></div>
-          <p id="app-sub-title" class="mt-1 truncate text-[11px] font-medium text-slate-400">Family Legacy Workspace</p>
+        <div class="brand-icon-box">S</div>
+        <div style="min-width: 0;">
+          <div style="display: flex; align-items: center;">
+            <h1 id="app-main-title" class="brand-title">Silsilah Keluarga</h1>
+            <span id="app-version" class="version-tag">PRO</span>
+          </div>
+          <p id="app-sub-title" class="brand-subtitle">Family Heritage Workspace</p>
         </div>
       </div>
 
-      <nav class="sidebar-nav" aria-label="Navigasi utama">
-        <button class="nav-item active" data-view="tree" onclick="openTreeView(this)"><i class="fa-solid fa-diagram-project"></i><span>Pohon Keluarga</span></button>
-        <button class="nav-item" data-view="directory" onclick="openDirectoryWorkspace()"><i class="fa-solid fa-address-book"></i><span>Daftar Anggota</span></button>
-        <button class="nav-item" data-view="timeline" onclick="openTimelineWorkspace()"><i class="fa-solid fa-timeline"></i><span>Timeline Keluarga</span></button>
-        <button class="nav-item" data-view="calendar" onclick="openCalendarWorkspace()"><i class="fa-solid fa-calendar-days"></i><span>Kalender Keluarga</span></button>
-        <button class="nav-item" data-view="archive" onclick="openArchiveWorkspace()"><i class="fa-solid fa-box-archive"></i><span>Arsip & Galeri</span></button>
-        <button class="nav-item" data-view="quality" onclick="openQualityWorkspace()"><i class="fa-solid fa-shield-heart"></i><span>Kualitas Data</span></button>
-        <button class="nav-item" data-view="history" onclick="openHistoryWorkspace()"><i class="fa-solid fa-clock-rotate-left"></i><span>Riwayat Versi</span></button>
-        <button class="nav-item" data-view="stats" onclick="openStatsModal(); setActiveNav('stats')"><i class="fa-solid fa-chart-pie"></i><span>Statistik Keluarga</span></button>
-        <button class="nav-item" data-view="map" onclick="openMapMode(); setActiveNav('map')"><i class="fa-solid fa-map-location-dot"></i><span>Jejak Migrasi</span></button>
+      <nav class="sidebar-nav" aria-label="Navigasi Utama">
+        <button class="nav-item active" data-view="tree" onclick="switchWorkspaceView('tree')">
+          <i class="fa-solid fa-diagram-project"></i>
+          <span>Pohon Silsilah</span>
+        </button>
+        <button class="nav-item" data-view="directory" onclick="switchWorkspaceView('directory')">
+          <i class="fa-solid fa-address-book"></i>
+          <span>Direktori Anggota</span>
+        </button>
+        <button class="nav-item" data-view="timeline" onclick="switchWorkspaceView('timeline')">
+          <i class="fa-solid fa-timeline"></i>
+          <span>Timeline Keluarga</span>
+        </button>
+        <button class="nav-item" data-view="calendar" onclick="switchWorkspaceView('calendar')">
+          <i class="fa-solid fa-calendar-days"></i>
+          <span>Kalender & Acara</span>
+        </button>
+        <button class="nav-item" data-view="archive" onclick="switchWorkspaceView('archive')">
+          <i class="fa-solid fa-photo-film"></i>
+          <span>Arsip & Galeri</span>
+        </button>
+        <button class="nav-item" data-view="stats" onclick="switchWorkspaceView('stats')">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Statistik Keluarga</span>
+        </button>
+        <button class="nav-item" data-view="map" onclick="switchWorkspaceView('map')">
+          <i class="fa-solid fa-earth-asia"></i>
+          <span>Jejak Migrasi</span>
+        </button>
+        <button class="nav-item" data-view="quality" onclick="switchWorkspaceView('quality')">
+          <i class="fa-solid fa-shield-heart"></i>
+          <span>Kualitas Data</span>
+        </button>
+        <button class="nav-item" data-view="history" onclick="switchWorkspaceView('history')">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>Riwayat Versi</span>
+        </button>
       </nav>
 
       <div class="sidebar-section">
-        <div class="sidebar-section-title"><span>Ringkasan</span><button onclick="refreshCloudData()" title="Muat ulang cloud"><i class="fa-solid fa-rotate"></i></button></div>
-        <div class="sidebar-stats">
-          <div class="sidebar-stat"><span id="sidebar-stat-total">0</span><small>Anggota</small></div>
-          <div class="sidebar-stat"><span id="sidebar-stat-depth">0</span><small>Generasi</small></div>
-          <div class="sidebar-stat"><span id="sidebar-stat-birthday">0</span><small>Ultah bulan ini</small></div>
-          <div class="sidebar-stat"><span id="sidebar-stat-quality">100</span><small>Skor data</small></div>
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Ringkasan Silsilah</span>
+          <button onclick="refreshCloudData()" title="Muat ulang dari cloud" style="color: #64748b;">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
         </div>
-      </div>
+        <div class="sidebar-mini-grid">
+          <div class="sidebar-mini-card">
+            <span id="sidebar-stat-total" class="val">0</span>
+            <span class="lbl">Anggota</span>
+          </div>
+          <div class="sidebar-mini-card">
+            <span id="sidebar-stat-depth" class="val">0</span>
+            <span class="lbl">Generasi</span>
+          </div>
+          <div class="sidebar-mini-card">
+            <span id="sidebar-stat-birthday" class="val">0</span>
+            <span class="lbl">Ultah Bulan Ini</span>
+          </div>
+          <div class="sidebar-mini-card">
+            <span id="sidebar-stat-quality" class="val">100</span>
+            <span class="lbl">Skor Data</span>
+          </div>
+        </div>
 
-      <div class="sidebar-section grow">
-        <div class="sidebar-section-title"><span>Status sistem</span></div>
-        <div class="sync-card">
-          <div class="sync-icon"><i class="fa-solid fa-cloud"></i></div>
-          <div class="min-w-0"><p id="sync-status-text" class="truncate text-sm font-bold text-white">Menghubungkan...</p><p id="sync-status-time" class="mt-0.5 truncate text-[11px] text-slate-400">Menunggu cloud</p></div>
-          <span id="sync-status-dot" class="sync-dot pending"></span>
+        <div class="cloud-sync-card">
+          <div class="cloud-icon-status">
+            <i class="fa-solid fa-cloud"></i>
+          </div>
+          <div class="cloud-sync-details">
+            <p id="sync-status-text" class="cloud-sync-title">Menghubungkan...</p>
+            <p id="sync-status-time" class="cloud-sync-sub">Menunggu cloud</p>
+          </div>
+          <span id="sync-status-dot" class="status-dot-indicator pending"></span>
         </div>
       </div>
 
       <div class="sidebar-footer">
-        <button onclick="openSettingsModal()" class="sidebar-footer-btn"><i class="fa-solid fa-sliders"></i><span>Pengaturan</span></button>
-        <button id="btn-logout" onclick="logout()" class="sidebar-footer-btn danger"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>Keluar</span></button>
+        <button onclick="openSettingsModal()" class="sidebar-action-btn" type="button">
+          <i class="fa-solid fa-sliders"></i>
+          <span>Pengaturan</span>
+        </button>
+        <button id="btn-logout" onclick="logout()" class="sidebar-action-btn danger" type="button">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          <span>Keluar</span>
+        </button>
       </div>
     </aside>
 
-    <section class="workspace">
-      <header class="workspace-topbar">
-        <div class="flex min-w-0 items-center gap-3">
-          <button onclick="toggleSidebar()" class="icon-button mobile-menu" aria-label="Buka menu"><i class="fa-solid fa-bars"></i></button>
-          <div class="min-w-0">
-            <p class="text-[11px] font-extrabold uppercase tracking-[.2em] text-cyan-700">Workspace</p>
-            <div class="flex items-center gap-2"><h2 class="truncate text-lg font-black text-slate-950">Pohon Keluarga</h2><span class="hidden text-xs text-slate-400 sm:inline">/ kanvas interaktif</span></div>
-          </div>
-        </div>
+    <div id="sidebar-overlay" class="sidebar-backdrop-overlay" onclick="toggleSidebar(false)"></div>
 
-        <div class="topbar-search">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="search-input" placeholder="Cari anggota keluarga..." autocomplete="off">
-          <button id="clear-search" class="hidden" aria-label="Hapus pencarian"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-
-        <div class="topbar-actions">
-          <button onclick="openPresentationMode()" class="icon-button" title="Mode presentasi"><i class="fa-solid fa-display"></i></button>
-          <button onclick="openSettingsModal()" class="icon-button" title="Pengaturan"><i class="fa-solid fa-gear"></i></button>
-          <button onclick="openExportModal()" class="soft-button"><i class="fa-solid fa-arrow-up-from-bracket"></i><span class="hidden md:inline">Ekspor</span></button>
-          <div id="action-buttons-container" class="action-menu">
-            <button onclick="exportJSON()" title="Simpan JSON"><i class="fa-solid fa-file-arrow-down"></i></button>
-            <label title="Muat JSON"><i class="fa-solid fa-file-arrow-up"></i><input type="file" id="import-input" accept=".json" class="hidden"></label>
-            <button onclick="exportFamilyBookPDF()" title="Cetak buku keluarga PDF"><i class="fa-solid fa-book-open"></i></button>
-            <button onclick="exportGEDCOM()" title="Ekspor GEDCOM"><i class="fa-solid fa-file-export"></i></button>
-            <label title="Impor GEDCOM"><i class="fa-solid fa-file-import"></i><input type="file" id="gedcom-input" accept=".ged,.gedcom,text/plain" class="hidden"></label>
-            <button onclick="exportWebProject()" title="Ekspor proyek web"><i class="fa-solid fa-code"></i></button>
-          </div>
-        </div>
-      </header>
-
-      <main id="main-area" class="canvas-area cursor-grab bg-slate-100">
-        <div class="canvas-grid"></div>
-        <div class="canvas-heading">
-          <div><p class="canvas-eyebrow">Visualisasi hubungan</p><h3>Peta garis keturunan</h3></div>
-          <div class="canvas-legend"><span><i class="legend-line child"></i>Garis keturunan dari titik pasangan</span><span><i class="legend-line spouse"></i>Pasangan</span></div>
-        </div>
-
-        <div id="tree-transform" class="absolute left-0 top-0 h-max w-max">
-          <div class="family-tree px-10 pb-40"><svg id="tree-connectors" class="tree-connectors" aria-hidden="true"></svg><ul id="tree-container" class="transition-all duration-500 ease-in-out"></ul></div>
-        </div>
-
-        <div class="canvas-tools zoom-controls" data-no-pan>
-          <button onclick="adjustZoom(0.1)" title="Perbesar (+)"><i class="fa-solid fa-plus"></i></button>
-          <button onclick="resetZoom()" title="Muat seluruh pohon (0 / F)"><i class="fa-solid fa-expand"></i></button>
-          <button onclick="adjustZoom(-0.1)" title="Perkecil (-)"><i class="fa-solid fa-minus"></i></button>
-          <button id="zoom-level" class="zoom-level" onclick="setZoom100()" title="Kembali ke 100% (1)">100%</button>
-          <span></span>
-          <button onclick="expandAll()" title="Buka semua cabang"><i class="fa-solid fa-folder-open"></i></button>
-          <button onclick="collapseAll()" title="Tutup semua cabang"><i class="fa-solid fa-folder-closed"></i></button>
-        </div>
-
-        <div class="canvas-help">
-          <div class="help-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
-          <div><p class="font-black text-slate-800">Navigasi kanvas</p><p id="help-text-edit" class="mt-1 text-xs leading-5 text-slate-500">Geser kanvas dengan stabil, arahkan kursor lalu gulir untuk zoom tepat pada titik tersebut. Klik dua kali area kosong untuk memuat seluruh pohon.</p></div>
-          <button onclick="this.parentElement.classList.add('hidden')" aria-label="Tutup panduan"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      </main>
-    </section>
-    <div id="sidebar-overlay" onclick="toggleSidebar(false)" class="sidebar-overlay"></div>
-  </div>
-
-  <!-- MODAL EKSPOR & CETAK -->
-  <div id="export-modal" class="export-modal hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="export-dialog bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col transform scale-100 transition-transform">
-      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-        <div><p class="text-[10px] font-black uppercase tracking-[.18em] text-cyan-700">Dokumen keluarga</p><h2 class="mt-1 text-lg font-black text-slate-900"><i class="fa-solid fa-print mr-2 text-blue-600"></i>Ekspor & Cetak</h2></div>
-        <button onclick="closeExportModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-2 hover:bg-red-50" aria-label="Tutup"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <div class="export-options p-5 sm:p-6">
-        <button onclick="executeExport('png')" class="export-option export-blue">
-          <span class="export-icon"><i class="fa-solid fa-image"></i></span><span class="min-w-0 flex-1 text-left"><b>Bagan PNG resolusi tinggi</b><small>Gambar utuh untuk arsip, presentasi, dan berbagi.</small></span><i class="fa-solid fa-chevron-right"></i>
-        </button>
-        <button onclick="executeExport('pdf')" class="export-option export-red">
-          <span class="export-icon"><i class="fa-solid fa-file-pdf"></i></span><span class="min-w-0 flex-1 text-left"><b>Bagan PDF profesional</b><small>A3 lanskap; otomatis satu atau beberapa halaman tanpa memotong kartu.</small></span><i class="fa-solid fa-chevron-right"></i>
-        </button>
-        <button onclick="closeExportModal(); exportFamilyBookPDF()" class="export-option export-green">
-          <span class="export-icon"><i class="fa-solid fa-book-open"></i></span><span class="min-w-0 flex-1 text-left"><b>Buku keluarga PDF</b><small>Sampul, ringkasan, kronologi, relasi, astrologi, dan profil anggota.</small></span><i class="fa-solid fa-chevron-right"></i>
-        </button>
-        <button onclick="closeExportModal(); printFamilyBook()" class="export-option export-violet">
-          <span class="export-icon"><i class="fa-solid fa-print"></i></span><span class="min-w-0 flex-1 text-left"><b>Pratinjau cetak buku</b><small>Layout A4 ramah printer dengan page break otomatis.</small></span><i class="fa-solid fa-chevron-right"></i>
-        </button>
-        <div class="grid grid-cols-2 gap-3 pt-1">
-          <button onclick="closeExportModal(); exportGEDCOM()" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700 hover:bg-slate-100"><i class="fa-solid fa-file-export mr-2"></i>GEDCOM</button>
-          <label class="cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center text-sm font-bold text-slate-700 hover:bg-slate-100"><i class="fa-solid fa-file-import mr-2"></i>Impor GEDCOM<input type="file" id="gedcom-input-export" accept=".ged,.gedcom,text/plain" class="hidden"></label>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL PENGATURAN -->
-  <div id="settings-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
-        <h2 class="text-lg font-bold text-slate-800 flex items-center">
-          <i class="fa-solid fa-gear mr-2 text-slate-600"></i> Pengaturan Aplikasi
-        </h2>
-        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-      <div class="p-6 overflow-y-auto space-y-4">
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Utama Web</label>
-          <input type="text" id="set-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
-        </div>
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Subjudul Web</label>
-          <input type="text" id="set-subtitle" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Kode Akses / Password</label>
-          <input type="text" id="set-password" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Kosongkan jika ingin web publik">
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Warna Latar Kanvas</label>
-          <select id="set-bg" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
-            <option value="bg-slate-100">Bawaan (Abu-abu Lembut)</option>
-            <option value="bg-blue-50">Biru Laut (Ocean)</option>
-            <option value="bg-emerald-50">Hijau Daun (Nature)</option>
-            <option value="bg-amber-50">Kuning Hangat (Warm)</option>
-            <option value="bg-white">Putih Bersih</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Gaya Kartu Profil</label>
-          <select id="set-cardstyle" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition">
-            <option value="default">Bawaan (Modern &amp; Berwarna)</option>
-            <option value="minimalist">Minimalis (Garis Tipis, Putih)</option>
-            <option value="classic">Klasik (Sepia &amp; Serif)</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Judul Form Login</label>
-          <input type="text" id="set-login-title" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Akses Terbatas">
-        </div>
-        
-        <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Deskripsi Form Login</label>
-          <input type="text" id="set-login-desc" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition" placeholder="Silakan masukkan kode akses...">
-        </div>
-
-        <div class="flex items-center justify-between p-3 border border-slate-200 rounded-lg bg-slate-50 mt-2">
-          <div>
-            <span class="block text-sm font-bold text-slate-700">Izinkan Mode Edit</span>
-            <span class="block text-[11px] text-slate-500">Jika dimatikan, web menjadi mode lihat-saja (Read-Only)</span>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="set-editmode" class="sr-only peer">
-            <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
-        </div>
-
-      </div>
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl shrink-0">
-        <button type="button" onclick="closeSettingsModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition">Batal</button>
-        <button type="button" onclick="saveSettings()" class="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL EDITOR PROFIL -->
-  <div id="editor-modal" class="editor-modal hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div id="editor-dialog" class="editor-dialog bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh] transform scale-100 transition-transform">
+    <!-- MAIN WORKSPACE -->
+    <main class="workspace-wrapper">
       
-      <div class="editor-header px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-        <h2 id="modal-title" class="text-lg font-bold text-slate-800 flex items-center">
-          <i class="fa-solid fa-pen-to-square mr-2 text-blue-600" id="modal-title-icon"></i> <span id="modal-title-text">Edit Profil</span>
+      <!-- TOPBAR -->
+      <header class="workspace-topbar">
+        <div class="topbar-left">
+          <button onclick="toggleSidebar()" class="mobile-menu-trigger" aria-label="Buka menu navigasi">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <div class="topbar-breadcrumbs">
+            <span class="topbar-kicker">Ruang Kerja</span>
+            <h2 id="current-view-title" class="topbar-view-title">Pohon Silsilah</h2>
+          </div>
+        </div>
+
+        <!-- SEARCH BAR WITH LIVE AUTOCOMPLETE -->
+        <div class="topbar-search-container">
+          <div class="topbar-search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="search-input" class="topbar-search-input" placeholder="Cari nama keluarga, kota, marga... (Tekan /)">
+            <span class="search-shortcut-pill">/</span>
+          </div>
+          <div id="search-results-flyout" class="search-results-flyout hidden"></div>
+        </div>
+
+        <!-- TOPBAR ACTION BUTTONS -->
+        <div class="topbar-actions">
+          <div class="density-toggle-group">
+            <button id="density-detailed" onclick="setTreeDensity('detailed')" class="density-btn active" title="Tampilan Kartu Lengkap">Detail</button>
+            <button id="density-compact" onclick="setTreeDensity('compact')" class="density-btn" title="Tampilan Kartu Ringkas">Kompak</button>
+          </div>
+
+          <button onclick="openPresentationMode()" class="ui-btn ui-btn-icon-only" title="Mode Presentasi Slideshow">
+            <i class="fa-solid fa-display"></i>
+          </button>
+          <button onclick="openExportModal()" class="ui-btn ui-btn-primary">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            <span style="font-size: 12px;">Ekspor & Cetak</span>
+          </button>
+          <button onclick="openSettingsModal()" class="ui-btn ui-btn-icon-only" title="Pengaturan">
+            <i class="fa-solid fa-gear"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- VIEW 1: TREE CANVAS (Default) -->
+      <div id="view-tree" class="canvas-viewport" tabindex="0">
+        <div class="canvas-grid-layer"></div>
+
+        <!-- TREE TRANSFORM WORLD -->
+        <div id="tree-transform">
+          <div class="family-tree-surface">
+            <svg id="tree-connectors" class="tree-connectors-svg" aria-hidden="true"></svg>
+            <ul id="tree-container"></ul>
+          </div>
+        </div>
+
+        <!-- FLOATING CANVAS CONTROLS -->
+        <div class="canvas-floating-controls" data-no-pan>
+          <button onclick="adjustZoom(0.12)" class="canvas-ctrl-btn" title="Perbesar (+)">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <div id="zoom-level" class="zoom-indicator-pill" onclick="setZoom100()" title="Reset ke 100% (Tekan 1)">100%</div>
+          <button onclick="adjustZoom(-0.12)" class="canvas-ctrl-btn" title="Perkecil (-)">
+            <i class="fa-solid fa-minus"></i>
+          </button>
+          <div class="canvas-ctrl-divider"></div>
+          <button onclick="fitTreeToViewport(true)" class="canvas-ctrl-btn" title="Muat Seluruh Pohon (Tekan 0 / F)">
+            <i class="fa-solid fa-expand"></i>
+          </button>
+          <button onclick="expandAll()" class="canvas-ctrl-btn" title="Buka Semua Cabang">
+            <i class="fa-solid fa-folder-open"></i>
+          </button>
+          <button onclick="collapseAll()" class="canvas-ctrl-btn" title="Tutup Semua Cabang">
+            <i class="fa-solid fa-folder-closed"></i>
+          </button>
+          <div class="canvas-ctrl-divider"></div>
+          <button onclick="toggleMinimap()" class="canvas-ctrl-btn" title="Toggle Radar Minimap">
+            <i class="fa-solid fa-map"></i>
+          </button>
+        </div>
+
+        <!-- RADAR MINIMAP -->
+        <div id="canvas-minimap" class="canvas-minimap-container" data-no-pan>
+          <div class="minimap-header">
+            <span>Radar Silsilah</span>
+            <button onclick="toggleMinimap(false)" style="color: var(--ink-subtle);">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="minimap-canvas-box" id="minimap-canvas-box">
+            <canvas id="minimap-canvas"></canvas>
+            <div id="minimap-viewport-frame" class="minimap-viewport-frame"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: MEMBER DIRECTORY -->
+      <div id="view-directory" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Direktori Anggota Keluarga</h1>
+            <p class="module-title-sub">Daftar lengkap seluruh anggota keluarga dengan filter dan pencarian terstruktur.</p>
+          </div>
+          <button onclick="exportJSON()" class="ui-btn">
+            <i class="fa-solid fa-file-arrow-down"></i>
+            <span>Simpan JSON</span>
+          </button>
+        </div>
+
+        <div class="module-card-container">
+          <div class="directory-filters">
+            <input type="text" id="dir-search" oninput="filterDirectory()" placeholder="Filter nama, pekerjaan, tempat lahir..." class="directory-filter-input">
+            <select id="dir-filter-gen" onchange="filterDirectory()" class="directory-select">
+              <option value="">Semua Generasi</option>
+            </select>
+            <select id="dir-filter-gender" onchange="filterDirectory()" class="directory-select">
+              <option value="">Semua Gender</option>
+              <option value="L">Laki-laki</option>
+              <option value="P">Perempuan</option>
+            </select>
+            <select id="dir-filter-status" onchange="filterDirectory()" class="directory-select">
+              <option value="">Semua Status</option>
+              <option value="alive">Masih Hidup</option>
+              <option value="deceased">Telah Wafat</option>
+            </select>
+            <select id="dir-sort" onchange="filterDirectory()" class="directory-select">
+              <option value="name-asc">Nama (A - Z)</option>
+              <option value="name-desc">Nama (Z - A)</option>
+              <option value="gen-asc">Generasi (Atas - Bawah)</option>
+              <option value="birth-asc">Tahun Lahir Tertua</option>
+            </select>
+          </div>
+
+          <div id="directory-grid-container" class="directory-grid-layout"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: FAMILY TIMELINE -->
+      <div id="view-timeline" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Timeline Kronologi Keluarga</h1>
+            <p class="module-title-sub">Rekam jejak sejarah kelahiran, pernikahan, dan peristiwa penting keluarga lintas dekade.</p>
+          </div>
+        </div>
+        <div class="module-card-container">
+          <div id="timeline-list-container" style="max-width: 820px; margin: 0 auto; position: relative;"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: FAMILY CALENDAR -->
+      <div id="view-calendar" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Kalender & Agenda Keluarga</h1>
+            <p class="module-title-sub">Pengingat ulang tahun, haul atau peringatan wafat, serta agenda reuni keluarga.</p>
+          </div>
+          <button onclick="openFamilyEventModal()" class="ui-btn ui-btn-primary">
+            <i class="fa-solid fa-plus"></i>
+            <span>Tambah Acara</span>
+          </button>
+        </div>
+        <div id="calendar-workspace-content"></div>
+      </div>
+
+      <!-- VIEW 5: ARCHIVE & MEDIA VAULT -->
+      <div id="view-archive" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Arsip & Galeri Media Keluarga</h1>
+            <p class="module-title-sub">Koleksi foto kenangan, dokumen bersejarah, akta, dan bukti silsilah keluarga.</p>
+          </div>
+        </div>
+        <div class="module-card-container">
+          <div id="archive-workspace-content"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 6: FAMILY ANALYTICS & STATS -->
+      <div id="view-stats" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Statistik & Analisis Keluarga</h1>
+            <p class="module-title-sub">Laporan demografi, rasio gender, sebaran generasi, dan status data silsilah.</p>
+          </div>
+        </div>
+        <div id="stats-workspace-content"></div>
+      </div>
+
+      <!-- VIEW 7: MIGRATION MAP -->
+      <div id="view-map" class="workspace-module-view hidden" style="padding: 0; display: flex; flex-direction: column;">
+        <div style="padding: 18px 24px; background: #fff; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <h2 style="font-size: 18px; font-weight: 800;">Jejak Migrasi Keluarga</h2>
+            <p id="map-loading-status" style="font-size: 12px; color: var(--ink-muted);">Memuat koordinat tempat lahir keluarga...</p>
+          </div>
+          <button onclick="switchWorkspaceView('tree')" class="ui-btn">
+            <i class="fa-solid fa-diagram-project"></i>
+            <span>Kembali ke Pohon</span>
+          </button>
+        </div>
+        <div id="map-container" style="flex: 1; min-height: 480px; width: 100%; position: relative;"></div>
+      </div>
+
+      <!-- VIEW 8: DATA QUALITY AUDIT -->
+      <div id="view-quality" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Kualitas & Integritas Data</h1>
+            <p class="module-title-sub">Audit kelengkapan catatan keluarga: tanggal lahir, foto profil, dan dokumen validasi.</p>
+          </div>
+        </div>
+        <div id="quality-workspace-content"></div>
+      </div>
+
+      <!-- VIEW 9: VERSION HISTORY -->
+      <div id="view-history" class="workspace-module-view hidden">
+        <div class="module-page-header">
+          <div>
+            <h1 class="module-title-h1">Riwayat Versi Silsilah</h1>
+            <p class="module-title-sub">Snapshot otomatis saat terjadi pembaruan data silsilah di cloud, dengan opsi pemulihan.</p>
+          </div>
+        </div>
+        <div id="history-workspace-content"></div>
+      </div>
+
+    </main>
+
+    <!-- SLIDE-OVER PROFILE INSPECTOR DRAWER -->
+    <aside id="inspector-drawer" class="inspector-drawer" aria-label="Detail Profil">
+      <div class="inspector-header">
+        <button onclick="closeInspectorDrawer()" class="inspector-close-btn" aria-label="Tutup Panel">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="inspector-profile-hero">
+          <div id="inspector-avatar" class="inspector-avatar-box">
+            <div class="avatar-circle"><i class="fa-solid fa-user"></i></div>
+          </div>
+          <div class="inspector-hero-info">
+            <span id="inspector-gen-badge" class="inspector-gen-tag">Generasi 1</span>
+            <h3 id="inspector-name" class="inspector-person-name">Nama Anggota</h3>
+            <p id="inspector-lifespan" class="inspector-lifespan-text">1945 - Sekarang</p>
+          </div>
+        </div>
+
+        <div class="inspector-actions-bar">
+          <button id="inspector-btn-edit" onclick="openEditorFromInspector()" class="inspector-action-pill primary">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span>Edit Profil</span>
+          </button>
+          <button id="inspector-btn-add-child" onclick="actionAddChild()" class="inspector-action-pill">
+            <i class="fa-solid fa-child-reaching"></i>
+            <span>+ Anak</span>
+          </button>
+          <button id="inspector-btn-add-spouse" onclick="actionAddPartner()" class="inspector-action-pill">
+            <i class="fa-solid fa-heart"></i>
+            <span>+ Pasangan</span>
+          </button>
+          <button id="inspector-btn-share" onclick="openProfileShare()" class="inspector-action-pill">
+            <i class="fa-solid fa-qrcode"></i>
+            <span>QR</span>
+          </button>
+          <button id="inspector-btn-delete" onclick="handleDelete()" class="inspector-action-pill danger">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>Hapus</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Lineage Navigation Chips -->
+      <div style="padding: 14px 24px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface-subtle);">
+        <div class="relation-jump-title">Navigasi Jalur Garis Keluarga</div>
+        <div id="inspector-relations-chips" class="relation-jump-grid">
+          <!-- Filled dynamically by script -->
+        </div>
+      </div>
+
+      <nav class="inspector-nav-tabs">
+        <button onclick="switchInspectorTab('bio')" id="tab-btn-bio" class="inspector-tab-btn active">Biodata</button>
+        <button onclick="switchInspectorTab('astro')" id="tab-btn-astro" class="inspector-tab-btn">Astrologi</button>
+        <button onclick="switchInspectorTab('media')" id="tab-btn-media" class="inspector-tab-btn">Galeri & Dokumen</button>
+      </nav>
+
+      <div class="inspector-scroll-area">
+        <!-- Tab 1: Biodata -->
+        <div id="tab-content-bio">
+          <div id="inspector-bio-details" class="space-y-1"></div>
+        </div>
+
+        <!-- Tab 2: Astrologi Presisi -->
+        <div id="tab-content-astro" class="hidden">
+          <div id="inspector-astro-details"></div>
+        </div>
+
+        <!-- Tab 3: Media & Arsip -->
+        <div id="tab-content-media" class="hidden">
+          <div id="inspector-media-details"></div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- PROFILE EDITOR MODAL -->
+  <div id="editor-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+    <div id="editor-dialog" class="modal-dialog-shell" style="max-width: 780px;">
+      <div class="modal-header-bar">
+        <h2 id="modal-title-text" class="modal-header-title">
+          <i id="modal-title-icon" class="fa-solid fa-pen-to-square" style="color: var(--accent-cyan);"></i>
+          <span>Edit Profil Anggota</span>
         </h2>
-        <button onclick="closeEditorModal()" class="text-slate-400 hover:text-red-500 transition bg-white rounded-full p-1 hover:bg-red-50">
-          <i class="fa-solid fa-xmark text-lg"></i>
+        <button onclick="closeEditorModal()" class="ui-btn ui-btn-icon-only" style="width: 32px; height: 32px;" aria-label="Tutup">
+          <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <div id="quick-actions-panel" class="relation-toolbar hidden" aria-label="Aksi cepat relasi keluarga">
-        <div class="relation-toolbar-meta">
-          <div class="relation-toolbar-icon"><i class="fa-solid fa-people-arrows"></i></div>
-          <div class="min-w-0">
-            <p class="relation-toolbar-kicker">Aksi relasi</p>
-            <p id="relation-action-context" class="relation-toolbar-context">Pilih tindakan untuk anggota ini</p>
-          </div>
-        </div>
-        <div class="relation-action-grid">
-          <button id="quick-action-parents" type="button" onclick="actionAddParents()" class="relation-action relation-action-soft" title="Tambah orang tua atau generasi di atas"><i class="fa-solid fa-person-circle-plus"></i><span>Orang Tua</span></button>
-          <button id="quick-action-sibling" type="button" onclick="actionAddSibling()" class="relation-action relation-action-soft" title="Tambah saudara kandung"><i class="fa-solid fa-people-group"></i><span>Saudara</span></button>
-          <button id="quick-action-partner" type="button" onclick="actionAddPartner()" class="relation-action relation-action-primary" title="Tambah suami, istri, atau pasangan"><i class="fa-solid fa-heart-circle-plus"></i><span>Pasangan</span></button>
-          <button id="quick-action-child" type="button" onclick="actionAddChild()" class="relation-action relation-action-primary" title="Tambah anak"><i class="fa-solid fa-child-reaching"></i><span>Anak</span></button>
-          <button id="quick-action-share" type="button" onclick="openProfileShare()" class="relation-action relation-action-soft" title="Bagikan profil atau tampilkan QR"><i class="fa-solid fa-qrcode"></i><span>Bagikan</span></button>
-          <button id="quick-action-delete" type="button" onclick="handleDelete()" class="relation-action relation-action-danger" title="Hapus anggota"><i class="fa-solid fa-trash-can"></i><span>Hapus</span></button>
-        </div>
-      </div>
-
-      <div class="editor-scroll p-6 overflow-y-auto">
-
-        <form id="family-form" class="space-y-5">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nama Lengkap *</label>
-              <input type="text" id="input-name" required="" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="Contoh: Budi Santoso">
-            </div>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nomor Anggota</label><input type="text" id="input-familynumber" readonly class="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm font-bold text-slate-600" placeholder="Otomatis"></div>
-              <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Marga / Nama Keluarga</label><input type="text" id="input-surname" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm" placeholder="Marga / cabang"></div>
-              <div><label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tanggal Pernikahan</label><input type="date" id="input-marriagedate" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"></div>
-            </div>
-            
-            <div class="grid grid-cols-3 gap-3">
-              <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Gender *</label>
-                <select id="input-gender" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm">
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1" title="Misal: Anak Ke-1, Istri Kedua">Keterangan</label>
-                <input type="text" id="input-notes" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Anak Ke-1, dll">
-              </div>
-              <div>
-                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1" title="Mantan suami/istri atau pasangan lainnya">Pasangan Lain</label>
-                <input type="text" id="input-otherpartner" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition text-sm" placeholder="Nama mantan...">
-              </div>
-            </div>
-
-            <div id="container-childrelations" class="hidden bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-people-arrows mr-1"></i> Dari Pasangan Mana?</label>
-                  <select id="input-linkedspouse" class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
-                    </select>
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1"><i class="fa-solid fa-child mr-1"></i> Status Anak</label>
-                  <select id="input-childstatus" class="w-full px-3 py-2 bg-white border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition text-sm">
-                    <option value="kandung">Anak Kandung</option>
-                    <option value="tiri">Anak Tiri (Bawaan)</option>
-                    <option value="adopsi">Anak Angkat / Adopsi</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="border-t border-slate-200 pt-4 mt-4 space-y-4">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center"><i class="fa-solid fa-user mr-2"></i> Data Lengkap</h3>
-            
-            <div class="edit-only-field bg-slate-50 p-3 rounded-lg border border-slate-200">
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center"><i class="fa-solid fa-image mr-1"></i> Foto Profil</label>
-              <div class="flex gap-2 mb-2">
-                <label class="cursor-pointer bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-200 transition text-center whitespace-nowrap">
-                  <i class="fa-solid fa-upload mr-1"></i> Upload
-                  <input type="file" id="input-photo-file" accept="image/*" class="hidden">
-                </label>
-                <input type="url" id="input-photo" class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg outline-none text-xs transition" placeholder="Atau paste URL Foto">
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <label class="block text-xs font-bold text-blue-700 uppercase tracking-wide mb-2"><i class="fa-solid fa-cake-candles mr-1"></i> Data Kelahiran</label>
-                <label class="block text-[10px] text-slate-500 mb-1">Tanggal Lahir (Lengkap)</label>
-                <input type="date" id="input-birthdate" class="w-full px-3 py-2 mb-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition">
-                <label class="block text-[10px] text-slate-500 mb-1">Hanya Tahun (Jika lupa tanggal)</label>
-                <input type="number" id="input-birthyear" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="YYYY">
-              </div>
-              <div class="bg-slate-100 p-3 rounded-lg border border-slate-200">
-                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2"><i class="fa-solid fa-cross mr-1"></i> Data Wafat</label>
-                <label class="block text-[10px] text-slate-500 mb-1">Tanggal Wafat (Lengkap)</label>
-                <input type="date" id="input-deathdate" class="w-full px-3 py-2 mb-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition">
-                <label class="block text-[10px] text-slate-500 mb-1">Hanya Tahun</label>
-                <input type="number" id="input-deathyear" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="YYYY">
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mt-2">
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Tempat Lahir</label>
-                <input type="text" id="input-birthplace" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="Nama Kota (Misal: Surabaya)">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Golongan Darah</label>
-                <select id="input-blood" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition">
-                  <option value="">- Pilih -</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option><option value="O">O</option>
-                </select>
-              </div>
-            </div>
-
-            <section class="astrology-precision-section">
-              <div class="astrology-section-heading">
-                <div>
-                  <p class="astrology-kicker"><i class="fa-solid fa-stars mr-1"></i> Astrologi Presisi</p>
-                  <h4>Big Three & Shio berdasarkan data lahir</h4>
-                  <p>Semakin lengkap jam, zona waktu, serta koordinat lahir, semakin tinggi presisinya.</p>
-                </div>
-                <span id="astrology-engine-status" class="astrology-engine-pill">Memeriksa mesin astronomi…</span>
-              </div>
-
-              <div class="astrology-input-grid">
-                <div>
-                  <label>Jam Lahir</label>
-                  <input type="time" id="input-birthtime" step="60" class="pro-input" placeholder="11:45">
-                </div>
-                <div>
-                  <label>Zona Waktu IANA</label>
-                  <input type="text" id="input-birthtimezone" list="birth-timezones" class="pro-input" placeholder="Asia/Jakarta">
-                  <datalist id="birth-timezones">
-                    <option value="Asia/Jakarta"><option value="Asia/Makassar"><option value="Asia/Jayapura">
-                    <option value="Asia/Singapore"><option value="Asia/Kuala_Lumpur"><option value="Asia/Bangkok">
-                    <option value="Asia/Shanghai"><option value="Asia/Tokyo"><option value="Europe/London">
-                    <option value="America/New_York"><option value="Australia/Sydney"><option value="UTC">
-                  </datalist>
-                </div>
-                <div>
-                  <label>UTC Offset Cadangan</label>
-                  <input type="number" id="input-birthutcoffset" min="-12" max="14" step="0.25" class="pro-input" placeholder="7">
-                </div>
-                <div>
-                  <label>Dasar Tahun Shio</label>
-                  <select id="input-chinesezodiacbasis" class="pro-input">
-                    <option value="cny">Tahun Baru Imlek</option>
-                    <option value="lichun">Li Chun / Awal Musim Semi</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Latitude Lahir</label>
-                  <input type="number" id="input-birthlatitude" min="-90" max="90" step="0.000001" class="pro-input" placeholder="-7.257500">
-                </div>
-                <div>
-                  <label>Longitude Lahir</label>
-                  <input type="number" id="input-birthlongitude" min="-180" max="180" step="0.000001" class="pro-input" placeholder="112.752100">
-                </div>
-              </div>
-
-              <div class="astrology-actions edit-only-field">
-                <button type="button" onclick="fillAstrologyCoordinates()" class="pro-secondary-btn"><i class="fa-solid fa-location-crosshairs mr-2"></i>Ambil koordinat</button>
-                <button type="button" onclick="previewAstrologyFromForm()" class="pro-primary-btn"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Hitung ulang</button>
-              </div>
-
-              <div id="astrology-preview" class="astrology-preview" aria-live="polite">
-                <div class="astrology-empty"><i class="fa-solid fa-star-and-crescent"></i><span>Isi tanggal lahir untuk melihat hasil astrologi.</span></div>
-              </div>
-              <p class="astrology-disclaimer">Posisi benda langit dihitung secara astronomis. Makna astrologinya bersifat tradisi interpretatif, bukan diagnosis atau fakta ilmiah tentang kepribadian.</p>
-            </section>
-
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-book-open mr-1"></i> Biografi / Kisah Hidup</label>
-              <textarea id="input-biography" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition resize-y" placeholder="Ceritakan riwayat hidup, penghargaan, atau kenangan tentang orang ini..." rows="3"></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-phone mr-1"></i> No. HP / WA</label>
-                <input type="text" id="input-phone" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="0812xxxxxx">
-              </div>
-              <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Pekerjaan</label>
-                <input type="text" id="input-occupation" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="PNS, Dokter...">
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-house mr-1"></i> Alamat Lengkap</label>
-              <textarea id="input-address" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition resize-none" placeholder="Cth: Jl. Raya Mawar No. 10..." rows="2"></textarea>
-            </div>
-            <div class="edit-only-field">
-              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1 flex items-center"><i class="fa-solid fa-map-location-dot mr-1"></i> URL Google Maps</label>
-              <input type="url" id="input-gmap" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg outline-none text-sm transition" placeholder="https://maps.google.com/?q=...">
-            </div>
-            <div><label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><i class="fa-solid fa-quote-left mr-1"></i> Sumber Informasi</label><textarea id="input-source" rows="2" class="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm" placeholder="Nama narasumber, buku, arsip, atau catatan sumber..."></textarea></div>
-
-            <section class="profile-assets-section">
-              <div class="profile-assets-header"><div><p class="profile-assets-title"><i class="fa-solid fa-images"></i> Galeri Foto</p><p>Foto kenangan, makam, acara, dan dokumen visual.</p></div><label class="asset-upload-btn edit-only-field"><i class="fa-solid fa-plus"></i> Tambah foto<input id="input-gallery-files" type="file" accept="image/*" multiple class="hidden"></label></div>
-              <div id="profile-gallery-list" class="profile-gallery-grid"></div>
-            </section>
-            <section class="profile-assets-section">
-              <div class="profile-assets-header"><div><p class="profile-assets-title"><i class="fa-solid fa-folder-open"></i> Dokumen & Bukti</p><p>Akta, kartu keluarga, surat nikah, PDF, dan arsip lain.</p></div><label class="asset-upload-btn edit-only-field"><i class="fa-solid fa-paperclip"></i> Tambah dokumen<input id="input-document-files" type="file" accept="image/*,.pdf,.txt,.doc,.docx" multiple class="hidden"></label></div>
-              <div id="profile-document-list" class="profile-document-list"></div>
-            </section>
-
-          </div>
-        </form>
-      </div>
-
-      <div class="editor-footer px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end items-center rounded-b-2xl">
-        <div class="editor-footer-actions flex gap-3 ml-auto">
-          <button type="button" id="btn-cancel" onclick="closeEditorModal()" class="px-5 py-2 text-slate-600 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-bold transition shadow-sm">Batal</button>
-          <button type="button" id="btn-save" onclick="handleSave()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md transition">Simpan Perubahan</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="stats-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-      <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center">
-        <h2 class="text-lg font-bold text-slate-800 flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600"></i> Statistik Keluarga</h2>
-        <button onclick="closeStatsModal()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-      <div class="p-6 bg-slate-50 space-y-4">
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
-          <span class="text-slate-600 font-medium">Total Anggota</span>
-          <span id="stat-total" class="text-2xl font-bold text-blue-600">0</span>
-        </div>
-        <div class="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm flex justify-between items-center">
-          <div class="flex items-center text-amber-800 font-medium">
-            <i class="fa-solid fa-layer-group mr-2"></i> Kedalaman
-          </div>
-          <span id="stat-depth" class="text-lg font-bold text-amber-700">0 Generasi</span>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-sm text-center">
-            <span class="block text-slate-500 text-xs font-semibold mb-1 uppercase tracking-wider">Laki-Laki</span>
-            <span id="stat-male" class="text-xl font-bold text-slate-800">0</span>
-          </div>
-          <div class="bg-white p-4 rounded-xl border border-pink-100 shadow-sm text-center">
-            <span class="block text-slate-500 text-xs font-semibold mb-1 uppercase tracking-wider">Perempuan</span>
-            <span id="stat-female" class="text-xl font-bold text-slate-800">0</span>
-          </div>
-        </div>
-        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center text-sm">
-          <span class="text-slate-600">Telah Wafat</span>
-          <span id="stat-deceased" class="font-bold text-slate-800">0 orang</span>
-        </div>
+      <form id="family-form" onsubmit="event.preventDefault(); handleSave();" class="modal-body-scroll">
         
-        <div class="mt-4 border-t border-slate-200 pt-4">
-          <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center"><i class="fa-solid fa-cake-candles text-amber-500 mr-2"></i> Ulang Tahun Bulan Ini</h3>
-          <div id="stat-birthdays" class="space-y-2 max-h-32 overflow-y-auto text-sm pr-1">
+        <!-- STEP/TABS NAVIGATION INSIDE EDITOR -->
+        <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; margin-bottom: 20px; overflow-x: auto;">
+          <button type="button" onclick="setEditTab('general')" id="ed-tab-btn-general" class="ui-btn ui-btn-primary" style="padding: 6px 12px; font-size: 12px;">1. Informasi Dasar</button>
+          <button type="button" onclick="setEditTab('lifespan')" id="ed-tab-btn-lifespan" class="ui-btn" style="padding: 6px 12px; font-size: 12px;">2. Kelahiran & Wafat</button>
+          <button type="button" onclick="setEditTab('contact')" id="ed-tab-btn-contact" class="ui-btn" style="padding: 6px 12px; font-size: 12px;">3. Kontak & Alamat</button>
+          <button type="button" onclick="setEditTab('astrology')" id="ed-tab-btn-astrology" class="ui-btn" style="padding: 6px 12px; font-size: 12px;">4. Astrologi Presisi</button>
+          <button type="button" onclick="setEditTab('assets')" id="ed-tab-btn-assets" class="ui-btn" style="padding: 6px 12px; font-size: 12px;">5. Galeri & Dokumen</button>
+        </div>
+
+        <!-- TAB: GENERAL -->
+        <div id="ed-tab-general">
+          <div class="form-field-group">
+            <label class="form-label" for="input-name">Nama Lengkap <span class="form-label-required">*</span></label>
+            <input type="text" id="input-name" required class="form-input-text" placeholder="Contoh: Raden Mas Budi Santoso">
+          </div>
+
+          <div class="form-grid-3">
+            <div class="form-field-group">
+              <label class="form-label" for="input-gender">Gender <span class="form-label-required">*</span></label>
+              <select id="input-gender" class="form-select">
+                <option value="L">Laki-laki</option>
+                <option value="P">Perempuan</option>
+              </select>
             </div>
+            <div class="form-field-group">
+              <label class="form-label" for="input-familynumber">Nomor Anggota</label>
+              <input type="text" id="input-familynumber" readonly class="form-input-text" style="background: var(--bg-surface-subtle);" placeholder="Otomatis">
+            </div>
+            <div class="form-field-group">
+              <label class="form-label" for="input-surname">Marga / Trah</label>
+              <input type="text" id="input-surname" class="form-input-text" placeholder="Nama marga atau cabang">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-field-group">
+              <label class="form-label" for="input-notes">Keterangan Relasi</label>
+              <input type="text" id="input-notes" class="form-input-text" placeholder="Misal: Anak Sulung, Istri Pertama">
+            </div>
+            <div class="form-field-group">
+              <label class="form-label" for="input-otherpartner">Pasangan Lain / Eks</label>
+              <input type="text" id="input-otherpartner" class="form-input-text" placeholder="Nama mantan atau pasangan lainnya">
+            </div>
+          </div>
+
+          <div id="container-childrelations" class="hidden" style="background: var(--accent-indigo-light); padding: 14px; border-radius: 12px; border: 1px solid #c7d2fe; margin-bottom: 16px;">
+            <div class="form-grid-2">
+              <div>
+                <label class="form-label" for="input-linkedspouse" style="color: var(--accent-indigo);">Dari Pasangan Mana?</label>
+                <select id="input-linkedspouse" class="form-select"></select>
+              </div>
+              <div>
+                <label class="form-label" for="input-childstatus" style="color: var(--accent-indigo);">Status Anak</label>
+                <select id="input-childstatus" class="form-select">
+                  <option value="kandung">Anak Kandung</option>
+                  <option value="tiri">Anak Tiri (Bawaan)</option>
+                  <option value="adopsi">Anak Angkat / Adopsi</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-field-group edit-only-field">
+            <label class="form-label" for="input-photo">Foto Profil</label>
+            <div style="display: flex; gap: 8px;">
+              <label class="ui-btn" style="cursor: pointer;">
+                <i class="fa-solid fa-upload"></i>
+                <span>Unggah Foto</span>
+                <input type="file" id="input-photo-file" accept="image/*" class="hidden">
+              </label>
+              <input type="url" id="input-photo" class="form-input-text" placeholder="Atau tempelkan tautan URL gambar (https://...)">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: LIFESPAN -->
+        <div id="ed-tab-lifespan" class="hidden">
+          <div class="form-grid-2">
+            <div style="background: var(--accent-cyan-light); padding: 16px; border-radius: 14px; border: 1px solid #bae6fd;">
+              <h4 style="font-size: 13px; font-weight: 800; color: #0369a1; margin-bottom: 12px;">Data Kelahiran</h4>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthdate">Tanggal Lahir Lengkap</label>
+                <input type="date" id="input-birthdate" class="form-input-text">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthyear">Tahun Lahir (Jika lupa tanggal)</label>
+                <input type="number" id="input-birthyear" class="form-input-text" placeholder="YYYY (Misal: 1965)">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthplace">Kota / Tempat Lahir</label>
+                <input type="text" id="input-birthplace" class="form-input-text" placeholder="Contoh: Surabaya, Jawa Timur">
+              </div>
+            </div>
+
+            <div style="background: #f1f5f9; padding: 16px; border-radius: 14px; border: 1px solid var(--border-subtle);">
+              <h4 style="font-size: 13px; font-weight: 800; color: var(--ink-secondary); margin-bottom: 12px;">Data Wafat (Bila Ada)</h4>
+              <div class="form-field-group">
+                <label class="form-label" for="input-deathdate">Tanggal Wafat Lengkap</label>
+                <input type="date" id="input-deathdate" class="form-input-text">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-deathyear">Tahun Wafat</label>
+                <input type="number" id="input-deathyear" class="form-input-text" placeholder="YYYY">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-blood">Golongan Darah</label>
+                <select id="input-blood" class="form-select">
+                  <option value="">- Tidak Tahu -</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="AB">AB</option>
+                  <option value="O">O</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: CONTACT -->
+        <div id="ed-tab-contact" class="hidden">
+          <div class="form-grid-2">
+            <div class="form-field-group">
+              <label class="form-label" for="input-phone">No. Handphone / WhatsApp</label>
+              <input type="text" id="input-phone" class="form-input-text" placeholder="0812xxxxxxxx">
+            </div>
+            <div class="form-field-group">
+              <label class="form-label" for="input-occupation">Pekerjaan / Profesi</label>
+              <input type="text" id="input-occupation" class="form-input-text" placeholder="Dokter, Guru, Wiraswasta...">
+            </div>
+          </div>
+
+          <div class="form-field-group">
+            <label class="form-label" for="input-address">Alamat Tempat Tinggal</label>
+            <textarea id="input-address" class="form-textarea" rows="2" placeholder="Nama jalan, perumahan, kelurahan, kota..."></textarea>
+          </div>
+
+          <div class="form-field-group edit-only-field">
+            <label class="form-label" for="input-gmap">Tautan Google Maps Lokasi</label>
+            <input type="url" id="input-gmap" class="form-input-text" placeholder="https://maps.google.com/?q=...">
+          </div>
+
+          <div class="form-field-group">
+            <label class="form-label" for="input-biography">Biografi & Riwayat Hidup</label>
+            <textarea id="input-biography" class="form-textarea" rows="3" placeholder="Ceritakan kisah hidup, kenangan istimewa, penghargaan, atau jasa..."></textarea>
+          </div>
+
+          <div class="form-field-group">
+            <label class="form-label" for="input-source">Sumber Catatan / Narasumber</label>
+            <input type="text" id="input-source" class="form-input-text" placeholder="Buku silsilah keluarga, cerita kakek, akta kelahiran...">
+          </div>
+        </div>
+
+        <!-- TAB: ASTROLOGY -->
+        <div id="ed-tab-astrology" class="hidden">
+          <div style="background: linear-gradient(135deg, #fdf4ff 0%, #eef2ff 100%); padding: 18px; border-radius: 14px; border: 1px solid #c7d2fe; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <div>
+                <h4 style="font-size: 14px; font-weight: 800; color: #4338ca;">Astrologi Presisi & Perhitungan Astronomi</h4>
+                <p style="font-size: 11px; color: var(--ink-muted); margin-top: 2px;">Dihitung berdasarkan algoritma astronomis posisi matahari, bulan, dan ascendant.</p>
+              </div>
+              <span id="astrology-engine-status" class="astro-chip" style="font-size: 10px; font-weight: 700;">Mesin Astronomi Aktif</span>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthtime">Jam Lahir (WIB/WITA/WIT)</label>
+                <input type="time" id="input-birthtime" step="60" class="form-input-text">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthtimezone">Zona Waktu IANA</label>
+                <input type="text" id="input-birthtimezone" list="birth-timezones" class="form-input-text" placeholder="Asia/Jakarta">
+                <datalist id="birth-timezones">
+                  <option value="Asia/Jakarta">
+                  <option value="Asia/Makassar">
+                  <option value="Asia/Jayapura">
+                  <option value="Asia/Singapore">
+                  <option value="UTC">
+                </datalist>
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthutcoffset">UTC Offset Cadangan</label>
+                <input type="number" id="input-birthutcoffset" min="-12" max="14" step="0.25" class="form-input-text" placeholder="7">
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-field-group">
+                <label class="form-label" for="input-chinesezodiacbasis">Dasar Shio</label>
+                <select id="input-chinesezodiacbasis" class="form-select">
+                  <option value="cny">Tahun Baru Imlek</option>
+                  <option value="lichun">Li Chun (Awal Musim Semi)</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthlatitude">Latitude Lahir</label>
+                <input type="number" id="input-birthlatitude" step="0.000001" class="form-input-text" placeholder="-7.257500">
+              </div>
+              <div class="form-field-group">
+                <label class="form-label" for="input-birthlongitude">Longitude Lahir</label>
+                <input type="number" id="input-birthlongitude" step="0.000001" class="form-input-text" placeholder="112.752100">
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+              <button type="button" onclick="fillAstrologyCoordinates()" class="ui-btn" style="padding: 7px 12px; font-size: 12px;">
+                <i class="fa-solid fa-location-crosshairs"></i>
+                <span>Koordinat Kota Lahir</span>
+              </button>
+              <button type="button" onclick="previewAstrologyFromForm()" class="ui-btn ui-btn-primary" style="padding: 7px 12px; font-size: 12px;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Hitung Ulang</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="astrology-preview" style="min-height: 80px;"></div>
+        </div>
+
+        <!-- TAB: ASSETS -->
+        <div id="ed-tab-assets" class="hidden">
+          <div class="form-field-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div>
+                <h4 style="font-size: 13px; font-weight: 800;">Galeri Foto Kenangan</h4>
+                <p style="font-size: 11px; color: var(--ink-muted);">Foto dokumentasi keluarga, masa muda, atau kenangan.</p>
+              </div>
+              <label class="ui-btn edit-only-field" style="cursor: pointer; font-size: 12px;">
+                <i class="fa-solid fa-plus"></i>
+                <span>Tambah Foto</span>
+                <input id="input-gallery-files" type="file" accept="image/*" multiple class="hidden">
+              </label>
+            </div>
+            <div id="profile-gallery-list" class="profile-gallery-grid"></div>
+          </div>
+
+          <div class="form-field-group" style="margin-top: 24px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+              <div>
+                <h4 style="font-size: 13px; font-weight: 800;">Dokumen & Bukti Silsilah</h4>
+                <p style="font-size: 11px; color: var(--ink-muted);">Akta kelahiran, surat nikah, sertifikat, atau arsip PDF.</p>
+              </div>
+              <label class="ui-btn edit-only-field" style="cursor: pointer; font-size: 12px;">
+                <i class="fa-solid fa-paperclip"></i>
+                <span>Tambah Dokumen</span>
+                <input id="input-document-files" type="file" accept="image/*,.pdf,.txt,.doc,.docx" multiple class="hidden">
+              </label>
+            </div>
+            <div id="profile-document-list" class="profile-document-list"></div>
+          </div>
+        </div>
+
+      </form>
+
+      <div class="modal-footer-bar">
+        <button type="button" id="btn-cancel" onclick="closeEditorModal()" class="ui-btn">Batal</button>
+        <button type="button" id="btn-save" onclick="handleSave()" class="ui-btn ui-btn-primary">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT & PRINT MODAL -->
+  <div id="export-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
+    <div class="modal-dialog-shell" style="max-width: 520px;">
+      <div class="modal-header-bar">
+        <h2 id="export-modal-title" class="modal-header-title">
+          <i class="fa-solid fa-print" style="color: var(--accent-cyan);"></i>
+          <span>Ekspor & Cetak Silsilah</span>
+        </h2>
+        <button onclick="closeExportModal()" class="ui-btn ui-btn-icon-only" style="width: 32px; height: 32px;" aria-label="Tutup">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body-scroll" style="padding: 20px;">
+        <div class="export-options">
+          <button onclick="executeExport('png')" class="export-option export-blue">
+            <span class="export-icon"><i class="fa-solid fa-image"></i></span>
+            <span class="min-w-0 flex-1 text-left">
+              <b>Bagan Gambar PNG Resolusi Tinggi</b>
+              <small>Gambar tajam untuk presentasi, arsip keluarga, dan media sosial.</small>
+            </span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <button onclick="executeExport('pdf')" class="export-option export-red">
+            <span class="export-icon"><i class="fa-solid fa-file-pdf"></i></span>
+            <span class="min-w-0 flex-1 text-left">
+              <b>Bagan Vektor PDF Profesional</b>
+              <small>Format A3 lanskap presisi tanpa memotong garis keturunan.</small>
+            </span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <button onclick="closeExportModal(); exportFamilyBookPDF()" class="export-option export-green">
+            <span class="export-icon"><i class="fa-solid fa-book-open"></i></span>
+            <span class="min-w-0 flex-1 text-left">
+              <b>Buku Silsilah Keluarga PDF</b>
+              <small>Lengkap dengan sampul, riwayat, pohon, biodata, dan astrologi.</small>
+            </span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <button onclick="closeExportModal(); printFamilyBook()" class="export-option export-violet">
+            <span class="export-icon"><i class="fa-solid fa-print"></i></span>
+            <span class="min-w-0 flex-1 text-left">
+              <b>Pratinjau Cetak Standar A4</b>
+              <small>Siap langsung dicetak ke printer fisik secara rapi.</small>
+            </span>
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+            <button onclick="exportJSON()" class="ui-btn" style="font-size: 12px;">
+              <i class="fa-solid fa-file-arrow-down"></i>
+              <span>Simpan JSON</span>
+            </button>
+            <label class="ui-btn" style="font-size: 12px; cursor: pointer;">
+              <i class="fa-solid fa-file-arrow-up"></i>
+              <span>Muat JSON</span>
+              <input type="file" id="import-input" accept=".json" class="hidden">
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+            <button onclick="exportGEDCOM()" class="ui-btn" style="font-size: 12px;">
+              <i class="fa-solid fa-file-export"></i>
+              <span>Ekspor GEDCOM</span>
+            </button>
+            <label class="ui-btn" style="font-size: 12px; cursor: pointer;">
+              <i class="fa-solid fa-file-import"></i>
+              <span>Impor GEDCOM</span>
+              <input type="file" id="gedcom-input" accept=".ged,.gedcom,text/plain" class="hidden">
+            </label>
+          </div>
+
+          <button onclick="exportWebProject()" class="ui-btn" style="width: 100%; margin-top: 8px; font-size: 12px;">
+            <i class="fa-solid fa-file-zipper"></i>
+            <span>Cadangkan Seluruh Proyek Web (.ZIP)</span>
+          </button>
         </div>
       </div>
-      <div class="px-5 py-3 bg-white border-t border-slate-100 text-right">
-        <button onclick="closeStatsModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition">Tutup</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="modal-dialog-shell" style="max-width: 460px;">
+      <div class="modal-header-bar">
+        <h2 id="settings-modal-title" class="modal-header-title">
+          <i class="fa-solid fa-gear" style="color: var(--ink-secondary);"></i>
+          <span>Pengaturan Ruang Kerja</span>
+        </h2>
+        <button onclick="closeSettingsModal()" class="ui-btn ui-btn-icon-only" style="width: 32px; height: 32px;" aria-label="Tutup">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body-scroll" style="padding: 20px;">
+        <div class="form-field-group">
+          <label class="form-label" for="set-title">Judul Utama Web</label>
+          <input type="text" id="set-title" class="form-input-text">
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="set-subtitle">Subjudul Web</label>
+          <input type="text" id="set-subtitle" class="form-input-text">
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="set-password">Kode Akses / Sandi Masuk</label>
+          <input type="text" id="set-password" class="form-input-text" placeholder="Kosongkan jika web ingin dibuka publik">
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="set-cardstyle">Gaya Kartu Silsilah</label>
+          <select id="set-cardstyle" class="form-select">
+            <option value="default">Heritage Modern (Presisi & Bersih)</option>
+            <option value="minimalist">Minimalis Swiss (Monokrom Garis Halus)</option>
+            <option value="classic">Klasik Arsip (Warm Sepia & Serif)</option>
+          </select>
+        </div>
+
+        <div class="form-field-group" style="margin-top: 18px; padding: 12px 14px; border-radius: 12px; background: var(--bg-surface-subtle); display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <span style="font-size: 13px; font-weight: 700; display: block;">Izinkan Mode Edit</span>
+            <span style="font-size: 11px; color: var(--ink-muted); display: block;">Bila dinonaktifkan, web menjadi mode lihat-saja (Read-Only)</span>
+          </div>
+          <input type="checkbox" id="set-editmode" style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
+        </div>
+      </div>
+
+      <div class="modal-footer-bar">
+        <button type="button" onclick="closeSettingsModal()" class="ui-btn">Batal</button>
+        <button type="button" onclick="saveSettings()" class="ui-btn ui-btn-primary">Simpan Pengaturan</button>
       </div>
     </div>
   </div>
 
+  <!-- FAMILY EVENT MODAL -->
+  <div id="family-event-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+    <div class="modal-dialog-shell" style="max-width: 480px;">
+      <div class="modal-header-bar">
+        <h2 id="event-modal-title" class="modal-header-title">
+          <i class="fa-solid fa-calendar-plus" style="color: var(--accent-cyan);"></i>
+          <span>Tambah Acara Keluarga</span>
+        </h2>
+        <button onclick="closeFamilyEventModal()" class="ui-btn ui-btn-icon-only" style="width: 32px; height: 32px;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
 
-  <!-- WORKSPACE MODUL PROFESIONAL -->
-  <div id="pro-workspace" class="hidden fixed inset-0 z-[260] bg-slate-100">
-    <div class="pro-workspace-shell">
-      <header class="pro-workspace-header">
-        <div class="min-w-0"><p id="pro-workspace-eyebrow" class="pro-workspace-eyebrow">Family Legacy</p><h2 id="pro-workspace-title">Workspace</h2><p id="pro-workspace-subtitle">Informasi keluarga</p></div>
-        <div id="pro-workspace-actions" class="pro-workspace-actions"></div>
-        <button onclick="closeProWorkspace()" class="pro-close-btn" title="Tutup"><i class="fa-solid fa-xmark"></i></button>
-      </header>
-      <div id="pro-workspace-content" class="pro-workspace-content"></div>
-    </div>
-  </div>
-
-  <!-- MODAL ACARA KELUARGA -->
-  <div id="family-event-modal" class="hidden fixed inset-0 z-[520] items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
-    <div class="w-full max-w-lg rounded-3xl bg-white shadow-2xl"><div class="flex items-center justify-between border-b border-slate-100 px-6 py-5"><div><p class="text-xs font-black uppercase tracking-[.2em] text-cyan-700">Kalender keluarga</p><h3 class="mt-1 text-xl font-black text-slate-950">Tambah acara</h3></div><button onclick="closeFamilyEventModal()" class="pro-close-btn"><i class="fa-solid fa-xmark"></i></button></div>
-      <div class="grid gap-4 p-6 sm:grid-cols-2"><label class="sm:col-span-2"><span class="pro-label">Judul acara</span><input id="event-title" class="pro-input" placeholder="Reuni keluarga, haul, pernikahan..."></label><label><span class="pro-label">Tanggal</span><input id="event-date" type="date" class="pro-input"></label><label><span class="pro-label">Jenis</span><select id="event-type" class="pro-input"><option value="reunion">Reuni</option><option value="wedding">Pernikahan</option><option value="memorial">Peringatan wafat</option><option value="birthday">Ulang tahun</option><option value="other">Lainnya</option></select></label><label class="sm:col-span-2"><span class="pro-label">Terkait anggota (opsional)</span><select id="event-person" class="pro-input"></select></label><label class="sm:col-span-2"><span class="pro-label">Catatan</span><textarea id="event-notes" class="pro-input" rows="3"></textarea></label></div>
-      <div class="flex justify-end gap-3 border-t border-slate-100 px-6 py-4"><button onclick="closeFamilyEventModal()" class="pro-secondary-btn">Batal</button><button onclick="saveFamilyEvent()" class="pro-primary-btn">Simpan acara</button></div>
-    </div>
-  </div>
-
-  <!-- MODAL QR PROFIL -->
-  <div id="profile-share-modal" class="hidden fixed inset-0 z-[540] items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-    <div class="w-full max-w-md rounded-3xl bg-white p-7 text-center shadow-2xl"><div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700"><i class="fa-solid fa-qrcode text-2xl"></i></div><h3 id="profile-share-name" class="text-xl font-black text-slate-950">Bagikan profil</h3><p class="mt-2 text-sm text-slate-500">Tautan tetap melewati gembok keluarga yang sekarang.</p><div id="profile-qr-code" class="mx-auto my-6 flex min-h-[220px] items-center justify-center"></div><input id="profile-share-url" readonly class="pro-input text-center text-xs"><div class="mt-5 flex gap-3"><button onclick="copyProfileShareLink()" class="pro-primary-btn flex-1"><i class="fa-solid fa-copy mr-2"></i>Salin tautan</button><button onclick="closeProfileShare()" class="pro-secondary-btn flex-1">Tutup</button></div></div>
-  </div>
-
-  <!-- MODE PRESENTASI -->
-  <div id="presentation-mode" class="hidden fixed inset-0 z-[580] bg-[#07111f] text-white">
-    <div class="presentation-toolbar"><div><p class="text-xs font-black uppercase tracking-[.25em] text-cyan-300">Presentasi keluarga</p><p id="presentation-counter" class="mt-1 text-sm text-white/60">1 / 1</p></div><div class="flex gap-2"><button onclick="presentationPrevious()"><i class="fa-solid fa-chevron-left"></i></button><button onclick="presentationNext()"><i class="fa-solid fa-chevron-right"></i></button><button onclick="closePresentationMode()"><i class="fa-solid fa-xmark"></i></button></div></div><div id="presentation-content" class="presentation-content"></div>
-  </div>
-
-  <div id="map-wrapper" class="hidden fixed inset-0 z-[300] bg-slate-900 flex flex-col">
-    <div class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-md z-10 shrink-0">
-      <div class="flex items-center space-x-3">
-        <div class="bg-emerald-600 p-2 rounded-lg text-white shadow-sm">
-          <i class="fa-solid fa-earth-asia text-lg"></i>
+      <div class="modal-body-scroll" style="padding: 20px;">
+        <div class="form-field-group">
+          <label class="form-label" for="event-title">Nama Acara <span class="form-label-required">*</span></label>
+          <input type="text" id="event-title" required class="form-input-text" placeholder="Reuni Bani Santoso, Haul Akbar, Pernikahan...">
         </div>
-        <div>
-          <h1 class="text-lg font-bold text-slate-800 leading-tight">Jejak Migrasi Keluarga</h1>
-          <p id="map-loading-status" class="text-xs text-slate-500 font-medium">Memuat data lokasi...</p>
+
+        <div class="form-grid-2">
+          <div class="form-field-group">
+            <label class="form-label" for="event-date">Tanggal Acara</label>
+            <input type="date" id="event-date" class="form-input-text">
+          </div>
+          <div class="form-field-group">
+            <label class="form-label" for="event-type">Jenis Acara</label>
+            <select id="event-type" class="form-select">
+              <option value="reunion">Reuni Keluarga</option>
+              <option value="wedding">Pernikahan</option>
+              <option value="memorial">Haul / Peringatan Wafat</option>
+              <option value="birthday">Ulang Tahun</option>
+              <option value="other">Acara Lain</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="event-person">Terkait Anggota (Opsional)</label>
+          <select id="event-person" class="form-select"></select>
+        </div>
+
+        <div class="form-field-group">
+          <label class="form-label" for="event-notes">Catatan & Lokasi Acara</label>
+          <textarea id="event-notes" class="form-textarea" rows="2" placeholder="Tempat, waktu mulai, dresscode, nomor panitia..."></textarea>
         </div>
       </div>
-      <button onclick="closeMapMode()" class="flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition text-sm font-bold border border-red-200 shadow-sm">
-        <i class="fa-solid fa-xmark mr-2"></i> Tutup Peta
-      </button>
+
+      <div class="modal-footer-bar">
+        <button type="button" onclick="closeFamilyEventModal()" class="ui-btn">Batal</button>
+        <button type="button" onclick="saveFamilyEvent()" class="ui-btn ui-btn-primary">Simpan Acara</button>
+      </div>
     </div>
-    <div id="map-container" class="flex-1 w-full bg-slate-200 relative z-0"></div>
   </div>
 
-  
+  <!-- SHARE / QR MODAL -->
+  <div id="profile-share-modal" class="modal-backdrop-scrim" role="dialog" aria-modal="true">
+    <div class="modal-dialog-shell" style="max-width: 380px; text-align: center;">
+      <div class="modal-body-scroll" style="padding: 28px 24px 20px;">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--accent-cyan-light); color: var(--accent-cyan); display: grid; place-items: center; margin: 0 auto 12px; font-size: 20px;">
+          <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <h3 id="profile-share-name" style="font-size: 17px; font-weight: 800;">Bagikan Tautan Profil</h3>
+        <p style="font-size: 12px; color: var(--ink-muted); margin-top: 4px;">Pindai QR kode untuk langsung membuka kartu profil ini.</p>
+        
+        <div id="profile-qr-code" style="display: flex; align-items: center; justify-content: center; min-height: 200px; margin: 16px 0;"></div>
+        
+        <input type="text" id="profile-share-url" readonly class="form-input-text" style="font-size: 11px; text-align: center; font-family: monospace;">
+      </div>
+      <div class="modal-footer-bar" style="justify-content: center; background: #fff; padding: 12px 24px 24px;">
+        <button onclick="copyProfileShareLink()" class="ui-btn ui-btn-primary" style="flex: 1;">
+          <i class="fa-solid fa-copy"></i>
+          <span>Salin Tautan</span>
+        </button>
+        <button onclick="closeProfileShare()" class="ui-btn" style="flex: 1;">Tutup</button>
+      </div>
+    </div>
+  </div>
 
-
+  <!-- PRESENTATION MODE OVERLAY -->
+  <div id="presentation-mode" class="hidden" style="position: fixed; inset: 0; z-index: 950; background: #070d18; color: #fff; display: flex; flex-direction: column;">
+    <div class="presentation-toolbar">
+      <div>
+        <span style="font-size: 10px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; color: #38bdf8;">Mode Presentasi Keluarga</span>
+        <p id="presentation-counter" style="font-size: 12px; color: #94a3b8; margin-top: 2px;">1 / 1</p>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onclick="presentationPrevious()" class="ui-btn" style="background: rgba(255,255,255,0.1); color: #fff; border: none;" title="Sebelumnya (Panah Kiri)">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <button onclick="presentationNext()" class="ui-btn" style="background: rgba(255,255,255,0.1); color: #fff; border: none;" title="Berikutnya (Panah Kanan)">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+        <button onclick="closePresentationMode()" class="ui-btn" style="background: rgba(255,255,255,0.1); color: #fff; border: none;" title="Keluar (Esc)">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+    <div id="presentation-content" class="presentation-content"></div>
+  </div>
 
   <script src="script.js"></script>
 </body>
