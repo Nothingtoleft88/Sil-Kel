@@ -981,7 +981,10 @@
   function executeTransform() {
     const transformDiv = document.getElementById('tree-transform');
     if (!transformDiv) return;
-    transformDiv.style.transform = `translate3d(${position.x.toFixed(2)}px, ${position.y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
+    const tx = Math.round(position.x);
+    const ty = Math.round(position.y);
+    const sc = Number(scale.toFixed(4));
+    transformDiv.style.transform = `translate(${tx}px, ${ty}px) scale(${sc})`;
     const zoomLevelEl = document.getElementById('zoom-level');
     if (zoomLevelEl) zoomLevelEl.textContent = `${Math.round(scale * 100)}%`;
     isRenderPending = false;
