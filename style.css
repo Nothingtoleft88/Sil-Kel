@@ -766,6 +766,14 @@ a {
   transition: stroke 0.2s ease, stroke-width 0.2s ease;
 }
 
+.tree-connectors-svg .connector-halo {
+  stroke: var(--bg-canvas, #f8fafc) !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: none;
+}
+
 .tree-connectors-svg path.lineage-highlight {
   stroke: #0284c7 !important;
   stroke-width: 4px !important;

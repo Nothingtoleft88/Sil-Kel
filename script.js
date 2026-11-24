@@ -775,15 +775,64 @@
     };
   }
 
+  function generateRoundedPath(points, radius = 10) {
+    if (!points || points.length < 2) return '';
+    if (points.length === 2) {
+      return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+    }
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length - 1; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const next = points[i + 1];
+
+      const d1x = curr.x - prev.x;
+      const d1y = curr.y - prev.y;
+      const len1 = Math.hypot(d1x, d1y);
+
+      const d2x = next.x - curr.x;
+      const d2y = next.y - curr.y;
+      const len2 = Math.hypot(d2x, d2y);
+
+      const r = Math.min(radius, len1 / 2, len2 / 2);
+
+      if (r <= 0 || len1 === 0 || len2 === 0) {
+        d += ` L ${curr.x} ${curr.y}`;
+        continue;
+      }
+
+      const startX = Math.round(curr.x - (d1x / len1) * r);
+      const startY = Math.round(curr.y - (d1y / len1) * r);
+      const endX = Math.round(curr.x + (d2x / len2) * r);
+      const endY = Math.round(curr.y + (d2y / len2) * r);
+
+      d += ` L ${startX} ${startY} Q ${curr.x} ${curr.y} ${endX} ${endY}`;
+    }
+    const last = points[points.length - 1];
+    d += ` L ${last.x} ${last.y}`;
+    return d;
+  }
+
   function drawUnionLink(svg, rectA, rectB, color) {
     const leftRect = rectA.centerX <= rectB.centerX ? rectA : rectB;
     const rightRect = rectA.centerX <= rectB.centerX ? rectB : rectA;
     const y = Math.round((leftRect.centerY + rightRect.centerY) / 2);
-    const startX = leftRect.right;
-    const endX = rightRect.left;
+    const startX = Math.round(leftRect.right);
+    const endX = Math.round(rightRect.left);
     if (endX <= startX) return null;
 
     const midX = Math.round((startX + endX) / 2);
+
+    // Halo underlay
+    const halo = createSvgEl('path', {
+      d: `M ${startX} ${y} L ${endX} ${y}`,
+      fill: 'none',
+      stroke: 'var(--bg-canvas, #f8fafc)',
+      'stroke-width': 7,
+      'stroke-linecap': 'round',
+      class: 'connector-halo'
+    });
+    svg.appendChild(halo);
 
     // Horizontal bridge
     const path = createSvgEl('path', {
@@ -799,8 +848,8 @@
     const circle = createSvgEl('circle', {
       cx: midX,
       cy: y,
-      r: 9,
-      fill: '#ffffff',
+      r: 10,
+      fill: 'var(--bg-surface, #ffffff)',
       stroke: color || '#e11d48',
       'stroke-width': 1.5
     });
@@ -811,60 +860,143 @@
       y: y + 3.5,
       'text-anchor': 'middle',
       'font-size': 9,
-      fill: '#e11d48'
+      fill: '#e11d48',
+      'user-select': 'none'
     });
     text.textContent = '❤';
     svg.appendChild(text);
 
-    return { x: midX, y, clearanceY: Math.max(leftRect.bottom, rightRect.bottom) + 8, color };
+    return {
+      x: midX,
+      y,
+      clearanceY: Math.round(Math.max(leftRect.bottom, rightRect.bottom) + 8),
+      color,
+      isUnion: true
+    };
   }
 
   function drawChildrenBranch(svg, source, childRects, isHighlighted = false) {
     if (!childRects || !childRects.length) return;
     const sorted = [...childRects].sort((a, b) => a.centerX - b.centerX);
-    const railY = source.clearanceY + 16;
+    const minChildTop = Math.round(Math.min(...sorted.map(r => r.top)));
+    const stemStartY = source.isUnion ? source.y + 10 : source.y;
+
+    const startClearanceY = source.clearanceY ? Math.max(stemStartY + 4, source.clearanceY) : stemStartY + 8;
+    let railY = Math.round((startClearanceY + minChildTop) / 2);
+    if (railY < stemStartY + 14) railY = stemStartY + 14;
+    if (railY > minChildTop - 14) railY = minChildTop - 14;
+
     const strokeColor = isHighlighted ? '#0284c7' : (source.color || '#94a3b8');
     const strokeWidth = isHighlighted ? 3.5 : 2.5;
+    const haloWidth = strokeWidth + 4;
 
-    // Drop from union source to rail
-    const stemPath = createSvgEl('path', {
-      d: `M ${source.x} ${source.y + 9} L ${source.x} ${railY}`,
-      fill: 'none',
-      stroke: strokeColor,
-      'stroke-width': strokeWidth,
-      'stroke-linecap': 'round'
-    });
-    if (isHighlighted) stemPath.classList.add('lineage-highlight');
-    svg.appendChild(stemPath);
+    function appendPath(d) {
+      if (!d) return;
+      const halo = createSvgEl('path', {
+        d,
+        fill: 'none',
+        stroke: 'var(--bg-canvas, #f8fafc)',
+        'stroke-width': haloWidth,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        class: 'connector-halo'
+      });
+      svg.appendChild(halo);
 
-    // Sibling rail
-    const minChildX = sorted[0].centerX;
-    const maxChildX = sorted[sorted.length - 1].centerX;
-    const railLeft = Math.min(minChildX, source.x);
-    const railRight = Math.max(maxChildX, source.x);
-
-    const railPath = createSvgEl('path', {
-      d: `M ${railLeft} ${railY} L ${railRight} ${railY}`,
-      fill: 'none',
-      stroke: strokeColor,
-      'stroke-width': strokeWidth,
-      'stroke-linecap': 'round'
-    });
-    if (isHighlighted) railPath.classList.add('lineage-highlight');
-    svg.appendChild(railPath);
-
-    // Drops to each child
-    sorted.forEach(rect => {
-      const dropPath = createSvgEl('path', {
-        d: `M ${rect.centerX} ${railY} L ${rect.centerX} ${rect.top - 2}`,
+      const main = createSvgEl('path', {
+        d,
         fill: 'none',
         stroke: strokeColor,
         'stroke-width': strokeWidth,
-        'stroke-linecap': 'round'
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
       });
-      if (isHighlighted) dropPath.classList.add('lineage-highlight');
-      svg.appendChild(dropPath);
-    });
+      if (isHighlighted) main.classList.add('lineage-highlight');
+      svg.appendChild(main);
+    }
+
+    if (sorted.length === 1) {
+      const child = sorted[0];
+      const cX = Math.round(child.centerX);
+      const cY = Math.round(child.top - 2);
+      if (Math.abs(cX - source.x) < 4) {
+        appendPath(`M ${source.x} ${stemStartY} L ${cX} ${cY}`);
+      } else {
+        const d = generateRoundedPath([
+          { x: source.x, y: stemStartY },
+          { x: source.x, y: railY },
+          { x: cX, y: railY },
+          { x: cX, y: cY }
+        ], 12);
+        appendPath(d);
+      }
+      return;
+    }
+
+    const minChildX = Math.round(sorted[0].centerX);
+    const maxChildX = Math.round(sorted[sorted.length - 1].centerX);
+
+    if (minChildX <= source.x && source.x <= maxChildX) {
+      appendPath(`M ${source.x} ${stemStartY} L ${source.x} ${railY}`);
+
+      if (source.x > minChildX) {
+        appendPath(generateRoundedPath([
+          { x: source.x, y: railY },
+          { x: minChildX, y: railY },
+          { x: minChildX, y: Math.round(sorted[0].top - 2) }
+        ], 12));
+      } else {
+        appendPath(`M ${minChildX} ${railY} L ${minChildX} ${Math.round(sorted[0].top - 2)}`);
+      }
+
+      if (source.x < maxChildX) {
+        appendPath(generateRoundedPath([
+          { x: source.x, y: railY },
+          { x: maxChildX, y: railY },
+          { x: maxChildX, y: Math.round(sorted[sorted.length - 1].top - 2) }
+        ], 12));
+      } else {
+        appendPath(`M ${maxChildX} ${railY} L ${maxChildX} ${Math.round(sorted[sorted.length - 1].top - 2)}`);
+      }
+
+      for (let i = 1; i < sorted.length - 1; i++) {
+        const cX = Math.round(sorted[i].centerX);
+        const cY = Math.round(sorted[i].top - 2);
+        appendPath(`M ${cX} ${railY} L ${cX} ${cY}`);
+      }
+
+      const dot = createSvgEl('circle', {
+        cx: source.x,
+        cy: railY,
+        r: 2.5,
+        fill: strokeColor
+      });
+      svg.appendChild(dot);
+    } else if (source.x < minChildX) {
+      appendPath(generateRoundedPath([
+        { x: source.x, y: stemStartY },
+        { x: source.x, y: railY },
+        { x: maxChildX, y: railY },
+        { x: maxChildX, y: Math.round(sorted[sorted.length - 1].top - 2) }
+      ], 12));
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const cX = Math.round(sorted[i].centerX);
+        const cY = Math.round(sorted[i].top - 2);
+        appendPath(`M ${cX} ${railY} L ${cX} ${cY}`);
+      }
+    } else {
+      appendPath(generateRoundedPath([
+        { x: source.x, y: stemStartY },
+        { x: source.x, y: railY },
+        { x: minChildX, y: railY },
+        { x: minChildX, y: Math.round(sorted[0].top - 2) }
+      ], 12));
+      for (let i = 1; i < sorted.length; i++) {
+        const cX = Math.round(sorted[i].centerX);
+        const cY = Math.round(sorted[i].top - 2);
+        appendPath(`M ${cX} ${railY} L ${cX} ${cY}`);
+      }
+    }
   }
 
   function drawTreeConnectors() {
@@ -880,8 +1012,7 @@
     svg.replaceChildren();
 
     const rootRect = familyTree.getBoundingClientRect();
-    const scaleX = rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : 1;
-    const scaleY = rootRect.height && familyTree.offsetHeight ? rootRect.height / familyTree.offsetHeight : scaleX;
+    const sc = (typeof scale === 'number' && scale > 0) ? scale : (rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : 1);
 
     const primaryCards = new Map();
     const spouseCards = new Map();
@@ -889,7 +1020,7 @@
     familyTree.querySelectorAll('[data-person-id][data-card-role]').forEach(card => {
       const id = card.dataset.personId;
       if (!id) return;
-      const rect = getLocalCardRect(card, rootRect, scaleX || 1, scaleY || 1);
+      const rect = getLocalCardRect(card, rootRect, sc, sc);
       if (card.dataset.cardRole === 'spouse') {
         spouseCards.set(id, { element: card, rect, spouseOf: card.dataset.spouseOf || '' });
       } else {
@@ -904,14 +1035,79 @@
 
       const primaryRect = primaryEntry.rect;
       const unions = new Map();
-      let colorIndex = 0;
 
-      (node.spouses || []).forEach(spouse => {
+      // Draw unions across the marital row linking adjacent cards
+      let prevCardRect = primaryRect;
+      (node.spouses || []).forEach((spouse, idx) => {
         const spouseEntry = spouseCards.get(String(spouse.id));
         if (!spouseEntry) return;
-        const color = branchColors[colorIndex++ % branchColors.length];
-        const union = drawUnionLink(svg, primaryRect, spouseEntry.rect, color);
+        const color = branchColors[idx % branchColors.length];
+        const union = drawUnionLink(svg, prevCardRect, spouseEntry.rect, color);
         if (union) unions.set(String(spouse.id), union);
+        prevCardRect = spouseEntry.rect;
+
+        // Secondary spouses of spouse (if any)
+        if (spouse.spouses && spouse.spouses.length > 0) {
+          let prevSecRect = spouseEntry.rect;
+          spouse.spouses.forEach((secSpouse, sIdx) => {
+            const secEntry = spouseCards.get(String(secSpouse.id));
+            if (!secEntry) return;
+            const secColor = branchColors[(idx + sIdx + 1) % branchColors.length];
+            const secUnion = drawUnionLink(svg, prevSecRect, secEntry.rect, secColor);
+            if (secUnion) unions.set(String(secSpouse.id), secUnion);
+            prevSecRect = secEntry.rect;
+          });
+        }
+
+        // Connect spouse parents (if present)
+        if (spouse.parents && spouse.parents.length > 0) {
+          const parentRects = spouse.parents
+            .map(p => primaryCards.get(String(p.id))?.rect)
+            .filter(Boolean);
+          if (parentRects.length === 2) {
+            const pUnion = drawUnionLink(svg, parentRects[0], parentRects[1], '#94a3b8');
+            if (pUnion) {
+              const spouseDropD = `M ${pUnion.x} ${pUnion.y + 10} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
+              const halo = createSvgEl('path', {
+                d: spouseDropD,
+                fill: 'none',
+                stroke: 'var(--bg-canvas, #f8fafc)',
+                'stroke-width': 6.5,
+                'stroke-linecap': 'round',
+                class: 'connector-halo'
+              });
+              svg.appendChild(halo);
+              const pDrop = createSvgEl('path', {
+                d: spouseDropD,
+                fill: 'none',
+                stroke: '#94a3b8',
+                'stroke-width': 2.5,
+                'stroke-linecap': 'round'
+              });
+              svg.appendChild(pDrop);
+            }
+          } else if (parentRects.length === 1) {
+            const p0 = parentRects[0];
+            const spouseDropD = `M ${Math.round(p0.centerX)} ${Math.round(p0.bottom)} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
+            const halo = createSvgEl('path', {
+              d: spouseDropD,
+              fill: 'none',
+              stroke: 'var(--bg-canvas, #f8fafc)',
+              'stroke-width': 6.5,
+              'stroke-linecap': 'round',
+              class: 'connector-halo'
+            });
+            svg.appendChild(halo);
+            const pDrop = createSvgEl('path', {
+              d: spouseDropD,
+              fill: 'none',
+              stroke: '#94a3b8',
+              'stroke-width': 2.5,
+              'stroke-linecap': 'round'
+            });
+            svg.appendChild(pDrop);
+          }
+        }
       });
 
       const renderedChildren = (node.children || []).filter(c => primaryCards.has(String(c.id)));
@@ -928,7 +1124,7 @@
 
         groups.forEach((rects, key) => {
           const source = key === '__primary__'
-            ? { x: primaryRect.centerX, y: primaryRect.bottom, clearanceY: primaryRect.bottom + 8, color: '#94a3b8' }
+            ? { x: Math.round(primaryRect.centerX), y: Math.round(primaryRect.bottom), clearanceY: Math.round(primaryRect.bottom + 8), color: '#94a3b8', isUnion: false }
             : unions.get(key);
           if (source) {
             const isPathActive = highlightedLineage.ancestors.has(node.id) || highlightedLineage.descendants.has(node.id);
