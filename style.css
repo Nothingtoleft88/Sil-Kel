@@ -1902,3 +1902,297 @@ a {
     position: relative !important;
   }
 }
+
+/* ==========================================================================
+   PRO MAX EXPANSION FEATURES STYLES
+   ========================================================================== */
+
+/* 1. Perspective Toggle & Banners */
+.perspective-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.persp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.persp-btn:hover {
+  color: var(--ink-primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.persp-btn.active {
+  background: var(--bg-surface);
+  color: var(--accent-cyan);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 700;
+}
+
+/* Perspective Focus Banner */
+.tree-focus-banner {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  border-radius: 999px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-size: 12px;
+  animation: fadeInDown 0.25s ease;
+}
+
+.focus-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focus-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  margin-left: 4px;
+}
+
+.focus-reset-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.focus-reset-action-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Guest Read-Only Mode Banner */
+.guest-readonly-banner {
+  position: absolute;
+  top: 14px;
+  left: 20px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(254, 243, 199, 0.96);
+  backdrop-filter: blur(8px);
+  color: #92400e;
+  border-radius: 999px;
+  box-shadow: 0 4px 15px rgba(180, 83, 9, 0.15);
+  border: 1px solid #fde68a;
+  font-size: 12px;
+  font-weight: 600;
+  animation: fadeInLeft 0.25s ease;
+}
+
+.guest-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.guest-unlock-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.guest-unlock-action-btn:hover {
+  background: #d97706;
+}
+
+/* Guest Mode Body Enforcement */
+body.guest-mode .admin-only-action,
+body.guest-mode #inspector-btn-edit,
+body.guest-mode #inspector-btn-add-child,
+body.guest-mode #inspector-btn-add-spouse,
+body.guest-mode #inspector-btn-delete,
+body.guest-mode .node-quick-add {
+  display: none !important;
+}
+
+/* 2. Kinship Calculator Styles */
+.kinship-result-card {
+  background: var(--bg-surface-subtle);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.kinship-title-badge {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink-primary);
+  margin-bottom: 4px;
+}
+
+.kinship-degree-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent-cyan-light);
+  color: var(--accent-cyan);
+  margin-bottom: 14px;
+}
+
+.kinship-path-trail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+.kinship-node-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  background: var(--bg-surface-subtle);
+  color: var(--ink-primary);
+}
+
+.kinship-node-chip.lca {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* 3. Fan Chart (Sunburst) Styles */
+.fan-chart-canvas-container svg text {
+  font-family: inherit;
+  user-select: none;
+}
+
+.fan-chart-wedge {
+  cursor: pointer;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.fan-chart-wedge:hover {
+  opacity: 0.9;
+  filter: brightness(1.08) drop-shadow(0 2px 6px rgba(0,0,0,0.2));
+}
+
+.fan-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 50;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.1);
+  transform: translate(-50%, -120%);
+  transition: opacity 0.1s ease;
+}
+
+/* 4. Share Role Selector */
+.share-role-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-role-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-subtle);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.share-role-card:hover {
+  border-color: var(--border-focus);
+  background: var(--bg-surface-subtle);
+}
+
+.share-role-card.active {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.share-role-card strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-primary);
+  margin-bottom: 2px;
+}
+
+.share-role-card p {
+  font-size: 11px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+  margin: 0;
+}

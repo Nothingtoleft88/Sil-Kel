@@ -1136,7 +1136,7 @@
       (node.children || []).forEach(walkTree);
     }
 
-    walkTree(treeData);
+    walkTree(getPerspectiveTreeData());
     updateMinimap();
   }
 
@@ -1150,7 +1150,7 @@
     const container = document.getElementById('tree-container');
     if (!container || !treeData) return;
 
-    container.innerHTML = buildNodeHTML(treeData, 1);
+    container.innerHTML = buildNodeHTML(getPerspectiveTreeData(), 1);
     updateSidebarStats();
     applyLineageStyles();
     scheduleTreeConnectorRender();
@@ -1770,6 +1770,7 @@
 
     const viewTitles = {
       tree: 'Pohon Silsilah',
+      fan: 'Bagan Kipas (Fan)',
       directory: 'Direktori Anggota',
       timeline: 'Timeline Keluarga',
       calendar: 'Kalender & Acara',
@@ -1789,7 +1790,7 @@
     });
 
     // Show/hide view containers
-    const allViews = ['tree', 'directory', 'timeline', 'calendar', 'archive', 'stats', 'map', 'quality', 'history'];
+    const allViews = ['tree', 'fan', 'directory', 'timeline', 'calendar', 'archive', 'stats', 'map', 'quality', 'history'];
     allViews.forEach(v => {
       const el = document.getElementById(`view-${v}`);
       if (el) el.classList.toggle('hidden', v !== viewId);
@@ -1802,6 +1803,8 @@
     // Trigger sub-view renders
     if (viewId === 'tree') {
       scheduleTreeConnectorRender();
+    } else if (viewId === 'fan') {
+      renderFanChart();
     } else if (viewId === 'directory') {
       renderDirectory();
     } else if (viewId === 'timeline') {
@@ -2847,6 +2850,800 @@
     }
   };
 
+  // ==========================================================================
+  // FITUR 4: PERSPECTIVE VIEW ENGINE (Full, Pedigree / Leluhur, Jam Pasir)
+  // ==========================================================================
+  let activePerspectiveMode = 'full'; // 'full' | 'pedigree' | 'hourglass'
+  let activePerspectiveRootId = null;
+
+  function getPerspectiveTreeData() {
+    if (activePerspectiveMode === 'full' || !activePerspectiveRootId) {
+      return treeData;
+    }
+
+    const { personMap, parentMap } = buildGenealogyIndex();
+    const focalPerson = personMap.get(String(activePerspectiveRootId));
+    if (!focalPerson) return treeData;
+
+    if (activePerspectiveMode === 'pedigree') {
+      function buildAncestorSubtree(pid, currentDepth = 1, maxDepth = 4) {
+        const p = personMap.get(pid);
+        if (!p) return null;
+        const parents = Array.from(parentMap.get(pid) || []);
+        const copy = JSON.parse(JSON.stringify(p));
+        copy.children = [];
+        copy.spouses = [];
+        if (currentDepth < maxDepth && parents.length > 0) {
+          parents.forEach(parId => {
+            const parNode = buildAncestorSubtree(parId, currentDepth + 1, maxDepth);
+            if (parNode) copy.children.push(parNode);
+          });
+        }
+        return copy;
+      }
+      return buildAncestorSubtree(String(activePerspectiveRootId)) || treeData;
+    }
+
+    if (activePerspectiveMode === 'hourglass') {
+      const copy = JSON.parse(JSON.stringify(focalPerson));
+      return copy;
+    }
+
+    return treeData;
+  }
+
+  window.setTreePerspective = function(mode, rootId = null) {
+    activePerspectiveMode = mode;
+    if (mode === 'full') {
+      activePerspectiveRootId = null;
+    } else {
+      activePerspectiveRootId = rootId || activeInspectorPersonId || treeData?.id;
+    }
+
+    ['full', 'pedigree', 'hourglass'].forEach(m => {
+      const btn = document.getElementById(`persp-${m}`);
+      if (btn) btn.classList.toggle('active', m === mode);
+    });
+
+    const banner = document.getElementById('tree-focus-banner');
+    if (banner) {
+      if (mode !== 'full' && activePerspectiveRootId) {
+        const p = findNodeById(treeData, activePerspectiveRootId);
+        document.getElementById('focus-person-name').textContent = p ? p.name : 'Anggota';
+        document.getElementById('focus-mode-tag').textContent = mode === 'pedigree' ? 'Leluhur' : 'Jam Pasir';
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    renderTree();
+    fitTreeToViewport(true);
+  };
+
+  window.resetTreePerspective = function() {
+    window.setTreePerspective('full');
+  };
+
+  window.actionFocusPerspective = function() {
+    if (!activeInspectorPersonId) return;
+    closeInspectorDrawer();
+    window.setTreePerspective('pedigree', activeInspectorPersonId);
+  };
+
+  // ==========================================================================
+  // FITUR 1: KINSHIP / RELATIONSHIP DEGREE ENGINE
+  // ==========================================================================
+  let kinshipHighlightPath = [];
+
+  function buildGenealogyIndex() {
+    const personMap = new Map();
+    const parentMap = new Map();
+    const childrenMap = new Map();
+    const spouseMap = new Map();
+
+    function indexNode(node, parentId = null) {
+      if (!node) return;
+      const pid = String(node.id);
+      personMap.set(pid, node);
+
+      if (!parentMap.has(pid)) parentMap.set(pid, new Set());
+      if (!childrenMap.has(pid)) childrenMap.set(pid, new Set());
+      if (!spouseMap.has(pid)) spouseMap.set(pid, new Set());
+
+      if (parentId) {
+        parentMap.get(pid).add(parentId);
+        if (!childrenMap.has(parentId)) childrenMap.set(parentId, new Set());
+        childrenMap.get(parentId).add(pid);
+      }
+
+      (node.spouses || []).forEach(sp => {
+        const sid = String(sp.id);
+        personMap.set(sid, sp);
+        if (!parentMap.has(sid)) parentMap.set(sid, new Set());
+        if (!childrenMap.has(sid)) childrenMap.set(sid, new Set());
+        if (!spouseMap.has(sid)) spouseMap.set(sid, new Set());
+
+        spouseMap.get(pid).add(sid);
+        spouseMap.get(sid).add(pid);
+
+        if (sp.parents && sp.parents.length > 0) {
+          sp.parents.forEach(pParent => {
+            const ppid = String(pParent.id);
+            personMap.set(ppid, pParent);
+            if (!parentMap.has(sid)) parentMap.set(sid, new Set());
+            parentMap.get(sid).add(ppid);
+            if (!childrenMap.has(ppid)) childrenMap.set(ppid, new Set());
+            childrenMap.get(ppid).add(sid);
+          });
+        }
+      });
+
+      (node.children || []).forEach(child => {
+        indexNode(child, pid);
+        if (child.linkedSpouseId) {
+          const lsid = String(child.linkedSpouseId);
+          parentMap.get(String(child.id)).add(lsid);
+          if (childrenMap.has(lsid)) childrenMap.get(lsid).add(String(child.id));
+        }
+      });
+    }
+
+    indexNode(treeData);
+    return { personMap, parentMap, childrenMap, spouseMap };
+  }
+
+  function getAncestorsWithDepth(personId, parentMap) {
+    const visited = new Map();
+    const queue = [{ id: String(personId), depth: 0, path: [String(personId)] }];
+    visited.set(String(personId), { depth: 0, path: [String(personId)] });
+
+    while (queue.length > 0) {
+      const { id, depth, path } = queue.shift();
+      const parents = parentMap.get(id);
+      if (parents) {
+        parents.forEach(parentId => {
+          if (!visited.has(parentId) || visited.get(parentId).depth > depth + 1) {
+            const nextPath = [...path, parentId];
+            visited.set(parentId, { depth: depth + 1, path: nextPath });
+            queue.push({ id: parentId, depth: depth + 1, path: nextPath });
+          }
+        });
+      }
+    }
+    return visited;
+  }
+
+  function getKinshipTerm(dA, dB, personA, personB, lcaPerson) {
+    if (dA === 0 && dB === 0) return { title: 'Diri Sendiri', degree: '0 Derajat', desc: 'Individu yang sama.' };
+
+    const isMaleA = personA?.gender === 'L';
+
+    if (dA === 0) {
+      if (dB === 1) return { title: isMaleA ? 'Orang Tua (Ayah)' : 'Orang Tua (Ibu)', degree: '1 Derajat', desc: `${personA.name} adalah orang tua kandung dari ${personB.name}.` };
+      if (dB === 2) return { title: isMaleA ? 'Kakek (Eyang Kakung)' : 'Nenek (Eyang Putri)', degree: '2 Derajat', desc: `${personA.name} adalah kakek/nenek dari ${personB.name}.` };
+      if (dB === 3) return { title: 'Kakek/Nenek Buyut (Eyang Buyut)', degree: '3 Derajat', desc: `${personA.name} adalah buyut dari ${personB.name}.` };
+      if (dB === 4) return { title: 'Eyang Canggah', degree: '4 Derajat', desc: `${personA.name} adalah eyang canggah dari ${personB.name}.` };
+      if (dB === 5) return { title: 'Eyang Wareng', degree: '5 Derajat', desc: `${personA.name} adalah eyang wareng dari ${personB.name}.` };
+      return { title: `Leluhur Generasi ke-${dB}`, degree: `${dB} Derajat`, desc: `${personA.name} adalah leluhur dari ${personB.name}.` };
+    }
+
+    if (dB === 0) {
+      if (dA === 1) return { title: isMaleA ? 'Anak Kandung (Putra)' : 'Anak Kandung (Putri)', degree: '1 Derajat', desc: `${personA.name} adalah anak kandung dari ${personB.name}.` };
+      if (dA === 2) return { title: isMaleA ? 'Cucu (Putra)' : 'Cucu (Putri)', degree: '2 Derajat', desc: `${personA.name} adalah cucu dari ${personB.name}.` };
+      if (dA === 3) return { title: 'Cicit', degree: '3 Derajat', desc: `${personA.name} adalah cicit dari ${personB.name}.` };
+      if (dA === 4) return { title: 'Canggah', degree: '4 Derajat', desc: `${personA.name} adalah canggah dari ${personB.name}.` };
+      if (dA === 5) return { title: 'Wareng', degree: '5 Derajat', desc: `${personA.name} adalah wareng dari ${personB.name}.` };
+      return { title: `Keturunan Generasi ke-${dA}`, degree: `${dA} Derajat`, desc: `${personA.name} adalah keturunan langsung dari ${personB.name}.` };
+    }
+
+    if (dA === 1 && dB === 1) {
+      return { title: 'Saudara Kandung', degree: '2 Derajat', desc: `${personA.name} dan ${personB.name} adalah saudara kandung dengan orang tua ${lcaPerson?.name || ''}.` };
+    }
+
+    if (dA === 2 && dB === 2) {
+      return { title: 'Sepupu Sekali (Misanan)', degree: '4 Derajat', desc: `${personA.name} dan ${personB.name} adalah sepupu satu kakek/nenek (${lcaPerson?.name || ''}).` };
+    }
+    if (dA === 3 && dB === 3) {
+      return { title: 'Sepupu Dua Kali (Mindhoan)', degree: '6 Derajat', desc: `${personA.name} dan ${personB.name} adalah sepupu dua kali (buyut bersama: ${lcaPerson?.name || ''}).` };
+    }
+    if (dA === 4 && dB === 4) {
+      return { title: 'Sepupu Tiga Kali', degree: '8 Derajat', desc: `${personA.name} dan ${personB.name} adalah sepupu tiga kali (canggah bersama: ${lcaPerson?.name || ''}).` };
+    }
+
+    if (dA === 1 && dB === 2) {
+      return { title: isMaleA ? 'Paman (Pakde / Om)' : 'Bibi (Bude / Tante)', degree: '3 Derajat', desc: `${personA.name} adalah saudara dari orang tua ${personB.name}.` };
+    }
+    if (dA === 2 && dB === 1) {
+      return { title: isMaleA ? 'Keponakan (Putra)' : 'Keponakan (Putri)', degree: '3 Derajat', desc: `${personA.name} adalah anak dari saudara kandung ${personB.name}.` };
+    }
+
+    if (dA === 1 && dB === 3) {
+      return { title: isMaleA ? 'Kakek Paman (Grand Uncle)' : 'Nenek Bibi (Grand Aunt)', degree: '4 Derajat', desc: `${personA.name} adalah saudara dari kakek/nenek ${personB.name}.` };
+    }
+    if (dA === 3 && dB === 1) {
+      return { title: 'Cucu Keponakan', degree: '4 Derajat', desc: `${personA.name} adalah cucu dari saudara kandung ${personB.name}.` };
+    }
+
+    if (dA === 2 && dB === 3) {
+      return { title: isMaleA ? 'Paman Sepupu' : 'Bibi Sepupu', degree: '5 Derajat', desc: `${personA.name} adalah sepupu dari orang tua ${personB.name}.` };
+    }
+    if (dA === 3 && dB === 2) {
+      return { title: 'Keponakan Sepupu', degree: '5 Derajat', desc: `${personA.name} adalah anak dari sepupu ${personB.name}.` };
+    }
+
+    const genDiff = Math.abs(dA - dB);
+    return {
+      title: `Kerabat Garis Keturunan (${dA + dB} Derajat)`,
+      degree: `${dA + dB} Derajat`,
+      desc: `Hubungan kekerabatan melalui leluhur bersama ${lcaPerson?.name || ''} dengan selisih generasi ${genDiff}.`
+    };
+  }
+
+  window.openKinshipModal = function(defaultPersonAId = null, defaultPersonBId = null) {
+    const modal = document.getElementById('kinship-modal');
+    if (!modal) return;
+
+    const selectA = document.getElementById('kinship-person-a');
+    const selectB = document.getElementById('kinship-person-b');
+    const rows = flattenPeople(treeData).sort((a, b) => (a.person.name || '').localeCompare(b.person.name || ''));
+
+    selectA.innerHTML = '';
+    selectB.innerHTML = '';
+
+    rows.forEach(({ person, generation }) => {
+      const optA = document.createElement('option');
+      optA.value = person.id;
+      optA.textContent = `${person.name} (Gen ${generation})`;
+      selectA.appendChild(optA);
+
+      const optB = document.createElement('option');
+      optB.value = person.id;
+      optB.textContent = `${person.name} (Gen ${generation})`;
+      selectB.appendChild(optB);
+    });
+
+    if (defaultPersonAId && selectA.querySelector(`option[value="${defaultPersonAId}"]`)) {
+      selectA.value = defaultPersonAId;
+    } else if (rows.length > 0) {
+      selectA.value = rows[0].person.id;
+    }
+
+    if (defaultPersonBId && selectB.querySelector(`option[value="${defaultPersonBId}"]`)) {
+      selectB.value = defaultPersonBId;
+    } else if (rows.length > 1) {
+      selectB.value = rows[1].person.id;
+    } else if (rows.length > 0) {
+      selectB.value = rows[0].person.id;
+    }
+
+    modal.classList.add('open');
+    calculateKinship();
+  };
+
+  window.closeKinshipModal = function() {
+    const modal = document.getElementById('kinship-modal');
+    if (modal) modal.classList.remove('open');
+  };
+
+  window.swapKinshipPersons = function() {
+    const selectA = document.getElementById('kinship-person-a');
+    const selectB = document.getElementById('kinship-person-b');
+    const temp = selectA.value;
+    selectA.value = selectB.value;
+    selectB.value = temp;
+    calculateKinship();
+  };
+
+  window.actionInspectKinship = function() {
+    if (!activeInspectorPersonId) return;
+    openKinshipModal(activeInspectorPersonId);
+  };
+
+  window.calculateKinship = function() {
+    const idA = document.getElementById('kinship-person-a')?.value;
+    const idB = document.getElementById('kinship-person-b')?.value;
+    const container = document.getElementById('kinship-result-container');
+    const highlightBtn = document.getElementById('btn-highlight-kinship');
+    if (!container || !idA || !idB) return;
+
+    const { personMap, parentMap, spouseMap } = buildGenealogyIndex();
+    const personA = personMap.get(idA);
+    const personB = personMap.get(idB);
+    if (!personA || !personB) return;
+
+    if (idA === idB) {
+      container.innerHTML = `
+        <div class="kinship-title-badge">Diri Sendiri</div>
+        <div class="kinship-degree-tag">0 Derajat</div>
+        <p style="font-size: 13px; color: var(--ink-secondary);">Anda memilih individu yang sama.</p>
+      `;
+      if (highlightBtn) highlightBtn.classList.add('hidden');
+      return;
+    }
+
+    if (spouseMap.get(idA)?.has(idB)) {
+      const isMaleA = personA.gender === 'L';
+      container.innerHTML = `
+        <div class="kinship-title-badge">${isMaleA ? 'Suami' : 'Istri'} (Pasangan Hidup)</div>
+        <div class="kinship-degree-tag">Tali Pernikahan</div>
+        <p style="font-size: 13px; color: var(--ink-secondary);">${personA.name} adalah pasangan hidup sah dari ${personB.name}.</p>
+      `;
+      kinshipHighlightPath = [idA, idB];
+      if (highlightBtn) highlightBtn.classList.remove('hidden');
+      return;
+    }
+
+    const aA = getAncestorsWithDepth(idA, parentMap);
+    const aB = getAncestorsWithDepth(idB, parentMap);
+
+    let lca = null;
+    let minSum = Infinity;
+
+    for (const [ancId, infoA] of aA) {
+      if (aB.has(ancId)) {
+        const infoB = aB.get(ancId);
+        const sum = infoA.depth + infoB.depth;
+        if (sum < minSum) {
+          minSum = sum;
+          lca = { id: ancId, depthA: infoA.depth, depthB: infoB.depth, pathA: infoA.path, pathB: infoB.path };
+        }
+      }
+    }
+
+    if (!lca) {
+      container.innerHTML = `
+        <div class="kinship-title-badge">Belum Terhubung Langsung</div>
+        <div class="kinship-degree-tag" style="background: #f1f5f9; color: #64748b;">Garis Terpisah</div>
+        <p style="font-size: 13px; color: var(--ink-secondary);">Tidak ditemukan leluhur kandung bersama di dalam pohon silsilah aktif saat ini.</p>
+      `;
+      if (highlightBtn) highlightBtn.classList.add('hidden');
+      return;
+    }
+
+    const lcaPerson = personMap.get(lca.id);
+    const result = getKinshipTerm(lca.depthA, lca.depthB, personA, personB, lcaPerson);
+
+    const pathA = [...lca.pathA];
+    const pathB = [...lca.pathB].reverse();
+    const fullPath = [...pathA, ...pathB.slice(1)];
+    kinshipHighlightPath = fullPath;
+
+    let pathHtml = fullPath.map((nodeId, idx) => {
+      const p = personMap.get(nodeId);
+      const isLca = nodeId === lca.id;
+      const isEdge = idx === 0 || idx === fullPath.length - 1;
+      return `<span class="kinship-node-chip ${isLca ? 'lca' : ''}" style="${isEdge ? 'font-weight: 800; border: 1.5px solid var(--accent-cyan);' : ''}">${p ? p.name.split(' ')[0] : nodeId}</span>`;
+    }).join(' <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: #94a3b8;"></i> ');
+
+    container.innerHTML = `
+      <div class="kinship-title-badge">${result.title}</div>
+      <div class="kinship-degree-tag">${result.degree} • Selisih ${Math.abs(lca.depthA - lca.depthB)} Generasi</div>
+      <p style="font-size: 13px; color: var(--ink-secondary); max-width: 460px; margin: 0 auto 10px;">${result.desc}</p>
+      <div style="font-size: 11px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; margin-top: 6px;">Jalur Nasab (Leluhur Bersama: ${lcaPerson ? lcaPerson.name : ''})</div>
+      <div class="kinship-path-trail">${pathHtml}</div>
+    `;
+
+    if (highlightBtn) highlightBtn.classList.remove('hidden');
+  };
+
+  window.highlightKinshipInTree = function() {
+    closeKinshipModal();
+    if (currentActiveView !== 'tree') {
+      switchWorkspaceView('tree');
+    }
+    if (kinshipHighlightPath && kinshipHighlightPath.length > 0) {
+      highlightedLineage.ancestors = new Set(kinshipHighlightPath);
+      applyLineageStyles();
+      scheduleTreeConnectorRender();
+      flyToPerson(kinshipHighlightPath[0]);
+    }
+  };
+
+  // ==========================================================================
+  // FITUR 3: INTERACTIVE FAN CHART (SUNBURST) ENGINE
+  // ==========================================================================
+  let fanChartRootId = null;
+  let fanChartAngle = 180;
+  let fanChartType = 'descendant';
+
+  window.setFanAngle = function(angle) {
+    fanChartAngle = angle;
+    document.getElementById('fan-angle-180')?.classList.toggle('active', angle === 180);
+    document.getElementById('fan-angle-360')?.classList.toggle('active', angle === 360);
+    renderFanChart();
+  };
+
+  window.setFanType = function(type) {
+    fanChartType = type;
+    document.getElementById('fan-type-descendant')?.classList.toggle('active', type === 'descendant');
+    document.getElementById('fan-type-ancestor')?.classList.toggle('active', type === 'ancestor');
+    renderFanChart();
+  };
+
+  window.resetFanRoot = function() {
+    fanChartRootId = null;
+    renderFanChart();
+  };
+
+  window.actionOpenInFan = function() {
+    if (!activeInspectorPersonId) return;
+    fanChartRootId = activeInspectorPersonId;
+    closeInspectorDrawer();
+    switchWorkspaceView('fan');
+  };
+
+  function polarToCartesian(cx, cy, r, angleInDeg) {
+    const rad = ((angleInDeg - 90) * Math.PI) / 180.0;
+    return {
+      x: cx + r * Math.cos(rad),
+      y: cy + r * Math.sin(rad)
+    };
+  }
+
+  function describeArc(cx, cy, rInner, rOuter, startAngle, endAngle) {
+    const p1 = polarToCartesian(cx, cy, rOuter, startAngle);
+    const p2 = polarToCartesian(cx, cy, rOuter, endAngle);
+    const p3 = polarToCartesian(cx, cy, rInner, endAngle);
+    const p4 = polarToCartesian(cx, cy, rInner, startAngle);
+
+    const arcSweep = endAngle - startAngle <= 180 ? '0' : '1';
+
+    return [
+      `M ${p1.x} ${p1.y}`,
+      `A ${rOuter} ${rOuter} 0 ${arcSweep} 1 ${p2.x} ${p2.y}`,
+      `L ${p3.x} ${p3.y}`,
+      `A ${rInner} ${rInner} 0 ${arcSweep} 0 ${p4.x} ${p4.y}`,
+      'Z'
+    ].join(' ');
+  }
+
+  function renderFanChart() {
+    const svg = document.getElementById('fan-chart-svg');
+    if (!svg || !treeData) return;
+
+    const { personMap } = buildGenealogyIndex();
+    const rootId = fanChartRootId || treeData.id;
+    const rootPerson = personMap.get(String(rootId)) || treeData;
+
+    const is180 = fanChartAngle === 180;
+    const width = 940;
+    const height = is180 ? 540 : 940;
+    const cx = width / 2;
+    const cy = is180 ? 470 : height / 2;
+    const baseR = 64;
+    const ringW = 72;
+
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.replaceChildren();
+
+    const startDeg = is180 ? 270 : 0;
+    const totalDeg = is180 ? 180 : 360;
+
+    // Center Root Circle
+    const centerGroup = createSvgEl('g', { class: 'fan-chart-wedge', 'data-id': rootPerson.id });
+    const centerCircle = createSvgEl('circle', {
+      cx,
+      cy,
+      r: baseR,
+      fill: '#0f172a',
+      stroke: '#38bdf8',
+      'stroke-width': 2.5
+    });
+    centerGroup.appendChild(centerCircle);
+
+    const centerText = createSvgEl('text', {
+      x: cx,
+      y: is180 ? cy - 14 : cy - 6,
+      'text-anchor': 'middle',
+      fill: '#ffffff',
+      'font-size': 11,
+      'font-weight': 800
+    });
+    centerText.textContent = (rootPerson.name || '').slice(0, 16);
+    centerGroup.appendChild(centerText);
+
+    const centerSub = createSvgEl('text', {
+      x: cx,
+      y: is180 ? cy + 4 : cy + 12,
+      'text-anchor': 'middle',
+      fill: '#94a3b8',
+      'font-size': 9
+    });
+    centerSub.textContent = rootPerson.birthYear ? `Lhr: ${rootPerson.birthYear}` : 'Pusat Bagan';
+    centerGroup.appendChild(centerSub);
+
+    centerGroup.onclick = () => openInspectorDrawer(rootPerson.id);
+    svg.appendChild(centerGroup);
+
+    function countLeaves(node) {
+      if (!node.children || node.children.length === 0) return 1;
+      return node.children.reduce((acc, c) => acc + countLeaves(c), 0);
+    }
+
+    const totalLeaves = countLeaves(rootPerson);
+
+    function renderDescendantArcs(node, currentGen, angleStart, angleSpan) {
+      if (!node.children || node.children.length === 0 || currentGen > 5) return;
+
+      const rInner = baseR + (currentGen - 1) * ringW + 4;
+      const rOuter = rInner + ringW - 4;
+      let curAngle = angleStart;
+
+      node.children.forEach((child, idx) => {
+        const leaves = countLeaves(child);
+        const childSpan = (leaves / totalLeaves) * totalDeg;
+        const arcEnd = curAngle + childSpan;
+        const color = branchColors[(currentGen + idx) % branchColors.length];
+
+        const pathD = describeArc(cx, cy, rInner, rOuter, curAngle, arcEnd);
+        const g = createSvgEl('g', { class: 'fan-chart-wedge', 'data-id': child.id });
+
+        const path = createSvgEl('path', {
+          d: pathD,
+          fill: color,
+          stroke: '#ffffff',
+          'stroke-width': 1.5,
+          opacity: 0.88
+        });
+        g.appendChild(path);
+
+        const midAngle = curAngle + childSpan / 2;
+        const textPos = polarToCartesian(cx, cy, (rInner + rOuter) / 2, midAngle);
+
+        if (childSpan >= 8) {
+          const text = createSvgEl('text', {
+            x: textPos.x,
+            y: textPos.y + 3,
+            'text-anchor': 'middle',
+            fill: '#ffffff',
+            'font-size': childSpan > 15 ? 10 : 8,
+            'font-weight': 700
+          });
+          text.textContent = (child.name || '').split(' ')[0].slice(0, 10);
+          g.appendChild(text);
+        }
+
+        g.onclick = () => openInspectorDrawer(child.id);
+        svg.appendChild(g);
+
+        renderDescendantArcs(child, currentGen + 1, curAngle, childSpan);
+        curAngle = arcEnd;
+      });
+    }
+
+    renderDescendantArcs(rootPerson, 1, startDeg, totalDeg);
+  }
+
+  window.exportFanChart = function(format = 'png') {
+    const svg = document.getElementById('fan-chart-svg');
+    if (!svg) return;
+    showToast('Menyiapkan gambar bagan kipas...');
+
+    try {
+      const serializer = new XMLSerializer();
+      const svgStr = serializer.serializeToString(svg);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      canvas.width = 1880;
+      canvas.height = fanChartAngle === 180 ? 1080 : 1880;
+
+      const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+
+        const a = document.createElement('a');
+        a.download = `Bagan_Kipas_Silsilah_${new Date().toISOString().slice(0, 10)}.png`;
+        a.href = canvas.toDataURL('image/png');
+        a.click();
+        showToast('Bagan kipas berhasil diunduh!');
+      };
+      img.src = url;
+    } catch (err) {
+      showToast('Gagal mengekspor bagan kipas.', true);
+    }
+  };
+
+  // ==========================================================================
+  // FITUR 5: FULL GEDCOM 5.5.1 IMPORT & EXPORT ENGINE
+  // ==========================================================================
+  window.exportGEDCOM = function() {
+    const rows = flattenPeople(treeData);
+    const idMap = new Map(rows.map((r, i) => [r.person.id, `I${i + 1}`]));
+    const lines = [
+      '0 HEAD',
+      '1 SOUR SILSILAH-PRO-MAX',
+      '1 CHAR UTF-8',
+      '1 GEDC',
+      '2 VERS 5.5.1',
+      '2 FORM LINEAGE-LINKED'
+    ];
+
+    const families = [];
+    let famIndex = 1;
+
+    rows.forEach(({ person }) => {
+      const gid = idMap.get(person.id);
+      const nameParts = (person.name || 'Tanpa Nama').split(' ');
+      const givenName = nameParts[0];
+      const surname = person.surname || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
+
+      lines.push(`0 @${gid}@ INDI`, `1 NAME ${givenName} /${surname}/`);
+      if (surname) lines.push(`2 SURN ${surname}`);
+      lines.push(`1 SEX ${person.gender === 'P' ? 'F' : 'M'}`);
+
+      if (person.birthDate || person.birthYear) {
+        lines.push('1 BIRT', `2 DATE ${person.birthDate || person.birthYear}`);
+        if (person.birthPlace) lines.push(`2 PLAC ${person.birthPlace}`);
+      }
+      if (person.deathDate || person.deathYear) {
+        lines.push('1 DEAT', `2 DATE ${person.deathDate || person.deathYear}`);
+      }
+      if (person.occupation) lines.push(`1 OCCU ${person.occupation}`);
+      if (person.biography) lines.push(`1 NOTE ${person.biography.replace(/\n/g, ' ')}`);
+
+      (person.spouses || []).forEach(spouse => {
+        const spouseGid = idMap.get(spouse.id);
+        const famId = `F${famIndex++}`;
+        lines.push(`1 FAMS @${famId}@`);
+        families.push({
+          famId,
+          husb: person.gender === 'L' ? gid : spouseGid,
+          wife: person.gender === 'P' ? gid : spouseGid,
+          children: (person.children || []).map(c => idMap.get(c.id)).filter(Boolean)
+        });
+      });
+    });
+
+    families.forEach(f => {
+      lines.push(`0 @${f.famId}@ FAM`);
+      if (f.husb) lines.push(`1 HUSB @${f.husb}@`);
+      if (f.wife) lines.push(`1 WIFE @${f.wife}@`);
+      (f.children || []).forEach(chGid => {
+        lines.push(`1 CHIL @${chGid}@`);
+      });
+      lines.push('1 MARR');
+    });
+
+    lines.push('0 TRLR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `silsilah_keluarga_${new Date().toISOString().slice(0, 10)}.ged`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('File standar GEDCOM 5.5.1 berhasil diekspor.');
+  };
+
+  window.importGEDCOM = function(fileText) {
+    if (!fileText || !fileText.includes('INDI')) {
+      return showToast('Format file GEDCOM tidak valid.', true);
+    }
+
+    try {
+      const lines = fileText.split(/\r?\n/);
+      const indis = new Map();
+      const fams = new Map();
+      let curr = null;
+      let currType = null;
+
+      lines.forEach(line => {
+        line = line.trim();
+        if (!line) return;
+        const m = line.match(/^(\d+)\s+(@[^@]+@)?\s*([A-Za-z0-9_]+)?(.*)$/);
+        if (!m) return;
+        const level = parseInt(m[1], 10);
+        const id = m[2];
+        const tag = m[3];
+        const rest = (m[4] || '').trim();
+
+        if (level === 0) {
+          if (rest === 'INDI' || tag === 'INDI') {
+            currType = 'INDI';
+            curr = { id: id || tag, name: '', gender: 'L', birthDate: '', birthPlace: '', deathDate: '', occupation: '', biography: '', famc: [], fams: [] };
+            indis.set(curr.id, curr);
+          } else if (rest === 'FAM' || tag === 'FAM') {
+            currType = 'FAM';
+            curr = { id: id || tag, husb: '', wife: '', children: [] };
+            fams.set(curr.id, curr);
+          } else {
+            curr = null;
+            currType = null;
+          }
+        } else if (curr && currType === 'INDI') {
+          if (tag === 'NAME') curr.name = rest.replace(/\//g, '').trim();
+          else if (tag === 'SEX') curr.gender = rest.toUpperCase().startsWith('F') || rest.toUpperCase().startsWith('P') ? 'P' : 'L';
+          else if (tag === 'DATE') {
+            if (!curr.birthDate) curr.birthDate = rest;
+            else curr.deathDate = rest;
+          } else if (tag === 'PLAC') curr.birthPlace = rest;
+          else if (tag === 'OCCU') curr.occupation = rest;
+          else if (tag === 'NOTE') curr.biography = rest;
+          else if (tag === 'FAMC') curr.famc.push(rest);
+          else if (tag === 'FAMS') curr.fams.push(rest);
+        } else if (curr && currType === 'FAM') {
+          if (tag === 'HUSB') curr.husb = rest;
+          else if (tag === 'WIFE') curr.wife = rest;
+          else if (tag === 'CHIL') curr.children.push(rest);
+        }
+      });
+
+      if (indis.size === 0) {
+        return showToast('Tidak ada data anggota individu ditemukan di GEDCOM.', true);
+      }
+
+      let rootCandidate = Array.from(indis.values()).find(i => i.famc.length === 0) || Array.from(indis.values())[0];
+
+      function buildTreeNode(indi) {
+        const node = {
+          id: `ged-${Math.random().toString(36).substr(2, 7)}`,
+          name: indi.name || 'Tanpa Nama',
+          gender: indi.gender || 'L',
+          birthDate: indi.birthDate || '',
+          birthYear: indi.birthDate ? indi.birthDate.slice(0, 4) : '',
+          birthPlace: indi.birthPlace || '',
+          deathDate: indi.deathDate || '',
+          deathYear: indi.deathDate ? indi.deathDate.slice(0, 4) : '',
+          occupation: indi.occupation || '',
+          biography: indi.biography || '',
+          spouses: [],
+          children: [],
+          isCollapsed: false
+        };
+
+        (indi.fams || []).forEach(fId => {
+          const fam = fams.get(fId);
+          if (!fam) return;
+          const spouseGid = fam.husb === indi.id ? fam.wife : fam.husb;
+          const spouseIndi = indis.get(spouseGid);
+          if (spouseIndi) {
+            node.spouses.push({
+              id: `ged-${Math.random().toString(36).substr(2, 7)}`,
+              name: spouseIndi.name || 'Pasangan',
+              gender: spouseIndi.gender || 'P',
+              birthDate: spouseIndi.birthDate || '',
+              birthPlace: spouseIndi.birthPlace || '',
+              deathDate: spouseIndi.deathDate || '',
+              occupation: spouseIndi.occupation || ''
+            });
+          }
+
+          (fam.children || []).forEach(chGid => {
+            const chIndi = indis.get(chGid);
+            if (chIndi) {
+              node.children.push(buildTreeNode(chIndi));
+            }
+          });
+        });
+
+        return node;
+      }
+
+      const importedTree = buildTreeNode(rootCandidate);
+      treeData = importedTree;
+      ensureFamilyNumbers();
+      renderTree();
+      simpanKeFirebase(`Impor GEDCOM (${indis.size} anggota)`);
+      showToast(`Sukses mengimpor ${indis.size} anggota dari file GEDCOM!`);
+    } catch (err) {
+      console.error(err);
+      showToast('Gagal memproses file GEDCOM.', true);
+    }
+  };
+
+  // ==========================================================================
+  // FITUR 6: MULTI-PAGE HERITAGE PDF BOOK GENERATOR ENGINE
+  // ==========================================================================
   window.exportFamilyBookPDF = async function() {
     if (!window.jspdf) return showToast('Library PDF tidak tersedia.', true);
     showToast('Menyusun buku silsilah keluarga lengkap...');
@@ -2856,34 +3653,92 @@
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
       const rows = flattenPeople(treeData);
       const stats = calculateStats(treeData);
-      const W = 210, H = 297, M = 15;
+      const W = 210, H = 297, M = 18;
 
-      // Cover Page
+      // PAGE 1: LUXURY OBSIDIAN COVER
       pdf.setFillColor(7, 13, 24);
       pdf.rect(0, 0, W, H, 'F');
-      pdf.setTextColor(255);
+
+      pdf.setDrawColor(217, 119, 6);
+      pdf.setLineWidth(1.2);
+      pdf.rect(12, 12, W - 24, H - 24);
+      pdf.setLineWidth(0.4);
+      pdf.rect(14, 14, W - 28, H - 28);
+
+      pdf.setTextColor(245, 158, 11);
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
-      pdf.text('BUKU SILSILAH DAN WARISAN KELUARGA', M, 60);
-
-      pdf.setFontSize(26);
-      pdf.text(appSettings?.appTitle || 'Silsilah Keluarga', M, 75);
-      pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(11);
-      pdf.setTextColor(148, 163, 184);
-      pdf.text(appSettings?.appSubtitle || 'Family Heritage Workspace', M, 84);
+      pdf.text('DOKUMEN WARISAN DAN NASAB KELUARGA BESAR', W / 2, 60, { align: 'center' });
 
-      pdf.setTextColor(255);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(26);
+      pdf.text(appSettings?.appTitle || 'Silsilah Keluarga', W / 2, 85, { align: 'center' });
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(13);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text(appSettings?.appSubtitle || 'Family Heritage Workspace', W / 2, 96, { align: 'center' });
+
+      pdf.setFillColor(15, 23, 42);
+      pdf.roundedRect(W / 2 - 60, 160, 120, 36, 6, 6, 'F');
+      pdf.setTextColor(56, 189, 248);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(18);
-      pdf.text(`${stats.total}`, M, 150);
-      pdf.text(`${stats.maxDepth}`, 70, 150);
+      pdf.text(`${stats.total}`, W / 2 - 30, 178, { align: 'center' });
+      pdf.text(`${stats.maxDepth}`, W / 2 + 30, 178, { align: 'center' });
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
-      pdf.text('TOTAL ANGGOTA', M, 156);
-      pdf.text('GENERASI', 70, 156);
+      pdf.text('TOTAL ANGGOTA', W / 2 - 30, 185, { align: 'center' });
+      pdf.text('RENTANG GENERASI', W / 2 + 30, 185, { align: 'center' });
 
-      // Profiles
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Diterbitkan pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, W / 2, 260, { align: 'center' });
+
+      // PAGE 2: KATA PENGANTAR & RINGKASAN DEMOGRAFI
+      pdf.addPage();
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, 0, W, 26, 'F');
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.text('KATA PENGANTAR & RINGKASAN TRAH', M, 17);
+
+      let p2Y = 42;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(51, 65, 85);
+      const introText = 'Buku silsilah ini disusun sebagai ikhtiar menjaga tali silaturahmi, merawat ingatan sejarah leluhur, serta menjadi panduan bagi generasi penerus untuk saling mengenal sanak kerabat dan asal-usul keluarga besarnya.';
+      pdf.text(pdf.splitTextToSize(introText, W - M * 2), M, p2Y);
+
+      p2Y += 26;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('RINGKASAN DEMOGRAFI KELUARGA', M, p2Y);
+
+      p2Y += 8;
+      const demoRows = [
+        ['Total Anggota Tercatat', `${stats.total} Jiwa`],
+        ['Laki-laki', `${stats.male} Orang`],
+        ['Perempuan', `${stats.female} Orang`],
+        ['Anggota Masih Hidup', `${stats.living} Orang`],
+        ['Telah Berpulang (Almarhum/ah)', `${stats.deceased} Orang`],
+        ['Rentang Generasi', `${stats.maxDepth} Tingkat Generasi`]
+      ];
+
+      demoRows.forEach(([k, v]) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(k, M, p2Y);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(v, M + 80, p2Y);
+        p2Y += 8;
+      });
+
+      // PROFILES PAGES
       rows.forEach(({ person, generation }) => {
         pdf.addPage();
         pdf.setFillColor(248, 250, 252);
@@ -2921,6 +3776,34 @@
           y += 9;
         });
 
+        if (person.spouses && person.spouses.length > 0) {
+          y += 4;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text('PASANGAN', M, y);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(person.spouses.map(s => s.name).join(', '), M + 40, y);
+          y += 9;
+        }
+
+        if (person.children && person.children.length > 0) {
+          y += 4;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(8);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text('DAFTAR ANAK', M, y);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          const childNames = person.children.map((c, i) => `${i + 1}. ${c.name}`).join('   ');
+          const childLines = pdf.splitTextToSize(childNames, W - M * 2 - 40);
+          pdf.text(childLines, M + 40, y);
+          y += childLines.length * 7;
+        }
+
         if (person.biography) {
           y += 6;
           pdf.setFont('helvetica', 'bold');
@@ -2935,11 +3818,161 @@
         }
       });
 
+      // FINAL PAGE: INDEKS NAMA
+      pdf.addPage();
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, 0, W, 22, 'F');
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(13);
+      pdf.text('INDEKS ANGGOTA KELUARGA', M, 14);
+
+      let idxY = 34;
+      let colX = M;
+      const sortedNames = [...rows].sort((a, b) => (a.person.name || '').localeCompare(b.person.name || ''));
+
+      sortedNames.forEach(({ person, generation }) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(`${person.name} (Gen ${generation})`, colX, idxY);
+        idxY += 6;
+        if (idxY > H - 20) {
+          idxY = 34;
+          colX += 60;
+        }
+      });
+
       pdf.save(`Buku_Silsilah_Keluarga_${new Date().toISOString().slice(0, 10)}.pdf`);
       showToast('Buku silsilah PDF berhasil dibuat!');
     } catch (err) {
       console.error(err);
       showToast('Gagal menyusun buku silsilah PDF.', true);
+    }
+  };
+
+  // ==========================================================================
+  // FITUR 7: RBAC, GUEST READ-ONLY SHARE & WHATSAPP ENGINE
+  // ==========================================================================
+  let isGuestMode = false;
+  let shareQrInstance = null;
+
+  function initRbacAndShare() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const readonly = params.get('readonly');
+
+    if (mode === 'view' || readonly === 'true') {
+      isGuestMode = true;
+      document.body.classList.add('guest-mode');
+      const banner = document.getElementById('guest-readonly-banner');
+      if (banner) banner.classList.remove('hidden');
+
+      const loginScreen = document.getElementById('login-screen');
+      if (loginScreen) loginScreen.classList.add('hidden');
+    }
+
+    const gedcomInput = document.getElementById('gedcom-input');
+    if (gedcomInput) {
+      gedcomInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => importGEDCOM(evt.target.result);
+        reader.readAsText(file);
+        gedcomInput.value = '';
+      });
+    }
+  }
+
+  window.openShareLinkModal = function() {
+    const modal = document.getElementById('share-link-modal');
+    if (!modal) return;
+    modal.classList.add('open');
+    updateShareUrl();
+  };
+
+  window.closeShareLinkModal = function() {
+    const modal = document.getElementById('share-link-modal');
+    if (modal) modal.classList.remove('open');
+  };
+
+  window.updateShareUrl = function() {
+    const roleRadio = document.querySelector('input[name="shareRole"]:checked');
+    const role = roleRadio ? roleRadio.value : 'view';
+
+    document.getElementById('label-role-view')?.classList.toggle('active', role === 'view');
+    document.getElementById('label-role-admin')?.classList.toggle('active', role === 'admin');
+
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    const fullUrl = role === 'view' ? `${origin}${pathname}?mode=view` : `${origin}${pathname}`;
+
+    const input = document.getElementById('share-url-input');
+    if (input) input.value = fullUrl;
+
+    const qrBox = document.getElementById('share-qr-box');
+    if (qrBox && typeof QRCode !== 'undefined') {
+      qrBox.innerHTML = '';
+      shareQrInstance = new QRCode(qrBox, {
+        text: fullUrl,
+        width: 170,
+        height: 170,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  };
+
+  window.copyShareUrl = function() {
+    const input = document.getElementById('share-url-input');
+    if (!input) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+      showToast('Tautan berhasil disalin!');
+    }).catch(() => {
+      input.select();
+      document.execCommand('copy');
+      showToast('Tautan disalin ke clipboard!');
+    });
+  };
+
+  window.shareViaWhatsApp = function() {
+    const input = document.getElementById('share-url-input');
+    const url = input ? input.value : window.location.href;
+    const appTitle = appSettings?.appTitle || 'Silsilah Keluarga';
+    const msg = `Halo keluarga besar! Silakan buka portal ${appTitle} kita secara interaktif di sini: ${url} (Dapat dibuka langsung dari smartphone, mode baca aman).`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  window.promptAdminUnlock = function() {
+    const modal = document.getElementById('admin-unlock-modal');
+    if (modal) {
+      document.getElementById('admin-pin-input').value = '';
+      document.getElementById('admin-unlock-error')?.classList.add('hidden');
+      modal.classList.add('open');
+    }
+  };
+
+  window.closeAdminUnlockModal = function() {
+    const modal = document.getElementById('admin-unlock-modal');
+    if (modal) modal.classList.remove('open');
+  };
+
+  window.verifyAdminUnlock = function() {
+    const input = document.getElementById('admin-pin-input');
+    const errorMsg = document.getElementById('admin-unlock-error');
+    const entered = (input?.value || '').trim();
+    const correctPin = appSettings?.accessCode || '1234';
+
+    if (entered === correctPin) {
+      isGuestMode = false;
+      document.body.classList.remove('guest-mode');
+      document.getElementById('guest-readonly-banner')?.classList.add('hidden');
+      closeAdminUnlockModal();
+      showToast('Akses Admin aktif! Fitur sunting telah dibuka.');
+    } else {
+      if (errorMsg) errorMsg.classList.remove('hidden');
     }
   };
 
@@ -2962,44 +3995,6 @@
     a.click();
     URL.revokeObjectURL(url);
     showToast('Data JSON berhasil disimpan.');
-  };
-
-  window.exportGEDCOM = function() {
-    const rows = flattenPeople(treeData);
-    const idMap = new Map(rows.map((r, i) => [r.person.id, `I${i + 1}`]));
-    const lines = [
-      '0 HEAD',
-      '1 SOUR SILSILAH-PRO-MAX',
-      '1 CHAR UTF-8',
-      '1 GEDC',
-      '2 VERS 5.5.1'
-    ];
-
-    rows.forEach(({ person }) => {
-      const gid = idMap.get(person.id);
-      lines.push(`0 @${gid}@ INDI`, `1 NAME ${person.name || 'Tanpa Nama'}`);
-      if (person.surname) lines.push(`2 SURN ${person.surname}`);
-      lines.push(`1 SEX ${person.gender === 'P' ? 'F' : 'M'}`);
-      if (person.birthDate || person.birthYear) {
-        lines.push('1 BIRT', `2 DATE ${person.birthDate || person.birthYear}`);
-        if (person.birthPlace) lines.push(`2 PLAC ${person.birthPlace}`);
-      }
-      if (person.deathDate || person.deathYear) {
-        lines.push('1 DEAT', `2 DATE ${person.deathDate || person.deathYear}`);
-      }
-      if (person.occupation) lines.push(`1 OCCU ${person.occupation}`);
-      if (person.biography) lines.push(`1 NOTE ${person.biography.replace(/\n/g, ' ')}`);
-    });
-
-    lines.push('0 TRLR');
-    const blob = new Blob([lines.join('\r\n')], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `silsilah_keluarga_${new Date().toISOString().slice(0, 10)}.ged`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('File GEDCOM berhasil diekspor.');
   };
 
   window.exportWebProject = async function() {
@@ -3359,6 +4354,7 @@
     initCanvasGestures();
     initGlobalSearch();
     bootApplication();
+    initRbacAndShare();
 
     window.addEventListener('resize', () => {
       scheduleTreeConnectorRender();
@@ -3386,6 +4382,9 @@
         closeExportModal();
         closeSettingsModal();
         closePresentationMode();
+        closeKinshipModal();
+        closeShareLinkModal();
+        closeAdminUnlockModal();
       }
     });
   });
