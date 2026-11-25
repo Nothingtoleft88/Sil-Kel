@@ -1767,39 +1767,63 @@
     if (!c) return;
     const profile = getAstrologyProfile(person);
 
+    const sunDegree = profile.sun?.degreeText ? `${profile.sun.symbol} ${profile.sun.degreeText}` : '';
+    const moonDegree = profile.moon?.degreeText ? `${profile.moon.symbol} ${profile.moon.degreeText}` : '';
+    const ascDegree = profile.ascendant?.degreeText ? `${profile.ascendant.symbol} ${profile.ascendant.degreeText}` : '';
+    const chineseMeta = profile.chinese
+      ? `${profile.chinese.element} ${profile.chinese.polarity} (${profile.chinese.basisLabel}${profile.chinese.year ? ' ' + profile.chinese.year : ''})`
+      : '';
+
     let html = `
       <div style="background: linear-gradient(135deg, #fdf4ff 0%, #eef2ff 100%); padding: 16px; border-radius: 14px; border: 1px solid #c7d2fe; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
           <span style="font-size: 11px; font-weight: 800; color: #4338ca; text-transform: uppercase;">Akurasi Perhitungan</span>
-          <span class="astro-chip" style="font-size: 10px;">${escapeHTML(profile.level)}</span>
+          <span class="astro-chip" style="font-size: 10px;">${escapeHTML(profile.level)} (${profile.score}%)</span>
         </div>
         <div style="margin-top: 10px; height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden;">
           <div style="height: 100%; width: ${profile.score}%; background: linear-gradient(90deg, #0284c7, #4f46e5); border-radius: inherit;"></div>
         </div>
+        ${profile.utcSummary ? `<p style="font-size: 10.5px; color: #4338ca; margin-top: 8px; font-weight: 600;">${escapeHTML(profile.utcSummary)}</p>` : ''}
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
         <div style="padding: 12px; border-radius: 12px; background: #fffbeb; border: 1px solid #fde68a;">
           <span style="font-size: 10px; font-weight: 800; color: #92400e; text-transform: uppercase;">Zodiak Matahari (Sun)</span>
           <h4 style="font-size: 15px; font-weight: 800; color: #78350f; margin-top: 2px;">${escapeHTML(profile.sun?.name || 'Tidak ada')}</h4>
-          <p style="font-size: 11px; color: #b45309;">${escapeHTML(profile.sun?.degreeText || '')}</p>
+          <p style="font-size: 11px; color: #b45309;">${escapeHTML(sunDegree || (profile.sun?.isFallback ? 'Estimasi kalender' : ''))}</p>
+          ${profile.sun?.cuspNote ? `<p style="font-size: 10px; color: #b45309; margin-top: 4px; font-weight: 600;">${escapeHTML(profile.sun.cuspNote)}</p>` : ''}
         </div>
 
         <div style="padding: 12px; border-radius: 12px; background: #eef2ff; border: 1px solid #c7d2fe;">
           <span style="font-size: 10px; font-weight: 800; color: #3730a3; text-transform: uppercase;">Zodiak Bulan (Moon)</span>
           <h4 style="font-size: 15px; font-weight: 800; color: #1e1b4b; margin-top: 2px;">${escapeHTML(profile.moon?.name || 'Perlu jam lahir')}</h4>
-          <p style="font-size: 11px; color: #4338ca;">${escapeHTML(profile.moon?.degreeText || '')}</p>
+          <p style="font-size: 11px; color: #4338ca;">${escapeHTML(moonDegree)}</p>
         </div>
 
         <div style="padding: 12px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0;">
           <span style="font-size: 10px; font-weight: 800; color: #065f46; text-transform: uppercase;">Ascendant (Rising)</span>
           <h4 style="font-size: 15px; font-weight: 800; color: #022c22; margin-top: 2px;">${escapeHTML(profile.ascendant?.name || 'Perlu jam + koordinat')}</h4>
+          <p style="font-size: 11px; color: #047857;">${escapeHTML(ascDegree)}</p>
         </div>
 
         <div style="padding: 12px; border-radius: 12px; background: #fdf2f8; border: 1px solid #fbcfe8;">
           <span style="font-size: 10px; font-weight: 800; color: #9d174d; text-transform: uppercase;">Shio & Elemen</span>
-          <h4 style="font-size: 15px; font-weight: 800; color: #500724; margin-top: 2px;">${escapeHTML(profile.chinese?.name || 'Tidak ada')}</h4>
-          <p style="font-size: 11px; color: #be185d;">${escapeHTML(profile.chinese?.element || '')} ${escapeHTML(profile.chinese?.polarity || '')}</p>
+          <h4 style="font-size: 15px; font-weight: 800; color: #500724; margin-top: 2px;">${escapeHTML(profile.chinese ? `${profile.chinese.symbol} ${profile.chinese.name}` : 'Tidak ada')}</h4>
+          <p style="font-size: 11px; color: #be185d;">${escapeHTML(chineseMeta)}</p>
+          ${profile.chinese?.note ? `<p style="font-size: 10px; color: #9d174d; margin-top: 4px; font-weight: 600;">${escapeHTML(profile.chinese.note)}</p>` : ''}
+        </div>
+
+        <div style="padding: 12px; border-radius: 12px; background: #f0fdfa; border: 1px solid #99f6e4;">
+          <span style="font-size: 10px; font-weight: 800; color: #115e59; text-transform: uppercase;">Weton Jawa & Wuku</span>
+          <h4 style="font-size: 15px; font-weight: 800; color: #042f2e; margin-top: 2px;">${escapeHTML(profile.weton?.label || 'Perlu tgl lahir')}</h4>
+          ${profile.weton ? `<p style="font-size: 11px; color: #0f766e;">Neptu ${profile.weton.neptuTotal} (${profile.weton.hari.name} ${profile.weton.neptuHari} + ${profile.weton.pasaran.name} ${profile.weton.neptuPasaran}) | Wuku ${escapeHTML(profile.weton.wuku)}</p>` : ''}
+          ${profile.weton?.maghribNote ? `<p style="font-size: 10px; color: #115e59; margin-top: 4px; font-weight: 600;">${escapeHTML(profile.weton.maghribNote)}</p>` : ''}
+        </div>
+
+        <div style="padding: 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #cbd5e1;">
+          <span style="font-size: 10px; font-weight: 800; color: #334155; text-transform: uppercase;">Kalender Hijriyah</span>
+          <h4 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 2px;">${escapeHTML(profile.hijri || 'Perlu tgl lahir')}</h4>
+          <p style="font-size: 10.5px; color: #64748b;">Umm al-Qura</p>
         </div>
       </div>
     `;
@@ -2536,8 +2560,8 @@
     document.getElementById('input-birthtimezone').value = person.birthTimezone || 'Asia/Jakarta';
     document.getElementById('input-birthutcoffset').value = person.birthUtcOffset ?? 7;
     document.getElementById('input-chinesezodiacbasis').value = person.chineseZodiacBasis || 'cny';
-    document.getElementById('input-birthlatitude').value = person.birthLatitude || '';
-    document.getElementById('input-birthlongitude').value = person.birthLongitude || '';
+    document.getElementById('input-birthlatitude').value = person.birthLatitude ?? '';
+    document.getElementById('input-birthlongitude').value = person.birthLongitude ?? '';
 
     // Child relation selectors
     const containerChildRel = document.getElementById('container-childrelations');
@@ -2575,6 +2599,9 @@
         btn.classList.toggle('ui-btn-primary', t === tabName);
       }
     });
+    if (tabName === 'astrology' && typeof window.previewAstrologyFromForm === 'function') {
+      window.previewAstrologyFromForm();
+    }
   };
 
   function populateSpouseDropdown(parent) {
@@ -2939,7 +2966,7 @@
     renderTree();
   };
 
-  // --- ASTROLOGY PRECISION ENGINE ---
+  // --- ASTROLOGY, WETON & CALENDAR PRECISION ENGINE ---
   const ASTRO_SIGNS = [
     { name: 'Aries', element: 'Api', symbol: '♈' },
     { name: 'Taurus', element: 'Tanah', symbol: '♉' },
@@ -2972,6 +2999,38 @@
     { element: 'Air', polarity: 'Yang' },  { element: 'Air', polarity: 'Yin' }
   ];
 
+  const JAVA_DAYS = [
+    { name: 'Minggu', neptu: 5 },
+    { name: 'Senin', neptu: 4 },
+    { name: 'Selasa', neptu: 3 },
+    { name: 'Rabu', neptu: 7 },
+    { name: 'Kamis', neptu: 8 },
+    { name: 'Jumat', neptu: 6 },
+    { name: 'Sabtu', neptu: 9 }
+  ];
+
+  const JAVA_PASARAN = [
+    { name: 'Legi', neptu: 5 },
+    { name: 'Pahing', neptu: 9 },
+    { name: 'Pon', neptu: 7 },
+    { name: 'Wage', neptu: 4 },
+    { name: 'Kliwon', neptu: 8 }
+  ];
+
+  const JAVA_WUKU = [
+    'Sinta', 'Landep', 'Wukir', 'Kurantil', 'Tolu',
+    'Gumbreg', 'Wariga', 'Warigadian', 'Julungwangi', 'Sungsang',
+    'Galungan', 'Kuningan', 'Langkir', 'Mandasiya', 'Julungpujud',
+    'Pahang', 'Kuruwelut', 'Marakeh', 'Tambir', 'Medangkungan',
+    'Maktal', 'Wuye', 'Manahil', 'Prangbakat', 'Bala',
+    'Wugu', 'Wayang', 'Kulawu', 'Dukut', 'Watugunung'
+  ];
+
+  // Anchor: 1945-08-17 = JDN 2431685 = Jumat Legi (Wuku Manahil)
+  const WETON_LEGIFRI_JDN = 2431685;
+  // Anchor: 2024-02-28 = JDN 2460369 = Rabu (day 3) Wuku Galungan (index 10) -> epoch = 2460369 - (10 * 7 + 3) = 2460296
+  const WUKU_EPOCH_JDN = 2460296;
+
   function normDeg(val) {
     const res = Number(val) % 360;
     return res < 0 ? res + 360 : res;
@@ -2988,72 +3047,370 @@
   }
 
   function astronomyEngineReady() {
-    return Boolean(window.Astronomy && typeof Astronomy.SunPosition === 'function');
+    const astro = typeof window !== 'undefined' ? window.Astronomy : globalThis.Astronomy;
+    return Boolean(astro && typeof astro.SunPosition === 'function');
   }
 
-  function getAstrologyProfile(person = {}) {
-    if (!person.birthDate && !person.birthYear) {
-      return { sun: null, moon: null, ascendant: null, chinese: null, score: 0, level: 'Data belum diisi' };
+  function getAstronomyApi() {
+    return typeof window !== 'undefined' ? window.Astronomy : globalThis.Astronomy;
+  }
+
+  function parseIsoDateParts(birthDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthDate || '').trim());
+    if (!match) return null;
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    const d = Number(match[3]);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const probe = new Date(Date.UTC(y, m - 1, d));
+    if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return null;
+    return { y, m, d };
+  }
+
+  function parseTimeParts(birthTime) {
+    const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(birthTime || '').trim());
+    if (!match) return null;
+    const hr = Number(match[1]);
+    const mn = Number(match[2]);
+    if (!Number.isFinite(hr) || !Number.isFinite(mn) || hr < 0 || hr > 23 || mn < 0 || mn > 59) return null;
+    return { hr, mn };
+  }
+
+  function hasCoordValue(v) {
+    if (v === '' || v === null || v === undefined) return false;
+    return Number.isFinite(Number(v));
+  }
+
+  function formatUtcOffsetLabel(offsetMinutes) {
+    const sign = offsetMinutes >= 0 ? '+' : '-';
+    const abs = Math.abs(Math.round(offsetMinutes));
+    const h = Math.floor(abs / 60);
+    const m = abs % 60;
+    return m ? `UTC${sign}${h}:${String(m).padStart(2, '0')}` : `UTC${sign}${h}`;
+  }
+
+  function getIanaOffsetMinutes(utcProbeMs, timeZone) {
+    if (!timeZone) return null;
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: String(timeZone).trim(),
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      });
+      const parts = {};
+      fmt.formatToParts(new Date(utcProbeMs)).forEach(p => {
+        if (p.type !== 'literal') parts[p.type] = Number(p.value);
+      });
+      if (!Number.isFinite(parts.year)) return null;
+      const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour % 24, parts.minute, parts.second || 0);
+      return Math.round((localAsUtc - utcProbeMs) / 60000);
+    } catch (_) {
+      return null;
     }
+  }
 
-    const year = Number((person.birthDate || '').slice(0, 4) || person.birthYear);
-    let sun = null, moon = null, ascendant = null;
-    let score = 30;
+  function localDateTimeToUtc(y, m, d, hr, mn, timeZone, fallbackOffsetHours) {
+    const naiveUtcMs = Date.UTC(y, m - 1, d, hr, mn, 0);
+    let offsetMin = null;
+    const tzClean = String(timeZone || '').trim();
 
-    if (person.birthDate && astronomyEngineReady()) {
-      try {
-        const [y, m, d] = person.birthDate.split('-').map(Number);
-        const [hr, mn] = (person.birthTime || '12:00').split(':').map(Number);
-        const utcDate = new Date(Date.UTC(y, m - 1, d, hr || 12, mn || 0));
-
-        const sunLon = normDeg(Astronomy.SunPosition(utcDate).elon);
-        sun = signFromLongitude(sunLon);
-
-        if (person.birthTime) {
-          score += 25;
-          const moonLon = normDeg(Astronomy.EclipticGeoMoon(utcDate).lon);
-          moon = signFromLongitude(moonLon);
-
-          const lat = Number(person.birthLatitude);
-          const lng = Number(person.birthLongitude);
-          if (Number.isFinite(lat) && Number.isFinite(lng)) {
-            score += 35;
-            const siderealHours = Astronomy.SiderealTime(utcDate);
-            const theta = (siderealHours * 15 + lng) * Math.PI / 180;
-            const eps = 23.44 * Math.PI / 180;
-            const phi = lat * Math.PI / 180;
-            const ascY = -Math.cos(theta);
-            const ascX = Math.sin(theta) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps);
-            const ascLon = normDeg((Math.atan2(ascY, ascX) * 180 / Math.PI) + 180);
-            ascendant = signFromLongitude(ascLon);
-          }
-        }
-      } catch (err) {
-        console.warn('Astro calculation fallback:', err);
+    if (tzClean) {
+      const pass1 = getIanaOffsetMinutes(naiveUtcMs - 7 * 3600000, tzClean);
+      if (pass1 !== null) {
+        const pass2 = getIanaOffsetMinutes(naiveUtcMs - pass1 * 60000, tzClean);
+        offsetMin = pass2 !== null ? pass2 : pass1;
       }
     }
 
-    // Chinese Zodiac
-    const animal = CHINESE_ANIMALS[((year - 4) % 12 + 12) % 12];
-    const stem = CHINESE_STEMS[((year - 4) % 10 + 10) % 10];
-    const chinese = { ...animal, ...stem };
+    if (offsetMin === null) {
+      const numericFallback = (fallbackOffsetHours !== '' && fallbackOffsetHours !== null && fallbackOffsetHours !== undefined)
+        ? Number(fallbackOffsetHours)
+        : NaN;
+      offsetMin = Number.isFinite(numericFallback) ? Math.round(numericFallback * 60) : 420;
+    }
+
+    const utcDate = new Date(naiveUtcMs - offsetMin * 60000);
+    const utcHH = String(utcDate.getUTCHours()).padStart(2, '0');
+    const utcMM = String(utcDate.getUTCMinutes()).padStart(2, '0');
+    const localHH = String(hr).padStart(2, '0');
+    const localMM = String(mn).padStart(2, '0');
+    const offsetStr = formatUtcOffsetLabel(offsetMin);
+    const utcDayStr = `${utcDate.getUTCFullYear()}-${String(utcDate.getUTCMonth() + 1).padStart(2, '0')}-${String(utcDate.getUTCDate()).padStart(2, '0')}`;
+    const localDayStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dayShiftTag = utcDayStr !== localDayStr ? ` (${utcDayStr})` : '';
+    const tzDisplay = tzClean ? `${tzClean}, ${offsetStr}` : offsetStr;
+
+    return {
+      utcDate,
+      offsetMinutes: offsetMin,
+      offsetLabel: offsetStr,
+      summary: `${localHH}:${localMM} (${tzDisplay}) -> ${utcHH}:${utcMM} UTC${dayShiftTag}`
+    };
+  }
+
+  function gregorianToJdn(y, m, d) {
+    const a = Math.floor((14 - m) / 12);
+    const yy = y + 4800 - a;
+    const mm = m + 12 * a - 3;
+    return d + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+  }
+
+  function wetonFromJdn(jdn) {
+    const dayIdx = ((jdn + 1) % 7 + 7) % 7;
+    const pasIdx = ((jdn - WETON_LEGIFRI_JDN) % 5 + 5) % 5;
+    const hari = JAVA_DAYS[dayIdx];
+    const pasaran = JAVA_PASARAN[pasIdx];
+    const pawukonDay = ((jdn - WUKU_EPOCH_JDN) % 210 + 210) % 210;
+    const wuku = JAVA_WUKU[Math.floor(pawukonDay / 7)];
+    return {
+      hari,
+      pasaran,
+      label: `${hari.name} ${pasaran.name}`,
+      neptuHari: hari.neptu,
+      neptuPasaran: pasaran.neptu,
+      neptuTotal: hari.neptu + pasaran.neptu,
+      wuku
+    };
+  }
+
+  function getWetonJawa(birthDate, birthTime) {
+    const dp = parseIsoDateParts(birthDate);
+    if (!dp) return null;
+    const jdn = gregorianToJdn(dp.y, dp.m, dp.d);
+    const base = wetonFromJdn(jdn);
+    const tp = parseTimeParts(birthTime);
+    let maghribNote = '';
+    if (tp && tp.hr >= 18) {
+      const next = wetonFromJdn(jdn + 1);
+      maghribNote = `Lahir >= 18:00 (ba'da Maghrib): malam Jawa masuk ${next.label} (Neptu ${next.neptuTotal})`;
+    }
+    return { ...base, maghribNote };
+  }
+
+  function getHijriDate(birthDate) {
+    const dp = parseIsoDateParts(birthDate);
+    if (!dp) return null;
+    const probe = new Date(Date.UTC(dp.y, dp.m - 1, dp.d, 12, 0, 0));
+    const calendars = ['islamic-umalqura', 'islamic'];
+    for (const cal of calendars) {
+      try {
+        const text = new Intl.DateTimeFormat(`id-ID-u-ca-${cal}`, {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC'
+        }).format(probe);
+        if (text && /\d/.test(text)) return text;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  function getChineseLunarYearFromCny(y, m, d) {
+    try {
+      // Noon CST (04:00 UTC) avoids midnight rollover inside Shanghai calendar lookup
+      const probe = new Date(Date.UTC(y, m - 1, d, 4, 0, 0));
+      const fmt = new Intl.DateTimeFormat('en-US-u-ca-chinese', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      });
+      const relatedPart = fmt.formatToParts(probe).find(p => p.type === 'relatedYear');
+      const relatedYear = relatedPart ? Number(relatedPart.value) : NaN;
+      if (Number.isFinite(relatedYear) && relatedYear > 0) return relatedYear;
+    } catch (_) {}
+
+    // Astronomical fallback: Chinese New Year is the 2nd New Moon after Winter Solstice (270 deg) in UTC+8
+    if (astronomyEngineReady()) {
+      const Astro = getAstronomyApi();
+      if (typeof Astro.SearchSunLongitude === 'function' && typeof Astro.SearchMoonPhase === 'function') {
+        try {
+          const ws = Astro.SearchSunLongitude(270, new Date(Date.UTC(y - 1, 11, 10)), 25);
+          if (ws && ws.date) {
+            const nm1 = Astro.SearchMoonPhase(0, ws.date, 35);
+            const nm2 = nm1 ? Astro.SearchMoonPhase(0, new Date(nm1.date.getTime() + 86400000), 35) : null;
+            if (nm2 && nm2.date) {
+              const cstMs = nm2.date.getTime() + 8 * 3600000;
+              const cstDate = new Date(cstMs);
+              const cnyStr = `${cstDate.getUTCFullYear()}-${String(cstDate.getUTCMonth() + 1).padStart(2, '0')}-${String(cstDate.getUTCDate()).padStart(2, '0')}`;
+              const birthStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+              return birthStr < cnyStr ? y - 1 : y;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    return (m === 1 || (m === 2 && d < 4)) ? y - 1 : y;
+  }
+
+  function getChineseZodiac(dateParts, yearFallback, utcDate, basis, hasBirthTime) {
+    const normalizedBasis = basis === 'lichun' ? 'lichun' : 'cny';
+    let shioYear = yearFallback;
+    let isEstimate = false;
+    let note = '';
+
+    if (dateParts) {
+      if (normalizedBasis === 'lichun') {
+        const Astro = getAstronomyApi();
+        let lichunDate = new Date(Date.UTC(dateParts.y, 1, 4, 0, 0, 0));
+        if (astronomyEngineReady() && typeof Astro.SearchSunLongitude === 'function') {
+          try {
+            const res = Astro.SearchSunLongitude(315, new Date(Date.UTC(dateParts.y, 0, 25)), 20);
+            if (res && res.date) lichunDate = res.date;
+          } catch (_) {}
+        }
+        shioYear = utcDate < lichunDate ? dateParts.y - 1 : dateParts.y;
+        const lcCst = new Date(lichunDate.getTime() + 8 * 3600000);
+        if (!hasBirthTime && lcCst.getUTCMonth() + 1 === dateParts.m && lcCst.getUTCDate() === dateParts.d) {
+          note = 'Tanggal peralihan Li Chun: isi jam lahir untuk kepastian';
+        }
+      } else {
+        shioYear = getChineseLunarYearFromCny(dateParts.y, dateParts.m, dateParts.d);
+      }
+    } else if (Number.isFinite(shioYear)) {
+      isEstimate = true;
+      note = 'Estimasi tahun Masehi (isi tanggal lahir jika lahir Jan-Feb)';
+    }
+
+    if (!Number.isFinite(shioYear)) return null;
+    const animal = CHINESE_ANIMALS[((shioYear - 4) % 12 + 12) % 12];
+    const stem = CHINESE_STEMS[((shioYear - 4) % 10 + 10) % 10];
+    return {
+      ...animal,
+      ...stem,
+      year: shioYear,
+      basis: normalizedBasis,
+      basisLabel: normalizedBasis === 'lichun' ? 'Li Chun (BaZi)' : 'Tahun Baru Imlek',
+      isEstimate,
+      note
+    };
+  }
+
+  function getFallbackSunSign(m, d) {
+    const md = m * 100 + d;
+    let idx = 9; // Capricorn default Dec 22..Jan 19
+    if (md >= 321 && md <= 419) idx = 0;
+    else if (md >= 420 && md <= 520) idx = 1;
+    else if (md >= 521 && md <= 620) idx = 2;
+    else if (md >= 621 && md <= 722) idx = 3;
+    else if (md >= 723 && md <= 822) idx = 4;
+    else if (md >= 823 && md <= 922) idx = 5;
+    else if (md >= 923 && md <= 1022) idx = 6;
+    else if (md >= 1023 && md <= 1121) idx = 7;
+    else if (md >= 1122 && md <= 1221) idx = 8;
+    else if (md >= 120 && md <= 218) idx = 10;
+    else if (md >= 219 && md <= 320) idx = 11;
+    return { ...ASTRO_SIGNS[idx], index: idx, isFallback: true, degreeText: '' };
+  }
+
+  function getAstrologyProfile(person = {}) {
+    const dateParts = parseIsoDateParts(person.birthDate);
+    const parsedYear = Number(dateParts ? dateParts.y : person.birthYear);
+    if (!dateParts && (!Number.isFinite(parsedYear) || parsedYear <= 0)) {
+      return { sun: null, moon: null, ascendant: null, chinese: null, weton: null, hijri: null, utcSummary: '', score: 0, level: 'Data belum diisi' };
+    }
+
+    const timeParts = parseTimeParts(person.birthTime);
+    let sun = null, moon = null, ascendant = null, utcSummary = '';
+    let score = dateParts ? 40 : 20;
+
+    let utcDateForYear = null;
+    if (dateParts) {
+      const tzRes = localDateTimeToUtc(
+        dateParts.y, dateParts.m, dateParts.d,
+        timeParts ? timeParts.hr : 12,
+        timeParts ? timeParts.mn : 0,
+        person.birthTimezone,
+        person.birthUtcOffset
+      );
+      utcDateForYear = tzRes.utcDate;
+      if (timeParts) utcSummary = tzRes.summary;
+
+      const Astro = getAstronomyApi();
+      if (astronomyEngineReady()) {
+        try {
+          const sunLon = normDeg(Astro.SunPosition(tzRes.utcDate).elon);
+          sun = signFromLongitude(sunLon);
+
+          if (!timeParts) {
+            const dayStartUtc = localDateTimeToUtc(dateParts.y, dateParts.m, dateParts.d, 0, 0, person.birthTimezone, person.birthUtcOffset).utcDate;
+            const dayEndUtc = localDateTimeToUtc(dateParts.y, dateParts.m, dateParts.d, 23, 59, person.birthTimezone, person.birthUtcOffset).utcDate;
+            const sStart = signFromLongitude(Astro.SunPosition(dayStartUtc).elon);
+            const sEnd = signFromLongitude(Astro.SunPosition(dayEndUtc).elon);
+            if (sStart && sEnd && sStart.index !== sEnd.index) {
+              sun.isCusp = true;
+              sun.cuspNote = `Hari peralihan ${sStart.name}/${sEnd.name}: isi jam lahir`;
+            }
+          } else {
+            score += 25;
+            const moonLon = normDeg(Astro.EclipticGeoMoon(tzRes.utcDate).lon);
+            moon = signFromLongitude(moonLon);
+
+            if (hasCoordValue(person.birthLatitude) && hasCoordValue(person.birthLongitude)) {
+              const lat = Number(person.birthLatitude);
+              const lng = Number(person.birthLongitude);
+              if (lat >= -89.9 && lat <= 89.9 && lng >= -180 && lng <= 180) {
+                score += 35;
+                const siderealHours = Astro.SiderealTime(tzRes.utcDate);
+                const theta = (siderealHours * 15 + lng) * Math.PI / 180;
+                const epsDeg = (typeof Astro.e_tilt === 'function' && typeof Astro.MakeTime === 'function')
+                  ? Astro.e_tilt(Astro.MakeTime(tzRes.utcDate)).tobl
+                  : 23.439291;
+                const eps = epsDeg * Math.PI / 180;
+                const phi = lat * Math.PI / 180;
+                const ascY = Math.cos(theta);
+                const ascX = -(Math.sin(theta) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps));
+                const ascLon = normDeg(Math.atan2(ascY, ascX) * 180 / Math.PI);
+                ascendant = signFromLongitude(ascLon);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Astro calculation fallback:', err);
+          if (!sun) sun = getFallbackSunSign(dateParts.m, dateParts.d);
+        }
+      } else {
+        sun = getFallbackSunSign(dateParts.m, dateParts.d);
+      }
+    }
+
+    const chinese = getChineseZodiac(dateParts, parsedYear, utcDateForYear, person.chineseZodiacBasis, Boolean(timeParts));
+    const weton = dateParts ? getWetonJawa(person.birthDate, person.birthTime) : null;
+    const hijri = dateParts ? getHijriDate(person.birthDate) : null;
 
     return {
       sun,
       moon,
       ascendant,
       chinese,
+      weton,
+      hijri,
+      utcSummary,
       score,
-      level: score >= 85 ? 'Presisi Sangat Tinggi' : score >= 50 ? 'Presisi Cukup' : 'Estimasi Dasar'
+      level: score >= 90
+        ? 'Presisi Sangat Tinggi'
+        : score >= 60
+          ? 'Presisi Menengah'
+          : score >= 40
+            ? 'Presisi Tanggal Lahir'
+            : 'Estimasi Tahun Saja'
     };
   }
 
   function astrologyBadgeHtml(person) {
     const p = getAstrologyProfile(person);
-    if (!p.sun && !p.chinese) return '';
+    if (!p.sun && !p.chinese && !p.weton) return '';
     let chips = '';
     if (p.sun) chips += `<span class="astro-chip sun" title="Zodiak Matahari: ${p.sun.name}">${p.sun.symbol} ${p.sun.name}</span>`;
-    if (p.chinese) chips += `<span class="astro-chip chinese" title="Shio: ${p.chinese.name}">${p.chinese.symbol} ${p.chinese.name}</span>`;
+    if (p.chinese) chips += `<span class="astro-chip chinese" title="Shio (${p.chinese.basisLabel}): ${p.chinese.name} ${p.chinese.element} ${p.chinese.polarity}">${p.chinese.symbol} ${p.chinese.name}</span>`;
+    if (p.weton) chips += `<span class="astro-chip weton" title="Weton Jawa: ${p.weton.label} (Neptu ${p.weton.neptuTotal}, Wuku ${p.weton.wuku})">${p.weton.label}</span>`;
     return chips ? `<div class="card-badges-row">${chips}</div>` : '';
   }
 
@@ -3063,43 +3420,131 @@
       birthYear: document.getElementById('input-birthyear')?.value,
       birthTime: document.getElementById('input-birthtime')?.value,
       birthTimezone: document.getElementById('input-birthtimezone')?.value,
+      birthUtcOffset: document.getElementById('input-birthutcoffset')?.value,
+      chineseZodiacBasis: document.getElementById('input-chinesezodiacbasis')?.value,
       birthLatitude: document.getElementById('input-birthlatitude')?.value,
       birthLongitude: document.getElementById('input-birthlongitude')?.value
     };
+    const statusBadge = document.getElementById('astrology-engine-status');
+    if (statusBadge) {
+      statusBadge.textContent = astronomyEngineReady() ? 'Mesin Astronomi Aktif' : 'Mode Estimasi (Offline)';
+    }
+
     const profile = getAstrologyProfile(person);
     const preview = document.getElementById('astrology-preview');
     if (!preview) return;
 
+    const sunSub = profile.sun?.cuspNote || profile.sun?.degreeText || '';
+    const chineseText = profile.chinese
+      ? `${profile.chinese.symbol} ${profile.chinese.name} (${profile.chinese.element})`
+      : 'Belum diisi';
+    const wetonText = profile.weton ? profile.weton.label : 'Perlu tgl lahir';
+    const wetonSub = profile.weton ? `Neptu ${profile.weton.neptuTotal} | ${profile.weton.wuku}` : '';
+
     preview.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">
-        <div style="padding: 10px; border-radius: 10px; background: #fff; border: 1px solid var(--border-subtle);">
-          <small style="font-size: 10px; font-weight: 700; color: #92400e;">SUN SIGN</small>
-          <strong style="display: block; font-size: 13px;">${profile.sun?.name || 'Belum diisi'}</strong>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px;">
+        <div style="padding: 10px; border-radius: 10px; background: #fffbeb; border: 1px solid #fde68a;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #92400e;">SUN SIGN</small>
+          <strong style="display: block; font-size: 13px; color: #78350f;">${escapeHTML(profile.sun?.name || 'Belum diisi')}</strong>
+          <span style="font-size: 10px; color: #b45309;">${escapeHTML(sunSub)}</span>
         </div>
-        <div style="padding: 10px; border-radius: 10px; background: #fff; border: 1px solid var(--border-subtle);">
-          <small style="font-size: 10px; font-weight: 700; color: #3730a3;">MOON SIGN</small>
-          <strong style="display: block; font-size: 13px;">${profile.moon?.name || 'Perlu jam'}</strong>
+        <div style="padding: 10px; border-radius: 10px; background: #eef2ff; border: 1px solid #c7d2fe;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #3730a3;">MOON SIGN</small>
+          <strong style="display: block; font-size: 13px; color: #1e1b4b;">${escapeHTML(profile.moon?.name || 'Perlu jam')}</strong>
+          <span style="font-size: 10px; color: #4338ca;">${escapeHTML(profile.moon?.degreeText || '')}</span>
         </div>
-        <div style="padding: 10px; border-radius: 10px; background: #fff; border: 1px solid var(--border-subtle);">
-          <small style="font-size: 10px; font-weight: 700; color: #065f46;">ASCENDANT</small>
-          <strong style="display: block; font-size: 13px;">${profile.ascendant?.name || 'Perlu koordinat'}</strong>
+        <div style="padding: 10px; border-radius: 10px; background: #ecfdf5; border: 1px solid #a7f3d0;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #065f46;">ASCENDANT</small>
+          <strong style="display: block; font-size: 13px; color: #022c22;">${escapeHTML(profile.ascendant?.name || 'Perlu koordinat')}</strong>
+          <span style="font-size: 10px; color: #047857;">${escapeHTML(profile.ascendant?.degreeText || '')}</span>
+        </div>
+        <div style="padding: 10px; border-radius: 10px; background: #fdf2f8; border: 1px solid #fbcfe8;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #9d174d;">SHIO & ELEMEN</small>
+          <strong style="display: block; font-size: 12.5px; color: #500724;">${escapeHTML(chineseText)}</strong>
+          <span style="font-size: 10px; color: #be185d;">${escapeHTML(profile.chinese?.basisLabel || '')}</span>
+        </div>
+        <div style="padding: 10px; border-radius: 10px; background: #f0fdfa; border: 1px solid #99f6e4;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #115e59;">WETON JAWA</small>
+          <strong style="display: block; font-size: 12.5px; color: #042f2e;">${escapeHTML(wetonText)}</strong>
+          <span style="font-size: 10px; color: #0f766e;">${escapeHTML(wetonSub)}</span>
+        </div>
+        <div style="padding: 10px; border-radius: 10px; background: #f8fafc; border: 1px solid #cbd5e1;">
+          <small style="font-size: 9.5px; font-weight: 800; color: #334155;">HIJRIYAH</small>
+          <strong style="display: block; font-size: 12px; color: #0f172a;">${escapeHTML(profile.hijri || 'Perlu tgl lahir')}</strong>
+          <span style="font-size: 10px; color: #64748b;">Umm al-Qura</span>
         </div>
       </div>
+      ${(profile.utcSummary || profile.weton?.maghribNote || profile.chinese?.note) ? `
+        <div style="margin-top: 8px; font-size: 10.5px; color: var(--ink-muted); line-height: 1.45;">
+          ${profile.utcSummary ? `<div>Basis waktu: ${escapeHTML(profile.utcSummary)}</div>` : ''}
+          ${profile.weton?.maghribNote ? `<div style="color: #0f766e; font-weight: 600;">${escapeHTML(profile.weton.maghribNote)}</div>` : ''}
+          ${profile.chinese?.note ? `<div style="color: #9d174d; font-weight: 600;">${escapeHTML(profile.chinese.note)}</div>` : ''}
+        </div>
+      ` : ''}
     `;
   };
 
   window.fillAstrologyCoordinates = function() {
     const city = (document.getElementById('input-birthplace')?.value || '').toLowerCase().trim();
     const cityCoords = {
-      jakarta: { lat: -6.2088, lng: 106.8456, tz: 'Asia/Jakarta' },
-      surabaya: { lat: -7.2575, lng: 112.7521, tz: 'Asia/Jakarta' },
-      bandung: { lat: -6.9175, lng: 107.6191, tz: 'Asia/Jakarta' },
-      semarang: { lat: -6.9667, lng: 110.4167, tz: 'Asia/Jakarta' },
-      yogyakarta: { lat: -7.7956, lng: 110.3695, tz: 'Asia/Jakarta' },
-      malang: { lat: -7.9666, lng: 112.6326, tz: 'Asia/Jakarta' },
-      medan: { lat: 3.5952, lng: 98.6722, tz: 'Asia/Jakarta' },
-      makassar: { lat: -5.1477, lng: 119.4327, tz: 'Asia/Makassar' },
-      denpasar: { lat: -8.6705, lng: 115.2126, tz: 'Asia/Makassar' }
+      jakarta: { lat: -6.2088, lng: 106.8456, tz: 'Asia/Jakarta', offset: 7 },
+      surabaya: { lat: -7.2575, lng: 112.7521, tz: 'Asia/Jakarta', offset: 7 },
+      bandung: { lat: -6.9175, lng: 107.6191, tz: 'Asia/Jakarta', offset: 7 },
+      semarang: { lat: -6.9667, lng: 110.4167, tz: 'Asia/Jakarta', offset: 7 },
+      yogyakarta: { lat: -7.7956, lng: 110.3695, tz: 'Asia/Jakarta', offset: 7 },
+      jogja: { lat: -7.7956, lng: 110.3695, tz: 'Asia/Jakarta', offset: 7 },
+      surakarta: { lat: -7.5755, lng: 110.8243, tz: 'Asia/Jakarta', offset: 7 },
+      solo: { lat: -7.5755, lng: 110.8243, tz: 'Asia/Jakarta', offset: 7 },
+      malang: { lat: -7.9666, lng: 112.6326, tz: 'Asia/Jakarta', offset: 7 },
+      medan: { lat: 3.5952, lng: 98.6722, tz: 'Asia/Jakarta', offset: 7 },
+      palembang: { lat: -2.9761, lng: 104.7754, tz: 'Asia/Jakarta', offset: 7 },
+      pekanbaru: { lat: 0.5071, lng: 101.4478, tz: 'Asia/Jakarta', offset: 7 },
+      padang: { lat: -0.9471, lng: 100.4172, tz: 'Asia/Jakarta', offset: 7 },
+      batam: { lat: 1.0456, lng: 104.0305, tz: 'Asia/Jakarta', offset: 7 },
+      lampung: { lat: -5.4294, lng: 105.2625, tz: 'Asia/Jakarta', offset: 7 },
+      bogor: { lat: -6.5971, lng: 106.8060, tz: 'Asia/Jakarta', offset: 7 },
+      depok: { lat: -6.4025, lng: 106.7942, tz: 'Asia/Jakarta', offset: 7 },
+      tangerang: { lat: -6.1783, lng: 106.6319, tz: 'Asia/Jakarta', offset: 7 },
+      bekasi: { lat: -6.2383, lng: 106.9756, tz: 'Asia/Jakarta', offset: 7 },
+      cirebon: { lat: -6.7320, lng: 108.5523, tz: 'Asia/Jakarta', offset: 7 },
+      tasikmalaya: { lat: -7.3274, lng: 108.2207, tz: 'Asia/Jakarta', offset: 7 },
+      purwokerto: { lat: -7.4243, lng: 109.2302, tz: 'Asia/Jakarta', offset: 7 },
+      tegal: { lat: -6.8694, lng: 109.1402, tz: 'Asia/Jakarta', offset: 7 },
+      pekalongan: { lat: -6.8885, lng: 109.6753, tz: 'Asia/Jakarta', offset: 7 },
+      magelang: { lat: -7.4797, lng: 110.2177, tz: 'Asia/Jakarta', offset: 7 },
+      kudus: { lat: -6.8048, lng: 110.8405, tz: 'Asia/Jakarta', offset: 7 },
+      kediri: { lat: -7.8480, lng: 112.0178, tz: 'Asia/Jakarta', offset: 7 },
+      sidoarjo: { lat: -7.4478, lng: 112.7183, tz: 'Asia/Jakarta', offset: 7 },
+      gresik: { lat: -7.1539, lng: 112.6561, tz: 'Asia/Jakarta', offset: 7 },
+      pasuruan: { lat: -7.6453, lng: 112.9075, tz: 'Asia/Jakarta', offset: 7 },
+      jember: { lat: -8.1724, lng: 113.6995, tz: 'Asia/Jakarta', offset: 7 },
+      madiun: { lat: -7.6298, lng: 111.5239, tz: 'Asia/Jakarta', offset: 7 },
+      blitar: { lat: -8.0955, lng: 112.1609, tz: 'Asia/Jakarta', offset: 7 },
+      mojokerto: { lat: -7.4722, lng: 112.4336, tz: 'Asia/Jakarta', offset: 7 },
+      banyuwangi: { lat: -8.2191, lng: 114.3691, tz: 'Asia/Jakarta', offset: 7 },
+      pontianak: { lat: -0.0263, lng: 109.3425, tz: 'Asia/Pontianak', offset: 7 },
+      aceh: { lat: 5.5483, lng: 95.3238, tz: 'Asia/Jakarta', offset: 7 },
+      jambi: { lat: -1.6101, lng: 103.6131, tz: 'Asia/Jakarta', offset: 7 },
+      bengkulu: { lat: -3.7928, lng: 102.2608, tz: 'Asia/Jakarta', offset: 7 },
+      makassar: { lat: -5.1477, lng: 119.4327, tz: 'Asia/Makassar', offset: 8 },
+      denpasar: { lat: -8.6705, lng: 115.2126, tz: 'Asia/Makassar', offset: 8 },
+      bali: { lat: -8.6705, lng: 115.2126, tz: 'Asia/Makassar', offset: 8 },
+      banjarmasin: { lat: -3.3194, lng: 114.5908, tz: 'Asia/Makassar', offset: 8 },
+      balikpapan: { lat: -1.2379, lng: 116.8529, tz: 'Asia/Makassar', offset: 8 },
+      samarinda: { lat: -0.5022, lng: 117.1536, tz: 'Asia/Makassar', offset: 8 },
+      manado: { lat: 1.4748, lng: 124.8421, tz: 'Asia/Makassar', offset: 8 },
+      palu: { lat: -0.8917, lng: 119.8707, tz: 'Asia/Makassar', offset: 8 },
+      kendari: { lat: -3.9985, lng: 122.5129, tz: 'Asia/Makassar', offset: 8 },
+      mataram: { lat: -8.5833, lng: 116.1167, tz: 'Asia/Makassar', offset: 8 },
+      lombok: { lat: -8.5833, lng: 116.1167, tz: 'Asia/Makassar', offset: 8 },
+      kupang: { lat: -10.1772, lng: 123.6070, tz: 'Asia/Makassar', offset: 8 },
+      ambon: { lat: -3.6954, lng: 128.1814, tz: 'Asia/Jayapura', offset: 9 },
+      jayapura: { lat: -2.5916, lng: 140.6690, tz: 'Asia/Jayapura', offset: 9 },
+      sorong: { lat: -0.8762, lng: 131.2558, tz: 'Asia/Jayapura', offset: 9 },
+      singapura: { lat: 1.3521, lng: 103.8198, tz: 'Asia/Singapore', offset: 8 },
+      singapore: { lat: 1.3521, lng: 103.8198, tz: 'Asia/Singapore', offset: 8 },
+      'kuala lumpur': { lat: 3.1390, lng: 101.6869, tz: 'Asia/Kuala_Lumpur', offset: 8 },
+      tokyo: { lat: 35.6762, lng: 139.6503, tz: 'Asia/Tokyo', offset: 9 }
     };
 
     const matchKey = Object.keys(cityCoords).find(k => city.includes(k));
@@ -3108,8 +3553,10 @@
       document.getElementById('input-birthlatitude').value = data.lat;
       document.getElementById('input-birthlongitude').value = data.lng;
       document.getElementById('input-birthtimezone').value = data.tz;
+      const offsetEl = document.getElementById('input-birthutcoffset');
+      if (offsetEl) offsetEl.value = data.offset;
       previewAstrologyFromForm();
-      showToast(`Koordinat kota ${matchKey} berhasil diisi.`);
+      showToast(`Koordinat kota ${matchKey} (${data.tz}) berhasil diisi.`);
     } else {
       showToast('Kota tidak dikenali dalam daftar otomatis. Masukkan koordinat manual.', true);
     }
@@ -4756,8 +5203,13 @@
         const astro = getAstrologyProfile(person);
         const astroText = [
           astro.sun ? `Zodiak ${astro.sun.name}` : '',
-          astro.chinese ? `Shio ${astro.chinese.name} (${astro.chinese.element})` : ''
+          astro.moon ? `Moon ${astro.moon.name}` : '',
+          astro.ascendant ? `Rising ${astro.ascendant.name}` : '',
+          astro.chinese ? `Shio ${astro.chinese.name} (${astro.chinese.element} ${astro.chinese.polarity})` : ''
         ].filter(Boolean).join(', ');
+        const wetonText = astro.weton
+          ? `${astro.weton.label} (Neptu ${astro.weton.neptuTotal}, Wuku ${astro.weton.wuku})`
+          : '';
 
         let y = 36;
         const meta = [
@@ -4766,6 +5218,8 @@
           ['Kelahiran', `${person.birthPlace || ''} ${person.birthDate || person.birthYear || ''}`.trim()],
           ['Status', person.deathDate || person.deathYear ? `Wafat (${person.deathDate || person.deathYear})` : 'Masih Hidup'],
           ['Astrologi & Shio', astroText],
+          ['Weton Jawa', wetonText],
+          ['Kalender Hijriyah', astro.hijri || ''],
           ['Profesi', person.occupation],
           ['Gol. Darah', person.bloodType],
           ['No. HP', person.phone],

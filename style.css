@@ -1052,6 +1052,12 @@ a {
   color: #9d174d;
 }
 
+.astro-chip.weton {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  color: #115e59;
+}
+
 .spouse-tag-badge {
   font-size: 9px;
   font-weight: 700;
