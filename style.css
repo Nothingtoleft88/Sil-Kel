@@ -1461,7 +1461,289 @@ a {
 
 @media (max-width: 480px) {
   .vedic-subgrid,
-  .vedic-dasha-active {
+  .vedic-dasha-active,
+  .dm-hero-grid,
+  .dm-purpose-grid,
+  .dm-age-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Destiny Matrix (Matriks Takdir 22 Arcana) Workspace */
+.dm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dm-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dm-hero-card {
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.dm-hero-card.karma {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.dm-hero-card small {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+}
+
+.dm-hero-card.karma small {
+  color: #9a3412;
+}
+
+.dm-hero-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink-primary);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-hero-card.karma strong {
+  color: #7c2d12;
+}
+
+.dm-hero-card span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-secondary);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.dm-octagram-box {
+  padding: 12px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+}
+
+.dm-octagram-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.dm-octagram-svg {
+  width: 100%;
+  max-width: 344px;
+  height: auto;
+  display: block;
+}
+
+.dm-svg-node {
+  cursor: pointer;
+}
+
+.dm-svg-node circle {
+  transition: transform 0.15s ease, stroke-width 0.15s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dm-svg-node:hover circle {
+  transform: scale(1.08);
+}
+
+.dm-svg-node:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+.dm-node-inspector {
+  margin-top: 8px;
+  padding: 12px 13px;
+  border-radius: 11px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+
+.dm-node-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dm-node-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-split-flow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dm-flow-col {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+}
+
+.dm-flow-col b {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.dm-channels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dm-channel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 11.5px;
+}
+
+.dm-seq-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-seq-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  background: #ffffff;
+  color: var(--ink-primary);
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+}
+
+.dm-seq-btn:hover {
+  border-color: #0284c7;
+  color: #0369a1;
+}
+
+.dm-seq-btn:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
+
+.dm-purpose-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dm-purpose-card {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.dm-purpose-card small {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+
+.dm-purpose-card strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-primary);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-purpose-card span {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-secondary);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-age-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dm-age-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-age-card.current {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+  color: #0c4a6e;
+  font-weight: 800;
+}
+
+.dm-chakra-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+@media (max-width: 420px) {
+  .dm-split-flow {
     grid-template-columns: 1fr;
   }
 }
@@ -1809,18 +2091,28 @@ a {
 /* Inspector Tabs */
 .inspector-nav-tabs {
   display: flex;
-  padding: 0 24px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.inspector-nav-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .inspector-tab-btn {
-  padding: 12px 14px;
-  font-size: 12.5px;
+  padding: 11px 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink-muted);
   border-bottom: 2px solid transparent;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .inspector-tab-btn:hover {

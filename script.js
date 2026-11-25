@@ -1653,17 +1653,20 @@
     // Render Tab 2: Astro
     renderInspectorAstro(person);
 
-    // Render Tab 3: Vedic (opt-in per anggota)
+    // Render Tab 3: Destiny Matrix
+    renderInspectorMatrix(person);
+
+    // Render Tab 4: Vedic (opt-in per anggota)
     const vedicTabBtn = document.getElementById('tab-btn-vedic');
     if (vedicTabBtn) vedicTabBtn.classList.toggle('hidden', !person.vedicEnabled);
     renderInspectorVedic(person);
 
-    // Render Tab 4: Media
+    // Render Tab 5: Media
     renderInspectorMedia(person);
 
     if (initialTab === 'vedic' && person.vedicEnabled) {
       switchInspectorTab('vedic');
-    } else if (initialTab && ['bio', 'astro', 'media'].includes(initialTab)) {
+    } else if (initialTab && ['bio', 'astro', 'matrix', 'media'].includes(initialTab)) {
       switchInspectorTab(initialTab);
     } else if (vedicTabBtn && vedicTabBtn.classList.contains('active') && !person.vedicEnabled) {
       switchInspectorTab('bio');
@@ -2062,6 +2065,194 @@
     `;
   }
 
+  function renderInspectorMatrix(person) {
+    const c = document.getElementById('inspector-matrix-details');
+    if (!c) return;
+
+    const dm = computeDestinyMatrix(person);
+    if (!dm.ready) {
+      const canEdit = Boolean(appSettings?.enableEdit) && !isGuestMode;
+      c.innerHTML = `
+        <div class="dm-panel">
+          <div class="vedic-banner-note muted">
+            <strong style="display: block; font-size: 12px; color: var(--ink-primary); margin-bottom: 4px;">Data Tanggal Lahir Diperlukan</strong>
+            ${escapeHTML(dm.reason)}
+            ${canEdit ? `<div style="margin-top: 10px;"><button type="button" onclick="openEditorFromInspector()" class="ui-btn ui-btn-primary" style="font-size: 11.5px; padding: 6px 12px;">Isi Tanggal Lahir</button></div>` : ''}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    activeDestinyMatrixPersonId = person.id;
+    activeDestinySelectedKey = 'E';
+
+    const n = dm.nodes;
+    const comfortArc = ARCANA_CATALOG[n.E] || ARCANA_CATALOG[22];
+
+    const seqPillsHtml = (items) => {
+      const keysAndVals = items;
+      return keysAndVals.map(([k, v]) => `<button type="button" onclick="selectDestinyNode('${k}')" class="dm-seq-btn" title="Lihat detail titik ${escapeHTML(k)}">${v}</button>`).join('');
+    };
+
+    const chakraRows = dm.chakras.map(ch => `
+      <tr>
+        <td><span class="dm-chakra-dot" style="background: ${ch.color};"></span>${escapeHTML(ch.name)}</td>
+        <td><strong>${ch.physics}</strong></td>
+        <td><strong>${ch.energy}</strong></td>
+        <td><strong>${ch.emotions}</strong></td>
+      </tr>
+    `).join('');
+
+    const ageDecadeRows = dm.prognosis.decades.map((dec, idx) => {
+      const isCur = dm.prognosis.hasAge && idx === dm.prognosis.activeDecadeIndex;
+      return `
+        <div class="dm-age-card ${isCur ? 'current' : ''}">
+          <span>${escapeHTML(dec.label)}</span>
+          <span>${dec.from} - <strong>${dec.mid5}</strong> - ${dec.to}</span>
+        </div>
+      `;
+    }).join('');
+
+    const activeAgeText = dm.prognosis.hasAge
+      ? `Usia ${dm.prognosis.age} th: Energi Utama ${dm.prognosis.activePoint.val} (${ARCANA_CATALOG[dm.prognosis.activePoint.val]?.id || ''})`
+      : 'Tahun 0-80 (Siklus Utama)';
+
+    c.innerHTML = `
+      <div class="dm-panel">
+        <div class="dm-hero-grid">
+          <div class="dm-hero-card">
+            <small>Zona Nyaman (Pusat E)</small>
+            <strong>${n.E} - ${escapeHTML(comfortArc.id)}</strong>
+            <span>${escapeHTML(comfortArc.name)}</span>
+          </div>
+          <div class="dm-hero-card karma">
+            <small>Ekor Karma (D1-D2-D)</small>
+            <strong>${escapeHTML(dm.karmicTail.code)}</strong>
+            <span>${escapeHTML(dm.karmicTail.title)}</span>
+          </div>
+        </div>
+
+        <div class="dm-octagram-box">
+          <div class="vedic-section-head">
+            <h4>Oktagram Matriks Takdir (22 Arcana)</h4>
+            <span>Klik angka untuk detail</span>
+          </div>
+          <div id="dm-octagram-wrap" class="dm-octagram-wrap">
+            ${renderDestinyMatrixSvg(dm, 'E')}
+          </div>
+          <div id="dm-node-inspector" class="dm-node-inspector">
+            ${renderDestinyNodeDetailHtml(dm, 'E')}
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Saluran Utama Kehidupan</h4>
+            <span>Metode Natalia Ladini</span>
+          </div>
+          <div class="dm-channels-list">
+            <div class="dm-channel-row">
+              <div>
+                <strong style="display: block; color: var(--ink-primary);">Saluran Keuangan (Money Line)</strong>
+                <span style="font-size: 10px; color: var(--ink-muted);">Pintu karir, alur kerja &amp; kelimpahan</span>
+              </div>
+              <div class="dm-seq-pills">${seqPillsHtml([['C1', n.C1], ['Money', n.Money], ['K', n.K]])}</div>
+            </div>
+            <div class="dm-channel-row">
+              <div>
+                <strong style="display: block; color: var(--ink-primary);">Saluran Asmara (Love Line)</strong>
+                <span style="font-size: 10px; color: var(--ink-muted);">Pola pasangan selaras &amp; harmoni relasi</span>
+              </div>
+              <div class="dm-seq-pills">${seqPillsHtml([['D1', n.D1], ['Love', n.Love], ['K', n.K]])}</div>
+            </div>
+            <div class="dm-channel-row">
+              <div>
+                <strong style="display: block; color: var(--ink-primary);">Zona Bakat &amp; Ekspresi</strong>
+                <span style="font-size: 10px; color: var(--ink-muted);">Keahlian alami &amp; wawasan mental</span>
+              </div>
+              <div class="dm-seq-pills">${seqPillsHtml([['B', n.B], ['B2', n.B2], ['B1', n.B1]])}</div>
+            </div>
+            <div class="dm-channel-row">
+              <div>
+                <strong style="display: block; color: var(--ink-primary);">Garis Leluhur (Ayah / Ibu)</strong>
+                <span style="font-size: 10px; color: var(--ink-muted);">Ayah ${n.F}-${n.H} | Ibu ${n.G}-${n.I} | Pusat Leluhur ${n.E2}</span>
+              </div>
+              <div class="dm-seq-pills">${seqPillsHtml([['F', n.F], ['G', n.G], ['E2', n.E2]])}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>4 Tujuan Hidup (Purpose)</h4>
+            <span>Langit ${dm.purposes.sky} | Bumi ${dm.purposes.earth}</span>
+          </div>
+          <div class="dm-purpose-grid">
+            <div class="dm-purpose-card">
+              <small>Tujuan Pribadi (20-40 th)</small>
+              <strong>${dm.purposes.personal} - ${escapeHTML(ARCANA_CATALOG[dm.purposes.personal]?.id || '')}</strong>
+              <span>Langit (${dm.purposes.sky}) + Bumi (${dm.purposes.earth})</span>
+            </div>
+            <div class="dm-purpose-card">
+              <small>Tujuan Sosial (40-60 th)</small>
+              <strong>${dm.purposes.social} - ${escapeHTML(ARCANA_CATALOG[dm.purposes.social]?.id || '')}</strong>
+              <span>Ayah (${dm.purposes.maleLine}) + Ibu (${dm.purposes.femaleLine})</span>
+            </div>
+            <div class="dm-purpose-card">
+              <small>Tujuan Spiritual (60+ th)</small>
+              <strong>${dm.purposes.spiritual} - ${escapeHTML(ARCANA_CATALOG[dm.purposes.spiritual]?.id || '')}</strong>
+              <span>Sintesis Pribadi + Sosial</span>
+            </div>
+            <div class="dm-purpose-card">
+              <small>Tujuan Planetari (Warisan)</small>
+              <strong>${dm.purposes.planetary} - ${escapeHTML(ARCANA_CATALOG[dm.purposes.planetary]?.id || '')}</strong>
+              <span>Dampak jangka panjang generasi</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Prognosis Usia (0 - 80 Tahun)</h4>
+            <span>${escapeHTML(activeAgeText)}</span>
+          </div>
+          <div class="dm-age-grid">
+            ${ageDecadeRows}
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Peta Kesehatan 7 Cakra</h4>
+            <span>Fisik | Energi | Emosi</span>
+          </div>
+          <div class="vedic-table-scroll">
+            <table class="vedic-graha-table">
+              <thead>
+                <tr>
+                  <th>Cakra</th>
+                  <th>Fisik</th>
+                  <th>Energi</th>
+                  <th>Emosi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${chakraRows}
+                <tr style="background: #f8fafc; font-weight: 800;">
+                  <td>Total Keseimbangan</td>
+                  <td>${dm.chakraTotals.physics}</td>
+                  <td>${dm.chakraTotals.energy}</td>
+                  <td>${dm.chakraTotals.emotions}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderInspectorMedia(person) {
     const c = document.getElementById('inspector-media-details');
     if (!c) return;
@@ -2097,7 +2288,7 @@
   }
 
   window.switchInspectorTab = function(tabName) {
-    ['bio', 'astro', 'vedic', 'media'].forEach(t => {
+    ['bio', 'astro', 'matrix', 'vedic', 'media'].forEach(t => {
       document.getElementById(`tab-btn-${t}`)?.classList.toggle('active', t === tabName);
       document.getElementById(`tab-content-${t}`)?.classList.toggle('hidden', t !== tabName);
     });
@@ -4388,6 +4579,379 @@
     }
   };
 
+  // --- DESTINY MATRIX (MATRIKS TAKDIR 22 ARCANA / NATALIA LADINI) ENGINE ---
+  const ARCANA_CATALOG = {
+    1:  { name: 'The Magician',          id: 'Pencipta & Perintis',         plus: 'Inisiatif kuat, penuh ide orisinal, daya cipta cepat, kepemimpinan visioner.',        minus: 'Ego tinggi, ragu memulai, manipulasi, atau menyia-nyiakan bakat.' },
+    2:  { name: 'High Priestess',        id: 'Intuisi & Harmoni',           plus: 'Peka perasaan, pendamai alami, diplomatis, penyembuh berempati tinggi.',             minus: 'Mood berubah drastis, pasif-agresif, tertutup, mudah menyerap drama.' },
+    3:  { name: 'The Empress',           id: 'Kesuburan & Kelimpahan',      plus: 'Anggun, mencintai keluarga, produktif menciptakan kemakmuran dan kenyamanan.',        minus: 'Terlalu mengontrol pasangan/anak, boros, meremehkan kemampuan diri.' },
+    4:  { name: 'The Emperor',           id: 'Struktur & Otoritas',         plus: 'Bertanggung jawab, tegas, pelindung keluarga, handal dalam bisnis dan manajemen.',   minus: 'Kaku, keras kepala, dominan berlebihan, sulit menerima sudut pandang lain.' },
+    5:  { name: 'The Hierophant',        id: 'Tradisi, Ilmu & Guru',        plus: 'Tertib aturan, pembelajar sejati, pembimbing bijak, setia pada nilai keluarga.',     minus: 'Dogmatis, merasa paling benar, kaku pada tradisi tanpa dialog.' },
+    6:  { name: 'The Lovers',            id: 'Cinta, Pilihan & Estetika',   plus: 'Hangat dalam relasi, artistik, ramah, mudah menarik simpati dan cinta.',             minus: 'Terobsesi penampilan/validasi luar, bimbang menentukan pilihan hidup.' },
+    7:  { name: 'The Chariot',           id: 'Pergerakan & Kemenangan',     plus: 'Energik, berorientasi target, gesit memimpin proyek dan perjalanan jauh.',          minus: 'Tergesa-gesa, agresif saat tertekan, memaksakan kehendak secara kasar.' },
+    8:  { name: 'Justice',               id: 'Keadilan & Sebab-Akibat',     plus: 'Jujur, objektif, paham hukum karma/konsekuensi, stabil dalam menjaga amanah.',      minus: 'Menghakimi diri/orang lain, sering menyalahkan keadaan atas kegagalan.' },
+    9:  { name: 'The Hermit',            id: 'Kebijaksanaan Mendalam',      plus: 'Pemikir dalam, mandiri, penasihat tepercaya, fokus pada kualitas dan riset.',       minus: 'Menarik diri berlebihan, kesepian, sinis, takut membuka hati.' },
+    10: { name: 'Wheel of Fortune',      id: 'Arus Rezeki & Keberuntungan', plus: 'Mudah mendapat peluang, luwes beradaptasi, optimis, percaya alur hidup.',          minus: 'Pasif menunggu nasib, mudah cemas saat situasi berubah, ikut arus tanpa arah.' },
+    11: { name: 'Strength',              id: 'Daya Juang & Potensi Besar',  plus: 'Stamina fisik/mental luar biasa, tahan banting, mampu memimpin tim besar.',         minus: 'Pemarah, memaksa tubuh melebihi batas (burnout), menekan orang lemah.' },
+    12: { name: 'The Hanged Man',        id: 'Pelayanan & Sudut Pandang Baru', plus: 'Tulus menolong, kreatif tidak biasa, rendah hati, melihat solusi tak terduga.',    minus: 'Mentalitas korban, sulit menolak (people pleaser), meremehkan nilai jasa sendiri.' },
+    13: { name: 'Transformation',        id: 'Pembaruan & Keberanian',      plus: 'Berani menutup fase lama, adaptif di situasi krisis, katalis perubahan.',           minus: 'Takut kehilangan, menunda perubahan perlu, ceroboh dan ekstrem.' },
+    14: { name: 'Temperance',            id: 'Keseimbangan & Seni Jiwa',    plus: 'Tenang, penyabar, berbakat di bidang seni/penyembuhan, hidup seimbang.',             minus: 'Tidak sabaran, hilang kendali emosi, meragukan ketenangan hidup.' },
+    15: { name: 'The Devil',             id: 'Karisma & Pengaruh Material', plus: 'Daya pikat kuat, jeli membaca niat orang, piawai mengelola peluang finansial.',      minus: 'Tergiur kontrol, iri, ketergantungan materi/emosi, manipulatif.' },
+    16: { name: 'The Tower',             id: 'Kebangkitan Spiritual',       plus: 'Membangun ulang fondasi kokoh, jujur tanpa topeng, pencerahan cepat.',              minus: 'Kejutan krisis berulang karena enggan berubah, meledak-ledak.' },
+    17: { name: 'The Star',              id: 'Bintang Inspirasi & Karya',   plus: 'Populer lewat keahlian tulus, optimis, menginspirasi banyak kalangan.',              minus: 'Takut tampil, rendah diri ("sindrom penipu"), atau sombong saat dipuji.' },
+    18: { name: 'The Moon',              id: 'Imajinasi & Kedalaman Batin', plus: 'Daya cipta visual/imajinasi tinggi, mampu mewujudkan pikiran jadi nyata.',          minus: 'Ketakutan tak berdasar, ilusi, kecemasan, curiga berlebihan.' },
+    19: { name: 'The Sun',               id: 'Sinar Kemakmuran & Ceria',    plus: 'Dermawan, ceria, magnet kelimpahan dan kepemimpinan publik yang hangat.',            minus: 'Membakar energi untuk satu obsesi, menyalahkan diri, terlalu bangga.' },
+    20: { name: 'Judgement',             id: 'Panggilan & Ikatan Leluhur',  plus: 'Peka tradisi keluarga besar, pembawa pemulihan lintas generasi, visioner.',          minus: 'Konflik dengan orang tua/keluarga, terus hidup di penyesalan masa lalu.' },
+    21: { name: 'The World',             id: 'Wawasan Global & Penggenapan', plus: 'Berpikiran terbuka, cocok proyek internasional/teknologi, pembawa damai.',         minus: 'Membatasi diri, takut melangkah keluar zona asal, mengeluh tanpa aksi.' },
+    22: { name: 'The Fool',              id: 'Kebebasan Murni & Awal Baru', plus: 'Jiwa bebas, ceria, percaya diri menapaki jalan baru tanpa beban.',                  minus: 'Lari dari tanggung jawab, sembrono, merasa terkekang oleh komitmen.' }
+  };
+
+  // All 26 mathematically possible Ladini Karmic Tails (D1 - D2 - D)
+  const KARMIC_TAIL_CATALOG = {
+    '3-7-22':  { title: 'Tahanan / Belenggu Kebebasan', theme: 'Belajar bertanggung jawab dengan sukarela dan tidak lari dari komitmen.' },
+    '3-13-10': { title: 'Kehilangan Kelimpahan & Kepercayaan', theme: 'Memulihkan keberanian mengambil keputusan tanpa takut kegagalan mendadak.' },
+    '3-22-19': { title: 'Jiwa Terkekang', theme: 'Menyalurkan kebebasan kreatif menjadi kemurahan hati yang hangat bagi sesama.' },
+    '6-5-17':  { title: 'Kebanggaan & Penampilan', theme: 'Mengasah keaslian hati dan membagikan ilmu tanpa mencari pujian semu.' },
+    '6-8-20':  { title: 'Kekecewaan dalam Keluarga', theme: 'Memulihkan kepercayaan terhadap keluarga dan memilih relasi atas dasar ketulusan.' },
+    '6-14-8':  { title: 'Diktator / Kesalahan Masa Lalu', theme: 'Menyeimbangkan keadilan dengan kelembutan agar tidak menghakimi diri dan pasangan.' },
+    '6-17-11': { title: 'Bintang yang Terpendam', theme: 'Keluar dari zona takut dinilai dan memakai daya juang untuk karya nyata.' },
+    '6-20-14': { title: 'Jiwa Pengorbanan Keluarga', theme: 'Berbakti pada keluarga dengan batas sehat tanpa memendam luka emosi.' },
+    '9-3-21':  { title: 'Penjaga Tradisi Terisolasi', theme: 'Membuka wawasan mendunia dan berbagi kebijaksanaan secara hangat.' },
+    '9-9-18':  { title: 'Ilmu Spiritual Tertutup', theme: 'Mengatasi kesepian dan ketakutan batin lalu menyalurkan keahlian bagi masyarakat.' },
+    '9-12-3':  { title: 'Pertapa / Kesendirian & Pengabdian', theme: 'Berani menerima bantuan serta membuka diri pada kehangatan rumah tangga dan materi.' },
+    '9-15-6':  { title: 'Godaan Hati & Kesetiaan', theme: 'Memilih cinta tulus serta jujur atas hasrat pribadi tanpa konflik batin.' },
+    '9-18-9':  { title: 'Pengetahuan yang Disembunyikan', theme: 'Mengubah keraguan menjadi pengajaran bijak dan keyakinan pada intuisi sendiri.' },
+    '12-16-4': { title: 'Kaisar / Kekuasaan Tegas', theme: 'Memimpin dengan empati dan fleksibilitas alih-alih kendali kaku.' },
+    '12-19-7': { title: 'Pejuang yang Lelah', theme: 'Beraksi terarah untuk tujuan mulia sembari belajar melayani dan istirahat seimbang.' },
+    '15-5-8':  { title: 'Pemberontak Aturan Keluarga', theme: 'Menghormati integritas dan nilai moral tanpa merasa terkekang.' },
+    '15-8-11': { title: 'Kekuatan & Batas Fisik', theme: 'Mengendalikan amarah serta kekuatan besar secara bijaksana dan adil.' },
+    '15-20-5': { title: 'Pemberontak Garis Keturunan', theme: 'Menyelaraskan kemandirian dengan kehormatan silsilah dan prinsip hidup.' },
+    '18-3-12': { title: 'Pengasuhan & Beban Emosi', theme: 'Menjaga batas sehat saat mengasuh agar tidak terjebak rasa kurang dihargai.' },
+    '18-6-6':  { title: 'Sihir Cinta & Ketakutan Diri', theme: 'Mencintai diri sendiri secara utuh sebelum meminta validasi dalam pasangan.' },
+    '18-6-15': { title: 'Godaan Bayangan Gelap', theme: 'Mengubah daya pikat dan imajinasi tinggi menjadi karya jujur tanpa manipulasi.' },
+    '18-9-9':  { title: 'Ilmu Batin & Kesunyian', theme: 'Menghadirkan kepekaan batin ke dunia nyata agar tidak tenggelam dalam cemas.' },
+    '21-4-10': { title: 'Jiwa Tertindas / Penjara Kendali', theme: 'Mengambil kendali hidup sendiri dengan percaya pada arus kelimpahan semesta.' },
+    '21-7-13': { title: 'Penghancuran & Jiwa Massal', theme: 'Menjadi pembaharu damai yang membangun sistem tanpa kekerasan fisik atau verbal.' },
+    '21-10-7': { title: 'Pengejar Misi Duniawi', theme: 'Menyelaraskan ambisi bergerak cepat dengan rasa syukur atas setiap langkah.' },
+    '21-10-16': { title: 'Kejatuhan Menara Material', theme: 'Membangun fondasi spiritual dan finansial selaras tanpa memaksa hasil instan.' }
+  };
+
+  function reduceArcana(val) {
+    let n = Math.abs(Math.trunc(Number(val) || 0));
+    if (n === 0) return 22;
+    while (n > 22) {
+      let sum = 0;
+      const digits = String(n);
+      for (let i = 0; i < digits.length; i++) sum += Number(digits[i]);
+      n = sum;
+    }
+    return n === 0 ? 22 : n;
+  }
+
+  function sumDigits(val) {
+    const s = String(Math.abs(Math.trunc(Number(val) || 0)));
+    let total = 0;
+    for (let i = 0; i < s.length; i++) total += Number(s[i]);
+    return total;
+  }
+
+  function computeDecadeAgeNodes(startVal, endVal, startAge) {
+    const mid = reduceArcana(startVal + endVal); // +5
+    const q1 = reduceArcana(startVal + mid);     // +2.5
+    const q3 = reduceArcana(mid + endVal);       // +7.5
+    return [
+      { age: startAge,       val: startVal },
+      { age: startAge + 1.25, val: reduceArcana(startVal + q1) },
+      { age: startAge + 2.5,  val: q1 },
+      { age: startAge + 3.75, val: reduceArcana(q1 + mid) },
+      { age: startAge + 5,    val: mid },
+      { age: startAge + 6.25, val: reduceArcana(mid + q3) },
+      { age: startAge + 7.5,  val: q3 },
+      { age: startAge + 8.75, val: reduceArcana(q3 + endVal) }
+    ];
+  }
+
+  function computeDestinyMatrix(person = {}) {
+    const dp = parseIsoDateParts(person.birthDate);
+    if (!dp) {
+      return {
+        ready: false,
+        reason: 'Tanggal lahir lengkap (YYYY-MM-DD) diperlukan untuk menghitung Destiny Matrix (Matriks Takdir 22 Arcana).'
+      };
+    }
+
+    // Core Personal Square (A, B, C, D, E)
+    const A = reduceArcana(dp.d);
+    const B = dp.m;
+    const C = reduceArcana(sumDigits(dp.y));
+    const D = reduceArcana(A + B + C);
+    const E = reduceArcana(A + B + C + D);
+
+    // Ancestral Diagonal Square (F, G, H, I, E2)
+    const F = reduceArcana(A + B);
+    const G = reduceArcana(B + C);
+    const H = reduceArcana(C + D);
+    const I = reduceArcana(D + A);
+    const E2 = reduceArcana(F + G + H + I);
+
+    // Inner Ray Nodes
+    const A1 = reduceArcana(A + E);
+    const A2 = reduceArcana(A + A1);
+    const A3 = reduceArcana(A1 + E);
+
+    const B1 = reduceArcana(B + E);
+    const B2 = reduceArcana(B + B1);
+    const B3 = reduceArcana(B1 + E);
+
+    const C1 = reduceArcana(C + E);
+    const C2 = reduceArcana(C + C1);
+
+    const D1 = reduceArcana(D + E);
+    const D2 = reduceArcana(D + D1);
+
+    // Love Line & Money Line (bottom-right inner balance axis D1 - C1)
+    const K = reduceArcana(D1 + C1);
+    const Love = reduceArcana(D1 + K);
+    const Money = reduceArcana(C1 + K);
+
+    const karmicTailCode = `${D1}-${D2}-${D}`;
+    const karmicTailInfo = KARMIC_TAIL_CATALOG[karmicTailCode] || {
+      title: 'Kombinasi Pelajaran Jiwa',
+      theme: `Menyelaraskan pelajaran energi ${D1}, ${D2}, dan ${D} secara sadar.`
+    };
+
+    // Four Life Purposes
+    const sky = reduceArcana(B + D);
+    const earth = reduceArcana(A + C);
+    const personal = reduceArcana(sky + earth);
+
+    const maleLine = reduceArcana(F + H);
+    const femaleLine = reduceArcana(G + I);
+    const social = reduceArcana(maleLine + femaleLine);
+
+    const spiritual = reduceArcana(personal + social);
+    const planetary = reduceArcana(social + spiritual);
+
+    // 7 Chakras Table (Physics, Energy, Emotions)
+    const chakras = [
+      { id: 'sahasrara', name: 'Sahasrara (Mahkota)',    color: '#7c3aed', physics: A,  energy: B },
+      { id: 'ajna',      name: 'Ajna (Mata Ketiga)',     color: '#4f46e5', physics: A2, energy: B2 },
+      { id: 'vishuddha', name: 'Vishuddha (Tenggorokan)',color: '#0284c7', physics: A1, energy: B1 },
+      { id: 'anahata',   name: 'Anahata (Jantung)',      color: '#16a34a', physics: A3, energy: B3 },
+      { id: 'manipura',  name: 'Manipura (Ulu Hati)',    color: '#d97706', physics: E,  energy: E },
+      { id: 'svadh',     name: 'Svadhisthana (Sakral)',  color: '#ea580c', physics: C1, energy: D1 },
+      { id: 'muladhara', name: 'Muladhara (Akar)',       color: '#dc2626', physics: C,  energy: D }
+    ].map(ch => ({ ...ch, emotions: reduceArcana(ch.physics + ch.energy) }));
+
+    const totalPhysics = reduceArcana(chakras.reduce((s, r) => s + r.physics, 0));
+    const totalEnergy = reduceArcana(chakras.reduce((s, r) => s + r.energy, 0));
+    const totalEmotions = reduceArcana(chakras.reduce((s, r) => s + r.emotions, 0));
+
+    // 80-Year Age Prognosis Ring
+    const decadesSpec = [
+      { label: '0 - 10 th',  startAge: 0,  from: A, to: F },
+      { label: '10 - 20 th', startAge: 10, from: F, to: B },
+      { label: '20 - 30 th', startAge: 20, from: B, to: G },
+      { label: '30 - 40 th', startAge: 30, from: G, to: C },
+      { label: '40 - 50 th', startAge: 40, from: C, to: H },
+      { label: '50 - 60 th', startAge: 50, from: H, to: D },
+      { label: '60 - 70 th', startAge: 60, from: D, to: I },
+      { label: '70 - 80 th', startAge: 70, from: I, to: A }
+    ];
+
+    const decades = decadesSpec.map(dSpec => ({
+      ...dSpec,
+      mid5: reduceArcana(dSpec.from + dSpec.to),
+      nodes: computeDecadeAgeNodes(dSpec.from, dSpec.to, dSpec.startAge)
+    }));
+
+    const numericAge = Number(getAge(person.birthDate, person.deathDate));
+    const hasAge = Number.isFinite(numericAge) && numericAge >= 0;
+    const cycleAge = hasAge ? (numericAge % 80) : 0;
+    const activeDecadeIndex = Math.min(7, Math.floor(cycleAge / 10));
+    const allAgePoints = decades.flatMap(dec => dec.nodes);
+    let closestAgePoint = allAgePoints[0];
+    let bestAgeDist = Infinity;
+    allAgePoints.forEach(pt => {
+      const dist = Math.abs(pt.age - cycleAge);
+      if (dist < bestAgeDist) {
+        bestAgeDist = dist;
+        closestAgePoint = pt;
+      }
+    });
+
+    const nodeDetails = {
+      E:     { val: E,     label: 'Zona Nyaman Jiwa (Pusat E)',          role: 'Energi inti yang memberi kekuatan dan keseimbangan saat berada di titik netral.' },
+      A:     { val: A,     label: 'Potret Diri & Cakra Mahkota (A)',     role: 'Kesan pertama, karakter utama, dan cara menghadapi tantangan baru.' },
+      A1:    { val: A1,    label: 'Jalur Hubungan Anak-Orang Tua (A1)', role: 'Pelajaran komunikasi lintas generasi dan ekspresi tenggorokan.' },
+      A2:    { val: A2,    label: 'Intuisi Diri (Ajna Fisik A2)',       role: 'Pola pikir sehari-hari dan kejernihan visi hidup.' },
+      A3:    { val: A3,    label: 'Jantung Emosional (Anahata A3)',     role: 'Kepekaan rasa serta keterbukaan hati terhadap keluarga.' },
+      B:     { val: B,     label: 'Koneksi Spiritual & Bakat (B)',      role: 'Anugerah bawaan dan jalur bimbingan batin (bulan lahir).' },
+      B1:    { val: B1,    label: 'Ekspresi Bakat (Vishuddha B1)',      role: 'Keahlian kreatif yang mudah dikembangkan menjadi karya.' },
+      B2:    { val: B2,    label: 'Inspirasi Mental (Ajna B2)',         role: 'Sumber ide orisinal dan wawasan intuitif.' },
+      B3:    { val: B3,    label: 'Keinginan Hati (Anahata B3)',        role: 'Apa yang membuat hati benar-benar merasa hidup.' },
+      C:     { val: C,     label: 'Gerbang Material & Karir (C)',       role: 'Fondasi penghasilan, etos kerja, dan adaptasi dunia nyata (tahun lahir).' },
+      C1:    { val: C1,    label: 'Pintu Saluran Uang (C1)',            role: 'Jenis profesi atau sikap kerja yang membuka kelancaran rezeki.' },
+      C2:    { val: C2,    label: 'Pengembangan Karir (C2)',            role: 'Langkah praktis untuk memperkuat stabilitas aset dan profesi.' },
+      D:     { val: D,     label: 'Ujung Ekor Karma (D)',               role: 'Pelajaran jiwa paling utama dari pengalaman masa lalu.' },
+      D1:    { val: D1,    label: 'Akar Ekor Karma & Relasi (D1)',      role: 'Pemicu pola berulang sekaligus pintu masuk keharmonisan cinta.' },
+      D2:    { val: D2,    label: 'Tantangan Ekor Karma (D2)',          role: 'Ujian utama yang perlu diubah dari sisi bayangan ke sisi terang.' },
+      K:     { val: K,     label: 'Titik Temu Cinta & Finansial (K)',    role: 'Keseimbangan antara kehidupan asmara dan kelancaran materi.' },
+      Love:  { val: Love,  label: 'Saluran Asmara / Pasangan',          role: 'Karakter pasangan selaras dan pelajaran keharmonisan rumah tangga.' },
+      Money: { val: Money, label: 'Saluran Uang / Kelimpahan',          role: 'Aktivitas konkret dan sikap mental pembuka arus finansial.' },
+      F:     { val: F,     label: 'Bakat Garis Ayah (F)',               role: 'Energi keahlian dan karakter yang diwariskan lewat jalur ayah.' },
+      G:     { val: G,     label: 'Bakat Garis Ibu (G)',                role: 'Energi bakat dan kepekaan yang diwariskan lewat jalur ibu.' },
+      H:     { val: H,     label: 'Material Garis Ayah (H)',            role: 'Pola rezeki dan ketangguhan material garis keturunan ayah.' },
+      I:     { val: I,     label: 'Material Garis Ibu (I)',             role: 'Pola kelimpahan dan manajemen aset garis keturunan ibu.' },
+      E2:    { val: E2,    label: 'Kekuatan Garis Leluhur (E2)',        role: 'Daya dorong gabungan seluruh trah ayah dan ibu.' }
+    };
+
+    return {
+      ready: true,
+      birthDate: person.birthDate,
+      nodes: { A, A1, A2, A3, B, B1, B2, B3, C, C1, C2, D, D1, D2, E, E2, F, G, H, I, K, Love, Money },
+      karmicTail: { code: karmicTailCode, ...karmicTailInfo, parts: [D1, D2, D] },
+      loveLine: [D1, Love, K],
+      moneyLine: [C1, Money, K],
+      talentZone: [B, B2, B1],
+      parentChildLine: [A, A2, A1],
+      purposes: { sky, earth, personal, maleLine, femaleLine, social, spiritual, planetary },
+      chakras,
+      chakraTotals: { physics: totalPhysics, energy: totalEnergy, emotions: totalEmotions },
+      prognosis: {
+        hasAge,
+        age: hasAge ? numericAge : null,
+        activeDecadeIndex,
+        activePoint: closestAgePoint,
+        decades
+      },
+      nodeDetails
+    };
+  }
+
+  let activeDestinyMatrixPersonId = null;
+  let activeDestinySelectedKey = 'E';
+
+  function renderDestinyNodeDetailHtml(dm, nodeKey) {
+    const info = dm.nodeDetails[nodeKey] || dm.nodeDetails.E;
+    const arc = ARCANA_CATALOG[info.val] || ARCANA_CATALOG[22];
+    return `
+      <div class="dm-node-head">
+        <div>
+          <span style="font-size: 9.5px; font-weight: 800; color: var(--ink-muted); text-transform: uppercase;">${escapeHTML(info.label)}</span>
+          <h5 style="font-size: 13.5px; font-weight: 800; color: var(--ink-primary);">${escapeHTML(arc.id)} (${escapeHTML(arc.name)})</h5>
+        </div>
+        <span class="dm-node-num">${info.val}</span>
+      </div>
+      <p style="font-size: 11px; color: var(--ink-secondary); margin-bottom: 8px;">${escapeHTML(info.role)}</p>
+      <div class="dm-split-flow">
+        <div class="dm-flow-col" style="border-color: #a7f3d0; background: #f0fdf4;">
+          <b style="color: #065f46;">Sisi Terang (+)</b>
+          <span>${escapeHTML(arc.plus)}</span>
+        </div>
+        <div class="dm-flow-col" style="border-color: #fecaca; background: #fef2f2;">
+          <b style="color: #991b1b;">Tantangan (-)</b>
+          <span>${escapeHTML(arc.minus)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  window.selectDestinyNode = function(nodeKey) {
+    if (!activeDestinyMatrixPersonId) return;
+    const person = findNodeById(treeData, activeDestinyMatrixPersonId);
+    if (!person) return;
+    const dm = computeDestinyMatrix(person);
+    if (!dm.ready || !dm.nodeDetails[nodeKey]) return;
+    activeDestinySelectedKey = nodeKey;
+
+    const svgWrap = document.getElementById('dm-octagram-wrap');
+    if (svgWrap) svgWrap.innerHTML = renderDestinyMatrixSvg(dm, nodeKey);
+    const detailBox = document.getElementById('dm-node-inspector');
+    if (detailBox) detailBox.innerHTML = renderDestinyNodeDetailHtml(dm, nodeKey);
+  };
+
+  function renderDestinyMatrixSvg(dm, selectedKey = 'E') {
+    const n = dm.nodes;
+    const specs = [
+      { key: 'F',     x: 84,  y: 84,  r: 14, fill: '#334155', stroke: '#0f172a', text: '#ffffff', val: n.F,     name: 'Bakat Garis Ayah' },
+      { key: 'G',     x: 276, y: 84,  r: 14, fill: '#334155', stroke: '#0f172a', text: '#ffffff', val: n.G,     name: 'Bakat Garis Ibu' },
+      { key: 'H',     x: 276, y: 276, r: 14, fill: '#334155', stroke: '#0f172a', text: '#ffffff', val: n.H,     name: 'Material Garis Ayah' },
+      { key: 'I',     x: 84,  y: 276, r: 14, fill: '#334155', stroke: '#0f172a', text: '#ffffff', val: n.I,     name: 'Material Garis Ibu' },
+
+      { key: 'A',     x: 44,  y: 180, r: 14, fill: '#7c3aed', stroke: '#5b21b6', text: '#ffffff', val: n.A,     name: 'Potret Diri' },
+      { key: 'A2',    x: 74,  y: 180, r: 11, fill: '#4f46e5', stroke: '#3730a3', text: '#ffffff', val: n.A2,    name: 'Ajna Fisik' },
+      { key: 'A1',    x: 104, y: 180, r: 11.5, fill: '#0284c7', stroke: '#0369a1', text: '#ffffff', val: n.A1,  name: 'Vishuddha Fisik' },
+      { key: 'A3',    x: 138, y: 180, r: 11, fill: '#16a34a', stroke: '#15803d', text: '#ffffff', val: n.A3,    name: 'Anahata Fisik' },
+
+      { key: 'B',     x: 180, y: 44,  r: 14, fill: '#7c3aed', stroke: '#5b21b6', text: '#ffffff', val: n.B,     name: 'Bakat Spiritual' },
+      { key: 'B2',    x: 180, y: 74,  r: 11, fill: '#4f46e5', stroke: '#3730a3', text: '#ffffff', val: n.B2,    name: 'Ajna Energi' },
+      { key: 'B1',    x: 180, y: 104, r: 11.5, fill: '#0284c7', stroke: '#0369a1', text: '#ffffff', val: n.B1,  name: 'Vishuddha Energi' },
+      { key: 'B3',    x: 180, y: 138, r: 11, fill: '#16a34a', stroke: '#15803d', text: '#ffffff', val: n.B3,    name: 'Anahata Energi' },
+
+      { key: 'C',     x: 316, y: 180, r: 14, fill: '#dc2626', stroke: '#991b1b', text: '#ffffff', val: n.C,     name: 'Material Utama' },
+      { key: 'C2',    x: 282, y: 180, r: 11, fill: '#f8fafc', stroke: '#dc2626', text: '#991b1b', val: n.C2,    name: 'Karir' },
+      { key: 'C1',    x: 248, y: 180, r: 12, fill: '#ea580c', stroke: '#9a3412', text: '#ffffff', val: n.C1,    name: 'Pintu Keuangan' },
+
+      { key: 'D',     x: 180, y: 316, r: 14, fill: '#dc2626', stroke: '#991b1b', text: '#ffffff', val: n.D,     name: 'Ujung Ekor Karma' },
+      { key: 'D2',    x: 180, y: 282, r: 11, fill: '#fef2f2', stroke: '#dc2626', text: '#991b1b', val: n.D2,    name: 'Ekor Karma Tengah' },
+      { key: 'D1',    x: 180, y: 248, r: 12, fill: '#ea580c', stroke: '#9a3412', text: '#ffffff', val: n.D1,    name: 'Akar Ekor Karma' },
+
+      { key: 'Love',  x: 197, y: 231, r: 10.5, fill: '#fdf2f8', stroke: '#db2777', text: '#9d174d', val: n.Love, name: 'Saluran Cinta' },
+      { key: 'K',     x: 214, y: 214, r: 11.5, fill: '#ffffff', stroke: '#475569', text: '#0f172a', val: n.K,    name: 'Titik Keseimbangan' },
+      { key: 'Money', x: 231, y: 197, r: 10.5, fill: '#ecfdf5', stroke: '#059669', text: '#065f46', val: n.Money, name: 'Saluran Uang' },
+
+      { key: 'E',     x: 180, y: 180, r: 16, fill: '#eab308', stroke: '#a16207', text: '#422006', val: n.E,     name: 'Zona Nyaman (Pusat)' }
+    ];
+
+    const nodesMarkup = specs.map(s => {
+      const isSelected = selectedKey === s.key;
+      const aria = `${s.name}: Arcana ${s.val}`;
+      return `
+        <g class="dm-svg-node" role="button" tabindex="0" aria-label="${escapeHTML(aria)}"
+           onclick="selectDestinyNode('${s.key}')"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectDestinyNode('${s.key}');}">
+          ${isSelected ? `<circle cx="${s.x}" cy="${s.y}" r="${s.r + 4}" fill="none" stroke="#0284c7" stroke-width="2"/>` : ''}
+          <circle cx="${s.x}" cy="${s.y}" r="${s.r}" fill="${s.fill}" stroke="${s.stroke}" stroke-width="${s.r >= 14 ? 2 : 1.5}"/>
+          <text x="${s.x}" y="${s.y + 4}" text-anchor="middle" font-size="${s.r >= 15 ? 12 : s.r >= 13 ? 11 : 10}" font-weight="800" fill="${s.text}">${s.val}</text>
+        </g>
+      `;
+    }).join('');
+
+    return `
+      <svg viewBox="0 0 360 360" class="dm-octagram-svg" role="img" aria-label="Diagram Oktagram Destiny Matrix">
+        <rect x="4" y="4" width="352" height="352" rx="12" fill="#fcfcfd" stroke="#e2e8f0" stroke-width="1"/>
+        <!-- Ancestral Square -->
+        <rect x="84" y="84" width="192" height="192" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+        <!-- Personal Diamond -->
+        <polygon points="180,44 316,180 180,316 44,180" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+        <!-- Axis Lines -->
+        <line x1="44" y1="180" x2="316" y2="180" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 2"/>
+        <line x1="180" y1="44" x2="180" y2="316" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 2"/>
+        <line x1="84" y1="84" x2="276" y2="276" stroke="#cbd5e1" stroke-width="1.1"/>
+        <line x1="276" y1="84" x2="84" y2="276" stroke="#cbd5e1" stroke-width="1.1"/>
+        <!-- Love & Money Line -->
+        <line x1="180" y1="248" x2="248" y2="180" stroke="#059669" stroke-width="1.5"/>
+
+        <!-- Age Perimeter Markers -->
+        <text x="16" y="183" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">0 th</text>
+        <text x="68" y="70" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">10</text>
+        <text x="180" y="23" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">20 th</text>
+        <text x="292" y="70" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">30</text>
+        <text x="344" y="183" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">40 th</text>
+        <text x="292" y="294" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">50</text>
+        <text x="180" y="344" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">60 th</text>
+        <text x="68" y="294" text-anchor="middle" font-size="8.5" font-weight="700" fill="#64748b">70</text>
+
+        <!-- Minimal Vector Channel Markers: Heart (Love) & Coin (Money) -->
+        <path d="M189 240 C189 238,191.5 237.5,192.5 239 C193.5 237.5,196 238,196 240 C196 242,192.5 244,192.5 244 C192.5 244,189 242,189 240 Z" fill="#db2777" opacity="0.85"/>
+        <circle cx="241" cy="206" r="4.2" fill="none" stroke="#059669" stroke-width="1.2"/>
+        <text x="241" y="208.8" text-anchor="middle" font-size="6.5" font-weight="800" fill="#059669">$</text>
+
+        ${nodesMarkup}
+      </svg>
+    `;
+  }
+
   // --- EXPORT & PRINT SUITE ---
   window.openExportModal = function() {
     const modal = document.getElementById('export-modal');
@@ -6048,6 +6612,10 @@
             ].filter(Boolean).join(', ');
           }
         }
+        const dmPdf = computeDestinyMatrix(person);
+        const dmPdfText = dmPdf.ready
+          ? `Pusat ${dmPdf.nodes.E} (${ARCANA_CATALOG[dmPdf.nodes.E]?.id || ''}), Ekor Karma ${dmPdf.karmicTail.code}, Uang ${dmPdf.moneyLine.join('-')}, Cinta ${dmPdf.loveLine.join('-')}`
+          : '';
 
         let y = 36;
         const meta = [
@@ -6057,6 +6625,7 @@
           ['Status', person.deathDate || person.deathYear ? `Wafat (${person.deathDate || person.deathYear})` : 'Masih Hidup'],
           ['Astrologi & Shio', astroText],
           ['Vedic (Jyotish)', vedicPdfText],
+          ['Destiny Matrix', dmPdfText],
           ['Weton Jawa', wetonText],
           ['Kalender Hijriyah', astro.hijri || ''],
           ['Profesi', person.occupation],

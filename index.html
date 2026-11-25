@@ -605,8 +605,9 @@
       <nav class="inspector-nav-tabs">
         <button onclick="switchInspectorTab('bio')" id="tab-btn-bio" class="inspector-tab-btn active">Biodata</button>
         <button onclick="switchInspectorTab('astro')" id="tab-btn-astro" class="inspector-tab-btn">Astrologi</button>
+        <button onclick="switchInspectorTab('matrix')" id="tab-btn-matrix" class="inspector-tab-btn">Matrix</button>
         <button onclick="switchInspectorTab('vedic')" id="tab-btn-vedic" class="inspector-tab-btn hidden">Vedic</button>
-        <button onclick="switchInspectorTab('media')" id="tab-btn-media" class="inspector-tab-btn">Galeri & Dokumen</button>
+        <button onclick="switchInspectorTab('media')" id="tab-btn-media" class="inspector-tab-btn">Galeri</button>
       </nav>
 
       <div class="inspector-scroll-area">
@@ -620,12 +621,17 @@
           <div id="inspector-astro-details"></div>
         </div>
 
-        <!-- Tab 3: Vedic Jyotish (Opt-in per anggota) -->
+        <!-- Tab 3: Destiny Matrix (Matriks Takdir 22 Arcana) -->
+        <div id="tab-content-matrix" class="hidden">
+          <div id="inspector-matrix-details"></div>
+        </div>
+
+        <!-- Tab 4: Vedic Jyotish (Opt-in per anggota) -->
         <div id="tab-content-vedic" class="hidden">
           <div id="inspector-vedic-details"></div>
         </div>
 
-        <!-- Tab 4: Media & Arsip -->
+        <!-- Tab 5: Media & Arsip -->
         <div id="tab-content-media" class="hidden">
           <div id="inspector-media-details"></div>
         </div>
