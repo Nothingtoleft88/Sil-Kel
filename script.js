@@ -664,6 +664,15 @@
 
     const clickAction = isSpouse ? `handleCardClick('${parentId}', '${person.id}')` : `handleCardClick('${person.id}', null)`;
 
+    const isVedicOn = Boolean(person.vedicEnabled);
+    const vedicBtnAction = isSpouse
+      ? `handleCardVedicAction('${escapeHTML(parentId)}', '${escapeHTML(person.id)}')`
+      : `handleCardVedicAction('${escapeHTML(person.id)}', null)`;
+    const vedicBtnTitle = isVedicOn
+      ? `Buka analisis Vedic (Jyotish) untuk ${escapeHTML(person.name || 'anggota')}`
+      : `Tambahkan analisis Vedic (Jyotish) ke ${escapeHTML(person.name || 'anggota')}`;
+    const vedicCardBtn = `<button type="button" onclick="event.stopPropagation(); ${vedicBtnAction}" class="card-vedic-btn ${isVedicOn ? 'active' : ''}" title="${vedicBtnTitle}" aria-label="${vedicBtnTitle}" data-html2canvas-ignore>${isVedicOn ? 'Vedic' : '+ Vedic'}</button>`;
+
     return `
       <div class="relative flex flex-col items-center">
         <div onclick="${clickAction}"
@@ -673,6 +682,7 @@
              class="person-card-node ${isDeceased ? 'is-deceased' : ''}">
           <div class="card-top-strip ${isMale ? 'male' : 'female'}"></div>
           <div class="card-content-body">
+            ${vedicCardBtn}
             <span class="card-gen-pill">Gen ${level}</span>
             <div class="card-avatar-wrap ${isMale ? 'male' : 'female'}">
               <div class="avatar-circle">
@@ -1608,7 +1618,7 @@
     openInspectorDrawer(targetId);
   };
 
-  function openInspectorDrawer(personId) {
+  function openInspectorDrawer(personId, initialTab = null) {
     const person = findNodeById(treeData, personId);
     if (!person) return;
 
@@ -1643,8 +1653,21 @@
     // Render Tab 2: Astro
     renderInspectorAstro(person);
 
-    // Render Tab 3: Media
+    // Render Tab 3: Vedic (opt-in per anggota)
+    const vedicTabBtn = document.getElementById('tab-btn-vedic');
+    if (vedicTabBtn) vedicTabBtn.classList.toggle('hidden', !person.vedicEnabled);
+    renderInspectorVedic(person);
+
+    // Render Tab 4: Media
     renderInspectorMedia(person);
+
+    if (initialTab === 'vedic' && person.vedicEnabled) {
+      switchInspectorTab('vedic');
+    } else if (initialTab && ['bio', 'astro', 'media'].includes(initialTab)) {
+      switchInspectorTab(initialTab);
+    } else if (vedicTabBtn && vedicTabBtn.classList.contains('active') && !person.vedicEnabled) {
+      switchInspectorTab('bio');
+    }
 
     // Edit & Upward Lineage permission
     const isEdit = Boolean(appSettings?.enableEdit) && !isGuestMode;
@@ -1826,9 +1849,217 @@
           <p style="font-size: 10.5px; color: #64748b;">Umm al-Qura</p>
         </div>
       </div>
+
+      ${!person.vedicEnabled ? `
+        <div style="margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #fffdf7; border: 1px solid #fcd34d; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+          <div style="min-width: 160px;">
+            <div style="font-size: 11px; font-weight: 800; color: #78350f;">Vedic Astrology (Jyotish Sidereal)</div>
+            <p style="font-size: 10.5px; color: #9a3412; margin-top: 2px;">Kundali Selatan/Utara, Janma Nakshatra, dan Vimshottari Dasha.</p>
+          </div>
+          <button type="button" onclick="togglePersonVedic('${escapeHTML(person.id)}', true)" class="vedic-enable-btn">Aktifkan Vedic</button>
+        </div>
+      ` : ''}
     `;
 
     c.innerHTML = html;
+  }
+
+  function renderInspectorVedic(person) {
+    const c = document.getElementById('inspector-vedic-details');
+    if (!c) return;
+
+    if (!person.vedicEnabled) {
+      c.innerHTML = `
+        <div class="vedic-panel">
+          <div class="vedic-banner-note muted">
+            <strong style="display: block; font-size: 12px; color: var(--ink-primary); margin-bottom: 4px;">Analisis Vedic Belum Diaktifkan</strong>
+            Fitur Vedic bersifat opsional per anggota keluarga agar kartu utama tetap ringkas. Aktifkan di bawah ini jika ingin menampilkan bagan Kundali, Nakshatra, dan Dasha untuk ${escapeHTML(person.name || 'anggota ini')}.
+          </div>
+          <div>
+            <button type="button" onclick="togglePersonVedic('${escapeHTML(person.id)}', true)" class="vedic-enable-btn">Aktifkan Vedic untuk ${escapeHTML((person.name || 'Anggota').split(' ')[0])}</button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const vedic = getVedicProfile(person);
+    const pid = escapeHTML(person.id || '');
+    const curSys = person.vedicAyanamsa || 'lahiri';
+    const curStyle = person.vedicChartStyle || 'south';
+
+    const toolbarHtml = `
+      <div class="vedic-toolbar">
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+          <select aria-label="Pilih Ayanamsa" onchange="setPersonVedicOption('${pid}', 'vedicAyanamsa', this.value)" class="vedic-select">
+            <option value="lahiri" ${curSys === 'lahiri' ? 'selected' : ''}>Lahiri</option>
+            <option value="kp" ${curSys === 'kp' ? 'selected' : ''}>KP</option>
+            <option value="raman" ${curSys === 'raman' ? 'selected' : ''}>Raman</option>
+          </select>
+          <div class="vedic-ctrl-group" role="group" aria-label="Gaya Bagan Kundali">
+            <button type="button" onclick="setPersonVedicOption('${pid}', 'vedicChartStyle', 'south')" class="vedic-seg-btn ${curStyle === 'south' ? 'active' : ''}">Selatan</button>
+            <button type="button" onclick="setPersonVedicOption('${pid}', 'vedicChartStyle', 'north')" class="vedic-seg-btn ${curStyle === 'north' ? 'active' : ''}">Utara</button>
+          </div>
+        </div>
+        <button type="button" onclick="togglePersonVedic('${pid}', false)" class="vedic-disable-btn" title="Sembunyikan Vedic untuk anggota ini">Nonaktifkan</button>
+      </div>
+    `;
+
+    if (!vedic.ready) {
+      const canEdit = Boolean(appSettings?.enableEdit) && !isGuestMode;
+      c.innerHTML = `
+        <div class="vedic-panel">
+          ${toolbarHtml}
+          <div class="vedic-banner-note">
+            <strong style="display: block; font-size: 12px; color: #78350f; margin-bottom: 4px;">Data Belum Lengkap untuk Perhitungan Sidereal</strong>
+            ${escapeHTML(vedic.reason)}
+            ${canEdit ? `<div style="margin-top: 10px;"><button type="button" onclick="openEditorFromInspector()" class="vedic-enable-btn">Lengkapi di Editor Profil</button></div>` : ''}
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const moon = vedic.moonPlacement;
+    const sun = vedic.sunPlacement;
+    const lagnaText = vedic.lagna
+      ? `${vedic.lagna.rashi.name} (${vedic.lagna.degreeText})`
+      : 'Perlu jam + koordinat';
+    const lagnaSub = vedic.lagna
+      ? `Nakshatra ${vedic.lagna.nakshatra.name} Pada ${vedic.lagna.pada}`
+      : 'Bhava memakai Chandra Lagna';
+
+    let missingBanner = '';
+    if (vedic.isTimeEstimated) {
+      missingBanner = `<div class="vedic-banner-note">Jam lahir kosong, menggunakan estimasi 12:00 lokal. Lagna, Bhava, dan jam transisi Bulan membutuhkan jam serta koordinat lahir.</div>`;
+    } else if (!vedic.hasCoords) {
+      missingBanner = `<div class="vedic-banner-note">Koordinat kota lahir belum diisi. Lagna (Ascendant) tidak dapat dihitung dan Bhava memakai Chandra Lagna sebagai patokan sementara.</div>`;
+    }
+
+    const dashaRows = vedic.dasha.timeline.map(item => `
+      <div class="vedic-dasha-row ${item.isActive ? 'current' : ''}">
+        <span>${escapeHTML(item.lord)} (${item.years} thn)</span>
+        <span>${formatShortDateIndo(item.startDate)} s.d. ${formatShortDateIndo(item.endDate)}</span>
+      </div>
+    `).join('');
+
+    const lagnaRow = vedic.lagna ? `
+      <tr style="background: #fffdf7;">
+        <td><strong>Lagna</strong></td>
+        <td>${escapeHTML(vedic.lagna.rashi.name)}</td>
+        <td>${escapeHTML(vedic.lagna.degreeText)}</td>
+        <td>${escapeHTML(vedic.lagna.nakshatra.name)} P${vedic.lagna.pada}</td>
+        <td>${escapeHTML(vedic.lagna.navamsa.name)}</td>
+        <td><span class="vedic-tag own">Bhava 1</span></td>
+      </tr>
+    ` : '';
+
+    const grahaRows = vedic.grahas.map(g => {
+      const tags = [];
+      if (g.isRetrograde) tags.push(`<span class="vedic-tag retro" title="Vakri (Retrograde)">Vakri</span>`);
+      if (g.dignity === 'Uchcha') tags.push(`<span class="vedic-tag exalt" title="Eksaltasi (Uchcha)">Uchcha</span>`);
+      else if (g.dignity === 'Swakshetra') tags.push(`<span class="vedic-tag own" title="Rumah Sendiri (Swakshetra)">Swakshetra</span>`);
+      else if (g.dignity === 'Neecha') tags.push(`<span class="vedic-tag debil" title="Debilitasi (Neecha)">Neecha</span>`);
+
+      return `
+        <tr>
+          <td><strong>${escapeHTML(g.name)}</strong> <span style="font-size: 9.5px; color: var(--ink-muted);">H${g.bhava}</span></td>
+          <td>${escapeHTML(g.rashi.name)}</td>
+          <td>${escapeHTML(g.degreeText)}</td>
+          <td>${escapeHTML(g.nakshatra.name)} P${g.pada}</td>
+          <td>${escapeHTML(g.navamsa.name)}</td>
+          <td>${tags.join(' ') || '<span style="color: var(--ink-subtle);">-</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    c.innerHTML = `
+      <div class="vedic-panel">
+        ${toolbarHtml}
+        ${missingBanner}
+
+        <div class="vedic-hero-card">
+          <div class="vedic-hero-kicker">Janma Nakshatra &amp; Chandra Rashi</div>
+          <div class="vedic-hero-title">${escapeHTML(moon.nakshatra.name)} (Pada ${moon.pada})</div>
+          <div class="vedic-hero-meta">
+            Chandra Rashi: <strong>${escapeHTML(moon.rashi.name)}</strong> (${escapeHTML(moon.degreeText)}) | Penguasa Nakshatra: <strong>${escapeHTML(moon.nakshatra.lord)}</strong>
+          </div>
+          <div style="font-size: 10.5px; color: var(--ink-secondary); margin-top: 6px; font-variant-numeric: tabular-nums;">
+            ${escapeHTML(vedic.utcSummary)} | Ayanamsa ${escapeHTML(vedic.ayanamsa.label)} ${escapeHTML(vedic.ayanamsa.dmsText)}
+          </div>
+        </div>
+
+        <div class="vedic-subgrid">
+          <div class="vedic-mini-card">
+            <small>Lagna (Ascendant D1)</small>
+            <strong>${escapeHTML(lagnaText)}</strong>
+            <span>${escapeHTML(lagnaSub)}</span>
+          </div>
+          <div class="vedic-mini-card">
+            <small>Surya Rashi &amp; Panchanga</small>
+            <strong>${escapeHTML(vedic.sunPlacement.rashi.name)} (${escapeHTML(vedic.sunPlacement.degreeText)})</strong>
+            <span>${escapeHTML(vedic.panchanga.tithi)} | Yoga ${escapeHTML(vedic.panchanga.yoga)}</span>
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Bagan Kundali (D1 Rashi)</h4>
+            <span>${curStyle === 'north' ? 'Gaya Utara (Diamond)' : 'Gaya Selatan (Rashi Tetap)'}</span>
+          </div>
+          <div class="vedic-kundali-wrap">
+            ${renderVedicKundaliSvg(vedic, curStyle)}
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Vimshottari Mahadasha</h4>
+            <span>Saldo Lahir: ${escapeHTML(vedic.dasha.birthBalanceLord)} ${vedic.dasha.birthBalanceYears.toFixed(2)} thn</span>
+          </div>
+          <div class="vedic-dasha-active">
+            <div class="vedic-dasha-pill">
+              <small>Mahadasha Aktif</small>
+              <strong>${escapeHTML(vedic.dasha.currentMaha.lord)}</strong>
+              <span>${formatShortDateIndo(vedic.dasha.currentMaha.startDate)} s.d. ${formatShortDateIndo(vedic.dasha.currentMaha.endDate)}</span>
+            </div>
+            <div class="vedic-dasha-pill">
+              <small>Antardasha (Bhukti)</small>
+              <strong>${escapeHTML(vedic.dasha.currentAntar.lord)}</strong>
+              <span>${formatShortDateIndo(vedic.dasha.currentAntar.startDate)} s.d. ${formatShortDateIndo(vedic.dasha.currentAntar.endDate)}</span>
+            </div>
+          </div>
+          <div class="vedic-dasha-list">
+            ${dashaRows}
+          </div>
+        </div>
+
+        <div class="vedic-section-box">
+          <div class="vedic-section-head">
+            <h4>Ephemeris Navagraha (Sidereal &amp; D9 Navamsa)</h4>
+            <span>9 Planet + Lagna</span>
+          </div>
+          <div class="vedic-table-scroll">
+            <table class="vedic-graha-table">
+              <thead>
+                <tr>
+                  <th>Graha</th>
+                  <th>Rashi</th>
+                  <th>Derajat</th>
+                  <th>Nakshatra</th>
+                  <th>D9</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lagnaRow}
+                ${grahaRows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function renderInspectorMedia(person) {
@@ -1866,7 +2097,7 @@
   }
 
   window.switchInspectorTab = function(tabName) {
-    ['bio', 'astro', 'media'].forEach(t => {
+    ['bio', 'astro', 'vedic', 'media'].forEach(t => {
       document.getElementById(`tab-btn-${t}`)?.classList.toggle('active', t === tabName);
       document.getElementById(`tab-content-${t}`)?.classList.toggle('hidden', t !== tabName);
     });
@@ -2562,6 +2793,12 @@
     document.getElementById('input-chinesezodiacbasis').value = person.chineseZodiacBasis || 'cny';
     document.getElementById('input-birthlatitude').value = person.birthLatitude ?? '';
     document.getElementById('input-birthlongitude').value = person.birthLongitude ?? '';
+    const vEnEl = document.getElementById('input-vedicenabled');
+    if (vEnEl) vEnEl.checked = Boolean(person.vedicEnabled);
+    const vAyEl = document.getElementById('input-vedicayanamsa');
+    if (vAyEl) vAyEl.value = person.vedicAyanamsa || 'lahiri';
+    const vStEl = document.getElementById('input-vedicchartstyle');
+    if (vStEl) vStEl.value = person.vedicChartStyle || 'south';
 
     // Child relation selectors
     const containerChildRel = document.getElementById('container-childrelations');
@@ -2723,6 +2960,12 @@
     person.chineseZodiacBasis = document.getElementById('input-chinesezodiacbasis').value;
     person.birthLatitude = document.getElementById('input-birthlatitude').value;
     person.birthLongitude = document.getElementById('input-birthlongitude').value;
+    const vEnSave = document.getElementById('input-vedicenabled');
+    if (vEnSave) person.vedicEnabled = Boolean(vEnSave.checked);
+    const vAySave = document.getElementById('input-vedicayanamsa');
+    if (vAySave) person.vedicAyanamsa = vAySave.value || 'lahiri';
+    const vStSave = document.getElementById('input-vedicchartstyle');
+    if (vStSave) person.vedicChartStyle = vStSave.value || 'south';
 
     if (!selectedSpouseId && selectedNodeId !== treeData.id && findParent(treeData, selectedNodeId)) {
       person.linkedSpouseId = document.getElementById('input-linkedspouse').value;
@@ -3406,11 +3649,24 @@
 
   function astrologyBadgeHtml(person) {
     const p = getAstrologyProfile(person);
-    if (!p.sun && !p.chinese && !p.weton) return '';
+    if (!p.sun && !p.chinese && !p.weton && !person.vedicEnabled) return '';
     let chips = '';
     if (p.sun) chips += `<span class="astro-chip sun" title="Zodiak Matahari: ${p.sun.name}">${p.sun.symbol} ${p.sun.name}</span>`;
     if (p.chinese) chips += `<span class="astro-chip chinese" title="Shio (${p.chinese.basisLabel}): ${p.chinese.name} ${p.chinese.element} ${p.chinese.polarity}">${p.chinese.symbol} ${p.chinese.name}</span>`;
     if (p.weton) chips += `<span class="astro-chip weton" title="Weton Jawa: ${p.weton.label} (Neptu ${p.weton.neptuTotal}, Wuku ${p.weton.wuku})">${p.weton.label}</span>`;
+    if (person.vedicEnabled) {
+      const vp = getVedicProfile(person);
+      if (vp.ready) {
+        const primary = vp.moonPlacement || vp.sunPlacement;
+        const badgeText = vp.moonPlacement
+          ? `${vp.moonPlacement.rashi.name} • ${vp.moonPlacement.nakshatra.name}`
+          : `Surya: ${vp.sunPlacement?.rashi.name || 'Vedic'}`;
+        const tip = `Vedic (${vp.ayanamsa.label}): ${vp.lagna ? `Lagna ${vp.lagna.rashi.name}, ` : ''}Chandra ${vp.moonPlacement?.rashi.name || '-'} (${vp.moonPlacement ? `${vp.moonPlacement.nakshatra.name} Pada ${vp.moonPlacement.pada}` : '-'})`;
+        chips += `<span class="astro-chip vedic" title="${escapeHTML(tip)}">${escapeHTML(badgeText)}</span>`;
+      } else {
+        chips += `<span class="astro-chip vedic" title="${escapeHTML(vp.reason || 'Perlu tanggal lahir')}">Vedic Aktif</span>`;
+      }
+    }
     return chips ? `<div class="card-badges-row">${chips}</div>` : '';
   }
 
@@ -3559,6 +3815,576 @@
       showToast(`Koordinat kota ${matchKey} (${data.tz}) berhasil diisi.`);
     } else {
       showToast('Kota tidak dikenali dalam daftar otomatis. Masukkan koordinat manual.', true);
+    }
+  };
+
+  // --- VEDIC ASTROLOGY (JYOTISH / SIDEREAL) PRECISION ENGINE ---
+  const VEDIC_RASHIS = [
+    { idx: 0,  name: 'Mesha',      western: 'Aries',       lord: 'Mangala', element: 'Agni (Api)',    code: 'Ms' },
+    { idx: 1,  name: 'Vrishabha',  western: 'Taurus',      lord: 'Shukra',  element: 'Prithvi (Tanah)', code: 'Vr' },
+    { idx: 2,  name: 'Mithuna',    western: 'Gemini',      lord: 'Budha',   element: 'Vayu (Udara)',  code: 'Mi' },
+    { idx: 3,  name: 'Karka',      western: 'Cancer',      lord: 'Chandra', element: 'Jala (Air)',    code: 'Ka' },
+    { idx: 4,  name: 'Simha',      western: 'Leo',         lord: 'Surya',   element: 'Agni (Api)',    code: 'Si' },
+    { idx: 5,  name: 'Kanya',      western: 'Virgo',       lord: 'Budha',   element: 'Prithvi (Tanah)', code: 'Kn' },
+    { idx: 6,  name: 'Tula',       western: 'Libra',       lord: 'Shukra',  element: 'Vayu (Udara)',  code: 'Tu' },
+    { idx: 7,  name: 'Vrishchika', western: 'Scorpio',     lord: 'Mangala', element: 'Jala (Air)',    code: 'Vs' },
+    { idx: 8,  name: 'Dhanu',      western: 'Sagittarius', lord: 'Guru',    element: 'Agni (Api)',    code: 'Dh' },
+    { idx: 9,  name: 'Makara',     western: 'Capricorn',   lord: 'Shani',   element: 'Prithvi (Tanah)', code: 'Mk' },
+    { idx: 10, name: 'Kumbha',     western: 'Aquarius',    lord: 'Shani',   element: 'Vayu (Udara)',  code: 'Ku' },
+    { idx: 11, name: 'Meena',      western: 'Pisces',      lord: 'Guru',    element: 'Jala (Air)',    code: 'Me' }
+  ];
+
+  const VEDIC_NAKSHATRAS = [
+    { name: 'Ashwini',           lord: 'Ketu' },
+    { name: 'Bharani',           lord: 'Shukra' },
+    { name: 'Krittika',          lord: 'Surya' },
+    { name: 'Rohini',            lord: 'Chandra' },
+    { name: 'Mrigashira',        lord: 'Mangala' },
+    { name: 'Ardra',             lord: 'Rahu' },
+    { name: 'Punarvasu',         lord: 'Guru' },
+    { name: 'Pushya',            lord: 'Shani' },
+    { name: 'Ashlesha',          lord: 'Budha' },
+    { name: 'Magha',             lord: 'Ketu' },
+    { name: 'Purva Phalguni',    lord: 'Shukra' },
+    { name: 'Uttara Phalguni',   lord: 'Surya' },
+    { name: 'Hasta',             lord: 'Chandra' },
+    { name: 'Chitra',            lord: 'Mangala' },
+    { name: 'Swati',             lord: 'Rahu' },
+    { name: 'Vishakha',          lord: 'Guru' },
+    { name: 'Anuradha',          lord: 'Shani' },
+    { name: 'Jyeshtha',          lord: 'Budha' },
+    { name: 'Mula',              lord: 'Ketu' },
+    { name: 'Purva Ashadha',     lord: 'Shukra' },
+    { name: 'Uttara Ashadha',    lord: 'Surya' },
+    { name: 'Shravana',          lord: 'Chandra' },
+    { name: 'Dhanishta',         lord: 'Mangala' },
+    { name: 'Shatabhisha',       lord: 'Rahu' },
+    { name: 'Purva Bhadrapada',  lord: 'Guru' },
+    { name: 'Uttara Bhadrapada', lord: 'Shani' },
+    { name: 'Revati',            lord: 'Budha' }
+  ];
+
+  const VIMSHOTTARI_ORDER = [
+    { lord: 'Ketu',    years: 7 },
+    { lord: 'Shukra',  years: 20 },
+    { lord: 'Surya',   years: 6 },
+    { lord: 'Chandra', years: 10 },
+    { lord: 'Mangala', years: 7 },
+    { lord: 'Rahu',    years: 18 },
+    { lord: 'Guru',    years: 16 },
+    { lord: 'Shani',   years: 19 },
+    { lord: 'Budha',   years: 17 }
+  ];
+
+  const VEDIC_TITHIS = [
+    'Pratipada', 'Dwitiya', 'Tritiya', 'Chaturthi', 'Panchami',
+    'Shashthi', 'Saptami', 'Ashtami', 'Navami', 'Dashami',
+    'Ekadashi', 'Dwadashi', 'Trayodashi', 'Chaturdashi', 'Purnima'
+  ];
+
+  const VEDIC_YOGAS = [
+    'Vishkambha', 'Priti', 'Ayushman', 'Saubhagya', 'Shobhana', 'Atiganda', 'Sukarma',
+    'Dhriti', 'Shula', 'Ganda', 'Vriddhi', 'Dhruva', 'Vyaghata', 'Harshana', 'Vajra',
+    'Siddhi', 'Vyatipata', 'Variyana', 'Parigha', 'Shiva', 'Siddha', 'Sadhya',
+    'Shubha', 'Shukla', 'Brahma', 'Indra', 'Vaidhriti'
+  ];
+
+  const VEDIC_DIGNITY = {
+    Surya:   { exalt: 0,  debil: 6,  own: [4] },
+    Chandra: { exalt: 1,  debil: 7,  own: [3] },
+    Mangala: { exalt: 9,  debil: 3,  own: [0, 7] },
+    Budha:   { exalt: 5,  debil: 11, own: [2, 5] },
+    Guru:    { exalt: 3,  debil: 9,  own: [8, 11] },
+    Shukra:  { exalt: 11, debil: 5,  own: [1, 6] },
+    Shani:   { exalt: 6,  debil: 0,  own: [9, 10] }
+  };
+
+  function formatDmsDeg(deg) {
+    const abs = Math.abs(Number(deg) || 0);
+    const d = Math.floor(abs);
+    const mFloat = (abs - d) * 60;
+    const m = Math.floor(mFloat);
+    const s = Math.round((mFloat - m) * 60);
+    return `${d}° ${String(m).padStart(2, '0')}′ ${String(s).padStart(2, '0')}″`;
+  }
+
+  function formatShortDateIndo(dateObj) {
+    if (!(dateObj instanceof Date) || Number.isNaN(dateObj.getTime())) return '-';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return `${String(dateObj.getUTCDate()).padStart(2, '0')} ${months[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
+  }
+
+  function getVedicAyanamsa(utcDate, system = 'lahiri') {
+    const Astro = getAstronomyApi();
+    const tObj = (astronomyEngineReady() && typeof Astro.MakeTime === 'function') ? Astro.MakeTime(utcDate) : null;
+    const T = tObj ? (tObj.tt / 36525.0) : ((utcDate.getTime() - Date.UTC(2000, 0, 1, 12, 0, 0)) / (36525 * 86400000));
+    const dpsiDeg = (tObj && typeof Astro.e_tilt === 'function') ? (Astro.e_tilt(tObj).dpsi / 3600.0) : 0;
+
+    const normSys = system === 'kp' ? 'kp' : system === 'raman' ? 'raman' : 'lahiri';
+    const baseAtJ2000 = normSys === 'kp' ? 23.76083333 : normSys === 'raman' ? 22.41666667 : 23.85709233;
+    const labelMap = {
+      lahiri: 'Lahiri (Chitrapaksha)',
+      kp: 'KP (Krishnamurti)',
+      raman: 'B.V. Raman'
+    };
+    const degrees = baseAtJ2000 + 1.39697128 * T + 0.0003086 * T * T + dpsiDeg;
+    return {
+      system: normSys,
+      label: labelMap[normSys],
+      degrees,
+      dmsText: formatDmsDeg(degrees)
+    };
+  }
+
+  function vedicPlacementFromLon(sidLon) {
+    const lon = normDeg(sidLon);
+    const rashiIndex = Math.floor(lon / 30) % 12;
+    const degInRashi = lon - rashiIndex * 30;
+    const wholeDeg = Math.floor(degInRashi);
+    const mins = Math.floor((degInRashi - wholeDeg) * 60);
+    const nakSpan = 360 / 27;
+    const nakIndex = Math.floor(lon / nakSpan) % 27;
+    const pada = Math.min(4, Math.floor((lon - nakIndex * nakSpan) / (nakSpan / 4)) + 1);
+    const navamsaIndex = Math.floor((lon * 9) / 30) % 12;
+
+    return {
+      longitude: lon,
+      rashi: VEDIC_RASHIS[rashiIndex],
+      rashiIndex,
+      degreeInRashi: degInRashi,
+      degreeText: `${wholeDeg}° ${String(mins).padStart(2, '0')}′`,
+      nakshatra: VEDIC_NAKSHATRAS[nakIndex],
+      nakshatraIndex: nakIndex,
+      pada,
+      navamsa: VEDIC_RASHIS[navamsaIndex],
+      navamsaIndex
+    };
+  }
+
+  function getMeanLunarNodeTropLon(Astro, utcDate) {
+    const tObj = typeof Astro.MakeTime === 'function' ? Astro.MakeTime(utcDate) : null;
+    const T = tObj ? (tObj.tt / 36525.0) : ((utcDate.getTime() - Date.UTC(2000, 0, 1, 12, 0, 0)) / (36525 * 86400000));
+    const t2 = T * T;
+    const t3 = t2 * T;
+    const t4 = t3 * T;
+    return normDeg(125.0445479 - 1934.1362891 * T + 0.0020754 * t2 + (t3 / 467441) - (t4 / 60616000));
+  }
+
+  function getPlanetTrueEclipticLon(Astro, bodyName, utcDate) {
+    if (bodyName === 'Sun') return normDeg(Astro.SunPosition(utcDate).elon);
+    if (bodyName === 'Moon') return normDeg(Astro.EclipticGeoMoon(utcDate).lon);
+    const tObj = Astro.MakeTime(utcDate);
+    if (typeof Astro.Rotation_EQJ_ECT === 'function' && typeof Astro.RotateVector === 'function' && typeof Astro.SphereFromVector === 'function') {
+      const rot = Astro.Rotation_EQJ_ECT(tObj);
+      const vec = Astro.GeoVector(Astro.Body[bodyName], tObj, true);
+      return normDeg(Astro.SphereFromVector(Astro.RotateVector(rot, vec)).lon);
+    }
+    return normDeg(Astro.Ecliptic(Astro.GeoVector(Astro.Body[bodyName], tObj, true)).elon);
+  }
+
+  function isPlanetRetrograde(Astro, bodyName, utcDate) {
+    const dtMs = 6 * 3600000;
+    const lon1 = getPlanetTrueEclipticLon(Astro, bodyName, new Date(utcDate.getTime() - dtMs));
+    const lon2 = getPlanetTrueEclipticLon(Astro, bodyName, new Date(utcDate.getTime() + dtMs));
+    let delta = lon2 - lon1;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    return delta < 0;
+  }
+
+  function getVedicDignityTag(grahaName, rashiIndex) {
+    const rule = VEDIC_DIGNITY[grahaName];
+    if (!rule) return '';
+    if (rule.exalt === rashiIndex) return 'Uchcha';
+    if (rule.debil === rashiIndex) return 'Neecha';
+    if (rule.own.includes(rashiIndex)) return 'Swakshetra';
+    return '';
+  }
+
+  function computeVimshottariDasha(moonSidLon, birthUtcDate, referenceDate = new Date()) {
+    const MS_PER_YEAR = 365.2425 * 86400000;
+    const nakSpan = 360 / 27;
+    const nakIndex = Math.floor(normDeg(moonSidLon) / nakSpan) % 27;
+    const startIdx = nakIndex % 9;
+    const fractionElapsed = (normDeg(moonSidLon) - nakIndex * nakSpan) / nakSpan;
+    const firstLord = VIMSHOTTARI_ORDER[startIdx];
+    const remainingYearsAtBirth = (1 - fractionElapsed) * firstLord.years;
+
+    let cursorMs = birthUtcDate.getTime() - fractionElapsed * firstLord.years * MS_PER_YEAR;
+    const refMs = referenceDate.getTime();
+    const timeline = [];
+    let currentMaha = null;
+
+    for (let i = 0; i < 9; i++) {
+      const idx = (startIdx + i) % 9;
+      const item = VIMSHOTTARI_ORDER[idx];
+      const endMs = cursorMs + item.years * MS_PER_YEAR;
+      const displayStartMs = i === 0 ? birthUtcDate.getTime() : cursorMs;
+      const isActive = refMs >= displayStartMs && refMs < endMs;
+      const entry = {
+        lord: item.lord,
+        lordIdx: idx,
+        years: item.years,
+        rawStartMs: cursorMs,
+        startDate: new Date(displayStartMs),
+        endDate: new Date(endMs),
+        isActive
+      };
+      timeline.push(entry);
+      if (isActive) currentMaha = entry;
+      cursorMs = endMs;
+    }
+
+    if (!currentMaha) {
+      currentMaha = timeline[timeline.length - 1];
+    }
+
+    let antarCursorMs = currentMaha.rawStartMs;
+    let currentAntar = null;
+    const antardashas = [];
+    for (let j = 0; j < 9; j++) {
+      const aIdx = (currentMaha.lordIdx + j) % 9;
+      const aItem = VIMSHOTTARI_ORDER[aIdx];
+      const aYears = (currentMaha.years * aItem.years) / 120;
+      const aEndMs = antarCursorMs + aYears * MS_PER_YEAR;
+      const clampedStartMs = Math.max(birthUtcDate.getTime(), antarCursorMs);
+      const isActive = refMs >= clampedStartMs && refMs < aEndMs;
+      const aEntry = {
+        lord: aItem.lord,
+        years: aYears,
+        startDate: new Date(clampedStartMs),
+        endDate: new Date(aEndMs),
+        isActive
+      };
+      antardashas.push(aEntry);
+      if (isActive) currentAntar = aEntry;
+      antarCursorMs = aEndMs;
+    }
+
+    return {
+      birthBalanceLord: firstLord.lord,
+      birthBalanceYears: remainingYearsAtBirth,
+      currentMaha,
+      currentAntar: currentAntar || antardashas[0],
+      timeline,
+      antardashas
+    };
+  }
+
+  function getVedicProfile(person = {}) {
+    const dateParts = parseIsoDateParts(person.birthDate);
+    if (!dateParts) {
+      return {
+        ready: false,
+        reason: 'Tanggal lahir lengkap (YYYY-MM-DD) diperlukan untuk menghitung rasi sidereal dan Nakshatra.'
+      };
+    }
+    if (!astronomyEngineReady()) {
+      return {
+        ready: false,
+        reason: 'Mesin astronomi sedang offline. Sambungkan internet agar ephemeris Vedic dapat dimuat.'
+      };
+    }
+
+    const Astro = getAstronomyApi();
+    const timeParts = parseTimeParts(person.birthTime);
+    const hasCoords = Boolean(
+      timeParts &&
+      hasCoordValue(person.birthLatitude) &&
+      hasCoordValue(person.birthLongitude) &&
+      Number(person.birthLatitude) >= -89.9 && Number(person.birthLatitude) <= 89.9 &&
+      Number(person.birthLongitude) >= -180 && Number(person.birthLongitude) <= 180
+    );
+
+    const tzRes = localDateTimeToUtc(
+      dateParts.y, dateParts.m, dateParts.d,
+      timeParts ? timeParts.hr : 12,
+      timeParts ? timeParts.mn : 0,
+      person.birthTimezone,
+      person.birthUtcOffset
+    );
+    const utcDate = tzRes.utcDate;
+    const ayanamsa = getVedicAyanamsa(utcDate, person.vedicAyanamsa || 'lahiri');
+    const chartStyle = person.vedicChartStyle === 'north' ? 'north' : 'south';
+
+    let lagna = null;
+    if (hasCoords) {
+      const lat = Number(person.birthLatitude);
+      const lng = Number(person.birthLongitude);
+      const siderealHours = Astro.SiderealTime(utcDate);
+      const theta = (siderealHours * 15 + lng) * Math.PI / 180;
+      const epsDeg = (typeof Astro.e_tilt === 'function' && typeof Astro.MakeTime === 'function')
+        ? Astro.e_tilt(Astro.MakeTime(utcDate)).tobl
+        : 23.439291;
+      const eps = epsDeg * Math.PI / 180;
+      const phi = lat * Math.PI / 180;
+      const ascY = Math.cos(theta);
+      const ascX = -(Math.sin(theta) * Math.cos(eps) + Math.tan(phi) * Math.sin(eps));
+      const tropAscLon = normDeg(Math.atan2(ascY, ascX) * 180 / Math.PI);
+      lagna = vedicPlacementFromLon(tropAscLon - ayanamsa.degrees);
+    }
+
+    const planetDefs = [
+      { id: 'Sun',     name: 'Surya',   code: 'Su', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Sun', utcDate), canRetro: false },
+      { id: 'Moon',    name: 'Chandra', code: 'Mo', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Moon', utcDate), canRetro: false },
+      { id: 'Mars',    name: 'Mangala', code: 'Ma', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Mars', utcDate), canRetro: true },
+      { id: 'Mercury', name: 'Budha',   code: 'Me', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Mercury', utcDate), canRetro: true },
+      { id: 'Jupiter', name: 'Guru',    code: 'Ju', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Jupiter', utcDate), canRetro: true },
+      { id: 'Venus',   name: 'Shukra',  code: 'Ve', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Venus', utcDate), canRetro: true },
+      { id: 'Saturn',  name: 'Shani',   code: 'Sa', tropFn: () => getPlanetTrueEclipticLon(Astro, 'Saturn', utcDate), canRetro: true }
+    ];
+
+    const sunTrop = planetDefs[0].tropFn();
+    const moonTrop = planetDefs[1].tropFn();
+    const rahuTrop = getMeanLunarNodeTropLon(Astro, utcDate);
+    const ketuTrop = normDeg(rahuTrop + 180);
+
+    const sunPlace = vedicPlacementFromLon(sunTrop - ayanamsa.degrees);
+    const moonPlace = vedicPlacementFromLon(moonTrop - ayanamsa.degrees);
+    const rashiAnchor = lagna ? lagna.rashiIndex : moonPlace.rashiIndex;
+
+    const grahas = planetDefs.map(def => {
+      const tropLon = def.id === 'Sun' ? sunTrop : def.id === 'Moon' ? moonTrop : def.tropFn();
+      const placement = vedicPlacementFromLon(tropLon - ayanamsa.degrees);
+      const isRetrograde = def.canRetro ? isPlanetRetrograde(Astro, def.id, utcDate) : false;
+      const bhava = ((placement.rashiIndex - rashiAnchor) % 12 + 12) % 12 + 1;
+      const dignity = getVedicDignityTag(def.name, placement.rashiIndex);
+      return {
+        name: def.name,
+        code: def.code,
+        ...placement,
+        bhava,
+        isRetrograde,
+        dignity
+      };
+    });
+
+    const rahuPlace = vedicPlacementFromLon(rahuTrop - ayanamsa.degrees);
+    const ketuPlace = vedicPlacementFromLon(ketuTrop - ayanamsa.degrees);
+    grahas.push({
+      name: 'Rahu',
+      code: 'Ra',
+      ...rahuPlace,
+      bhava: ((rahuPlace.rashiIndex - rashiAnchor) % 12 + 12) % 12 + 1,
+      isRetrograde: true,
+      dignity: ''
+    });
+    grahas.push({
+      name: 'Ketu',
+      code: 'Ke',
+      ...ketuPlace,
+      bhava: ((ketuPlace.rashiIndex - rashiAnchor) % 12 + 12) % 12 + 1,
+      isRetrograde: true,
+      dignity: ''
+    });
+
+    // Panchanga: Tithi & Nitya Yoga
+    const lunarPhaseDiff = normDeg(moonTrop - sunTrop);
+    const tithiNum = Math.floor(lunarPhaseDiff / 12); // 0..29
+    const paksha = tithiNum < 15 ? 'Shukla Paksha' : 'Krishna Paksha';
+    const tithiName = tithiNum === 14
+      ? 'Purnima'
+      : tithiNum === 29
+        ? 'Amavasya'
+        : VEDIC_TITHIS[tithiNum % 15];
+    const yogaLon = normDeg(sunPlace.longitude + moonPlace.longitude);
+    const yogaName = VEDIC_YOGAS[Math.floor(yogaLon / (360 / 27)) % 27];
+
+    // Dasha reference date: date of death if deceased, otherwise today
+    let dashaRefDate = new Date();
+    const deathParts = parseIsoDateParts(person.deathDate);
+    if (deathParts) {
+      dashaRefDate = new Date(Date.UTC(deathParts.y, deathParts.m - 1, deathParts.d, 12, 0, 0));
+    }
+    const dasha = computeVimshottariDasha(moonPlace.longitude, utcDate, dashaRefDate);
+
+    return {
+      ready: true,
+      ayanamsa,
+      chartStyle,
+      isTimeEstimated: !timeParts,
+      hasCoords,
+      utcSummary: timeParts ? tzRes.summary : `Basis estimasi 12:00 (${tzRes.offsetLabel})`,
+      lagna,
+      sunPlacement: sunPlace,
+      moonPlacement: moonPlace,
+      grahas,
+      panchanga: {
+        tithi: `${paksha} ${tithiName}`,
+        yoga: yogaName
+      },
+      dasha
+    };
+  }
+
+  function formatKundaliTokens(tokens, maxPerLine) {
+    const lines = [];
+    for (let i = 0; i < tokens.length; i += maxPerLine) {
+      lines.push(tokens.slice(i, i + maxPerLine).join('  '));
+    }
+    return lines;
+  }
+
+  function renderVedicKundaliSvg(vedic, chartStyle = 'south') {
+    if (!vedic || !vedic.ready) return '';
+    const byRashi = Array.from({ length: 12 }, () => []);
+    if (vedic.lagna) {
+      byRashi[vedic.lagna.rashiIndex].push('Lg');
+    }
+    vedic.grahas.forEach(g => {
+      const label = g.isRetrograde && g.name !== 'Rahu' && g.name !== 'Ketu' ? `${g.code}*` : g.code;
+      byRashi[g.rashiIndex].push(label);
+    });
+
+    const lagnaRashiIdx = vedic.lagna ? vedic.lagna.rashiIndex : vedic.moonPlacement.rashiIndex;
+    const centerTitle = vedic.lagna ? `Lagna: ${vedic.lagna.rashi.name}` : `Chandra: ${vedic.moonPlacement.rashi.name}`;
+    const centerSub = `${vedic.ayanamsa.system.toUpperCase()} ${vedic.ayanamsa.dmsText}`;
+
+    if (chartStyle === 'north') {
+      const northHouses = [
+        { cx: 160, cy: 68,  rx: 160, ry: 138, perLine: 3 },
+        { cx: 80,  cy: 26,  rx: 80,  ry: 58,  perLine: 3 },
+        { cx: 26,  cy: 82,  rx: 56,  ry: 83,  perLine: 2 },
+        { cx: 78,  cy: 160, rx: 136, ry: 163, perLine: 3 },
+        { cx: 26,  cy: 242, rx: 56,  ry: 243, perLine: 2 },
+        { cx: 80,  cy: 294, rx: 80,  ry: 266, perLine: 3 },
+        { cx: 160, cy: 248, rx: 160, ry: 187, perLine: 3 },
+        { cx: 240, cy: 294, rx: 240, ry: 266, perLine: 3 },
+        { cx: 294, cy: 242, rx: 264, ry: 243, perLine: 2 },
+        { cx: 242, cy: 160, rx: 184, ry: 163, perLine: 3 },
+        { cx: 294, cy: 82,  rx: 264, ry: 83,  perLine: 2 },
+        { cx: 240, cy: 26,  rx: 240, ry: 58,  perLine: 3 }
+      ];
+
+      const houseNodes = northHouses.map((geom, hIdx) => {
+        const rIdx = (lagnaRashiIdx + hIdx) % 12;
+        const rNum = rIdx + 1;
+        const tokens = byRashi[rIdx];
+        const lines = formatKundaliTokens(tokens, geom.perLine);
+        const startY = geom.cy - ((lines.length - 1) * 6.5);
+        const tspans = lines.map((line, lIdx) =>
+          `<tspan x="${geom.cx}" y="${(startY + lIdx * 13).toFixed(1)}">${escapeHTML(line)}</tspan>`
+        ).join('');
+        return `
+          <text x="${geom.rx}" y="${geom.ry}" text-anchor="middle" font-size="9" font-weight="700" fill="#b45309" opacity="0.82">${rNum}</text>
+          ${tokens.length ? `<text text-anchor="middle" font-size="10.5" font-weight="800" fill="#1e293b">${tspans}</text>` : ''}
+        `;
+      }).join('');
+
+      return `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%;">
+          <svg viewBox="0 0 320 320" class="vedic-kundali-svg" role="img" aria-label="Bagan Kundali Gaya Utara (North Indian Diamond)">
+            <rect x="2" y="2" width="316" height="316" rx="8" fill="#fffdf7" stroke="#d97706" stroke-width="2"/>
+            <line x1="2" y1="2" x2="318" y2="318" stroke="#d97706" stroke-width="1.3"/>
+            <line x1="318" y1="2" x2="2" y2="318" stroke="#d97706" stroke-width="1.3"/>
+            <polygon points="160,2 318,160 160,318 2,160" fill="none" stroke="#d97706" stroke-width="1.4"/>
+            ${houseNodes}
+          </svg>
+          <div style="font-size: 10px; font-weight: 700; color: #92400e; text-align: center; font-variant-numeric: tabular-nums;">${escapeHTML(centerTitle)} | ${escapeHTML(centerSub)}</div>
+        </div>
+      `;
+    }
+
+    // South Indian Fixed-Sign Grid (4x4 outer ring)
+    const southCells = [
+      { rIdx: 11, col: 0, row: 0 }, { rIdx: 0,  col: 1, row: 0 }, { rIdx: 1,  col: 2, row: 0 }, { rIdx: 2,  col: 3, row: 0 },
+      { rIdx: 3,  col: 3, row: 1 }, { rIdx: 4,  col: 3, row: 2 },
+      { rIdx: 5,  col: 3, row: 3 }, { rIdx: 6,  col: 2, row: 3 }, { rIdx: 7,  col: 1, row: 3 }, { rIdx: 8,  col: 0, row: 3 },
+      { rIdx: 9,  col: 0, row: 2 }, { rIdx: 10, col: 0, row: 1 }
+    ];
+
+    const cellNodes = southCells.map(cell => {
+      const x = 4 + cell.col * 78;
+      const y = 4 + cell.row * 78;
+      const rashi = VEDIC_RASHIS[cell.rIdx];
+      const isLagnaCell = vedic.lagna && vedic.lagna.rashiIndex === cell.rIdx;
+      const isChandraCell = vedic.moonPlacement && vedic.moonPlacement.rashiIndex === cell.rIdx;
+      const tokens = byRashi[cell.rIdx];
+      const lines = formatKundaliTokens(tokens, 2);
+      const startY = y + 40 - ((lines.length - 1) * 6);
+      const tspans = lines.map((line, lIdx) =>
+        `<tspan x="${x + 39}" y="${(startY + lIdx * 13).toFixed(1)}">${escapeHTML(line)}</tspan>`
+      ).join('');
+      return `
+        <rect x="${x}" y="${y}" width="78" height="78" fill="${isLagnaCell ? '#fef3c7' : '#fffdf7'}" stroke="#d97706" stroke-width="1.2"/>
+        ${isLagnaCell ? `<line x1="${x}" y1="${y + 18}" x2="${x + 18}" y2="${y}" stroke="#b45309" stroke-width="1.8"/>` : ''}
+        <text x="${x + 73}" y="${y + 13}" text-anchor="end" font-size="8.5" font-weight="800" fill="${isLagnaCell ? '#9a3412' : '#b45309'}" opacity="0.85">${escapeHTML(rashi.code)}</text>
+        ${isChandraCell && !isLagnaCell ? `<circle cx="${x + 9}" cy="${y + 9}" r="2.5" fill="#4338ca"/>` : ''}
+        ${tokens.length ? `<text text-anchor="middle" font-size="11" font-weight="800" fill="#1e293b">${tspans}</text>` : ''}
+      `;
+    }).join('');
+
+    return `
+      <svg viewBox="0 0 320 320" class="vedic-kundali-svg" role="img" aria-label="Bagan Kundali Gaya Selatan (South Indian Rashi Chart)">
+        <rect x="4" y="4" width="312" height="312" rx="6" fill="#fffdf7" stroke="#d97706" stroke-width="2"/>
+        ${cellNodes}
+        <rect x="82" y="82" width="156" height="156" fill="#ffffff" stroke="#d97706" stroke-width="1.4"/>
+        <text x="160" y="138" text-anchor="middle" font-size="10" font-weight="800" fill="#9a3412" letter-spacing="0.06em">RASHI CHART (D1)</text>
+        <text x="160" y="157" text-anchor="middle" font-size="11.5" font-weight="800" fill="#0f172a">${escapeHTML(centerTitle)}</text>
+        <text x="160" y="175" text-anchor="middle" font-size="9.5" font-weight="700" fill="#78350f">${escapeHTML(vedic.ayanamsa.label)}</text>
+        <text x="160" y="191" text-anchor="middle" font-size="9.5" font-weight="700" fill="#b45309">${escapeHTML(vedic.ayanamsa.dmsText)}</text>
+      </svg>
+    `;
+  }
+
+  window.handleCardVedicAction = function(nodeId, spouseId) {
+    const targetId = spouseId || nodeId;
+    const person = findNodeById(treeData, targetId);
+    if (!person) return;
+
+    activeInspectorPersonId = targetId;
+    selectedNodeId = nodeId;
+    selectedSpouseId = spouseId || null;
+
+    if (!person.vedicEnabled) {
+      person.vedicEnabled = true;
+      if (!person.vedicAyanamsa) person.vedicAyanamsa = 'lahiri';
+      if (!person.vedicChartStyle) person.vedicChartStyle = 'south';
+
+      renderTree();
+      if (!isGuestMode && appSettings?.enableEdit) {
+        simpanKeFirebase(`Aktifkan Vedic Jyotish: ${person.name}`);
+        showToast(`Analisis Vedic (Jyotish) diaktifkan untuk ${person.name}.`);
+      } else {
+        showToast(`Pratinjau Vedic diaktifkan untuk ${person.name} (Mode Tamu tidak menyimpan ke cloud).`);
+      }
+    }
+
+    highlightPerson(targetId);
+    openInspectorDrawer(targetId, 'vedic');
+  };
+
+  window.togglePersonVedic = function(personId, enable) {
+    const person = findNodeById(treeData, personId);
+    if (!person) return;
+    person.vedicEnabled = Boolean(enable);
+    if (person.vedicEnabled) {
+      if (!person.vedicAyanamsa) person.vedicAyanamsa = 'lahiri';
+      if (!person.vedicChartStyle) person.vedicChartStyle = 'south';
+    }
+
+    renderTree();
+    if (!isGuestMode && appSettings?.enableEdit) {
+      simpanKeFirebase(`${person.vedicEnabled ? 'Aktifkan' : 'Nonaktifkan'} Vedic: ${person.name}`);
+      showToast(person.vedicEnabled ? `Vedic diaktifkan untuk ${person.name}.` : `Vedic dinonaktifkan untuk ${person.name}.`);
+    } else {
+      showToast(person.vedicEnabled ? 'Pratinjau Vedic diaktifkan (lokal).' : 'Vedic disembunyikan (lokal).');
+    }
+
+    openInspectorDrawer(personId, person.vedicEnabled ? 'vedic' : 'astro');
+  };
+
+  window.setPersonVedicOption = function(personId, field, value) {
+    const person = findNodeById(treeData, personId);
+    if (!person) return;
+    if (field !== 'vedicAyanamsa' && field !== 'vedicChartStyle') return;
+    person[field] = value;
+
+    renderTree();
+    renderInspectorVedic(person);
+
+    if (!isGuestMode && appSettings?.enableEdit) {
+      simpanKeFirebase(`Ubah opsi Vedic ${person.name}`);
     }
   };
 
@@ -5210,6 +6036,18 @@
         const wetonText = astro.weton
           ? `${astro.weton.label} (Neptu ${astro.weton.neptuTotal}, Wuku ${astro.weton.wuku})`
           : '';
+        let vedicPdfText = '';
+        if (person.vedicEnabled) {
+          const vp = getVedicProfile(person);
+          if (vp.ready) {
+            vedicPdfText = [
+              vp.lagna ? `Lagna ${vp.lagna.rashi.name} (${vp.lagna.degreeText})` : '',
+              `Chandra ${vp.moonPlacement.rashi.name}`,
+              `${vp.moonPlacement.nakshatra.name} Pada ${vp.moonPlacement.pada}`,
+              `Dasha ${vp.dasha.currentMaha.lord}/${vp.dasha.currentAntar.lord}`
+            ].filter(Boolean).join(', ');
+          }
+        }
 
         let y = 36;
         const meta = [
@@ -5218,6 +6056,7 @@
           ['Kelahiran', `${person.birthPlace || ''} ${person.birthDate || person.birthYear || ''}`.trim()],
           ['Status', person.deathDate || person.deathYear ? `Wafat (${person.deathDate || person.deathYear})` : 'Masih Hidup'],
           ['Astrologi & Shio', astroText],
+          ['Vedic (Jyotish)', vedicPdfText],
           ['Weton Jawa', wetonText],
           ['Kalender Hijriyah', astro.hijri || ''],
           ['Profesi', person.occupation],

@@ -605,6 +605,7 @@
       <nav class="inspector-nav-tabs">
         <button onclick="switchInspectorTab('bio')" id="tab-btn-bio" class="inspector-tab-btn active">Biodata</button>
         <button onclick="switchInspectorTab('astro')" id="tab-btn-astro" class="inspector-tab-btn">Astrologi</button>
+        <button onclick="switchInspectorTab('vedic')" id="tab-btn-vedic" class="inspector-tab-btn hidden">Vedic</button>
         <button onclick="switchInspectorTab('media')" id="tab-btn-media" class="inspector-tab-btn">Galeri & Dokumen</button>
       </nav>
 
@@ -619,7 +620,12 @@
           <div id="inspector-astro-details"></div>
         </div>
 
-        <!-- Tab 3: Media & Arsip -->
+        <!-- Tab 3: Vedic Jyotish (Opt-in per anggota) -->
+        <div id="tab-content-vedic" class="hidden">
+          <div id="inspector-vedic-details"></div>
+        </div>
+
+        <!-- Tab 4: Media & Arsip -->
         <div id="tab-content-media" class="hidden">
           <div id="inspector-media-details"></div>
         </div>
@@ -846,7 +852,32 @@
               </div>
             </div>
 
-            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px;">
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #c7d2fe;">
+              <div style="font-size: 11px; font-weight: 800; color: #78350f; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">Vedic Jyotish (Sidereal - Opsional per Anggota)</div>
+              <div class="form-grid-3" style="align-items: end;">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #fffdf7; border: 1px solid #fcd34d; cursor: pointer; font-size: 12px; font-weight: 700; color: #78350f;">
+                  <input type="checkbox" id="input-vedicenabled" style="width: 15px; height: 15px; accent-color: #b45309; cursor: pointer;">
+                  <span>Aktifkan Vedic</span>
+                </label>
+                <div class="form-field-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="input-vedicayanamsa">Sistem Ayanamsa</label>
+                  <select id="input-vedicayanamsa" class="form-select">
+                    <option value="lahiri">Lahiri (Chitrapaksha)</option>
+                    <option value="kp">KP (Krishnamurti)</option>
+                    <option value="raman">B.V. Raman</option>
+                  </select>
+                </div>
+                <div class="form-field-group" style="margin-bottom: 0;">
+                  <label class="form-label" for="input-vedicchartstyle">Gaya Bagan Kundali</label>
+                  <select id="input-vedicchartstyle" class="form-select">
+                    <option value="south">Selatan (South Indian)</option>
+                    <option value="north">Utara (North Diamond)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px;">
               <button type="button" onclick="fillAstrologyCoordinates()" class="ui-btn" style="padding: 7px 12px; font-size: 12px;">
                 <i class="fa-solid fa-location-crosshairs"></i>
                 <span>Koordinat Kota Lahir</span>
