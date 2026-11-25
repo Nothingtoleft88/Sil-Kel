@@ -813,7 +813,7 @@
     return d;
   }
 
-  function drawUnionLink(svg, rectA, rectB, color) {
+  function drawUnionLink(svg, rectA, rectB, color, isHighlighted = false) {
     const leftRect = rectA.centerX <= rectB.centerX ? rectA : rectB;
     const rightRect = rectA.centerX <= rectB.centerX ? rectB : rectA;
     const y = Math.round((leftRect.centerY + rightRect.centerY) / 2);
@@ -822,13 +822,15 @@
     if (endX <= startX) return null;
 
     const midX = Math.round((startX + endX) / 2);
+    const activeColor = isHighlighted ? '#0284c7' : (color || '#94a3b8');
+    const activeWidth = isHighlighted ? 3.5 : 2.5;
 
     // Halo underlay
     const halo = createSvgEl('path', {
       d: `M ${startX} ${y} L ${endX} ${y}`,
       fill: 'none',
       stroke: 'var(--bg-canvas, #f8fafc)',
-      'stroke-width': 7,
+      'stroke-width': activeWidth + 4.5,
       'stroke-linecap': 'round',
       class: 'connector-halo'
     });
@@ -838,10 +840,11 @@
     const path = createSvgEl('path', {
       d: `M ${startX} ${y} L ${endX} ${y}`,
       fill: 'none',
-      stroke: color || '#94a3b8',
-      'stroke-width': 2.5,
+      stroke: activeColor,
+      'stroke-width': activeWidth,
       'stroke-linecap': 'round'
     });
+    if (isHighlighted) path.classList.add('lineage-highlight');
     svg.appendChild(path);
 
     // Heart union badge
@@ -850,8 +853,8 @@
       cy: y,
       r: 10,
       fill: 'var(--bg-surface, #ffffff)',
-      stroke: color || '#e11d48',
-      'stroke-width': 1.5
+      stroke: isHighlighted ? '#0284c7' : (color || '#e11d48'),
+      'stroke-width': isHighlighted ? 2 : 1.5
     });
     svg.appendChild(circle);
 
@@ -1004,70 +1007,114 @@
     const svg = document.getElementById('tree-connectors');
     if (!familyTree || !svg || !treeData) return;
 
+    // Reset SVG dimensions BEFORE measuring surface so stale Full-tree size never inflates Pedigree/Hourglass scrollWidth
+    svg.setAttribute('width', 0);
+    svg.setAttribute('height', 0);
+    svg.replaceChildren();
+
     const w = Math.max(familyTree.scrollWidth, familyTree.offsetWidth, 1);
     const h = Math.max(familyTree.scrollHeight, familyTree.offsetHeight, 1);
     svg.setAttribute('width', w);
     svg.setAttribute('height', h);
     svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    svg.replaceChildren();
 
     const rootRect = familyTree.getBoundingClientRect();
-    const sc = (typeof scale === 'number' && scale > 0) ? scale : (rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : 1);
+    const sX = rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : (scale || 1);
+    const sY = rootRect.height && familyTree.offsetHeight ? rootRect.height / familyTree.offsetHeight : sX;
 
-    const primaryCards = new Map();
-    const spouseCards = new Map();
+    if (activePerspectiveMode === 'pedigree' || activePerspectiveMode === 'hourglass') {
+      drawPedigreeConnectors(svg, familyTree, rootRect, sX, sY);
+    }
 
-    familyTree.querySelectorAll('[data-person-id][data-card-role]').forEach(card => {
-      const id = card.dataset.personId;
-      if (!id) return;
-      const rect = getLocalCardRect(card, rootRect, sc, sc);
-      if (card.dataset.cardRole === 'spouse') {
-        spouseCards.set(id, { element: card, rect, spouseOf: card.dataset.spouseOf || '' });
-      } else {
-        primaryCards.set(id, { element: card, rect });
-      }
-    });
+    if (activePerspectiveMode === 'full' || activePerspectiveMode === 'hourglass') {
+      const cardScope = (activePerspectiveMode === 'hourglass')
+        ? (familyTree.querySelector('.hourglass-descendants-section') || familyTree)
+        : familyTree;
 
-    function walkTree(node) {
-      if (!node) return;
-      const primaryEntry = primaryCards.get(String(node.id));
-      if (!primaryEntry) return;
+      const primaryCards = new Map();
+      const spouseCards = new Map();
 
-      const primaryRect = primaryEntry.rect;
-      const unions = new Map();
-
-      // Draw unions across the marital row linking adjacent cards
-      let prevCardRect = primaryRect;
-      (node.spouses || []).forEach((spouse, idx) => {
-        const spouseEntry = spouseCards.get(String(spouse.id));
-        if (!spouseEntry) return;
-        const color = branchColors[idx % branchColors.length];
-        const union = drawUnionLink(svg, prevCardRect, spouseEntry.rect, color);
-        if (union) unions.set(String(spouse.id), union);
-        prevCardRect = spouseEntry.rect;
-
-        // Secondary spouses of spouse (if any)
-        if (spouse.spouses && spouse.spouses.length > 0) {
-          let prevSecRect = spouseEntry.rect;
-          spouse.spouses.forEach((secSpouse, sIdx) => {
-            const secEntry = spouseCards.get(String(secSpouse.id));
-            if (!secEntry) return;
-            const secColor = branchColors[(idx + sIdx + 1) % branchColors.length];
-            const secUnion = drawUnionLink(svg, prevSecRect, secEntry.rect, secColor);
-            if (secUnion) unions.set(String(secSpouse.id), secUnion);
-            prevSecRect = secEntry.rect;
-          });
+      cardScope.querySelectorAll('[data-person-id][data-card-role]').forEach(card => {
+        const id = card.dataset.personId;
+        if (!id) return;
+        const rect = getLocalCardRect(card, rootRect, sX, sY);
+        if (card.dataset.cardRole === 'spouse') {
+          spouseCards.set(id, { element: card, rect, spouseOf: card.dataset.spouseOf || '' });
+        } else {
+          primaryCards.set(id, { element: card, rect });
         }
+      });
 
-        // Connect spouse parents (if present)
-        if (spouse.parents && spouse.parents.length > 0) {
-          const parentRects = spouse.parents
-            .map(p => primaryCards.get(String(p.id))?.rect)
-            .filter(Boolean);
-          if (parentRects.length === 2) {
-            const pUnion = drawUnionLink(svg, parentRects[0], parentRects[1], '#94a3b8');
-            if (pUnion) {
-              const spouseDropD = `M ${pUnion.x} ${pUnion.y + 10} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
+      const isLit = (id) => {
+        const sid = String(id || '');
+        return highlightedLineage.ancestors.has(sid) || highlightedLineage.descendants.has(sid);
+      };
+
+      function walkTree(node) {
+        if (!node) return;
+        const primaryEntry = primaryCards.get(String(node.id));
+        if (!primaryEntry) return;
+
+        const primaryRect = primaryEntry.rect;
+        const unions = new Map();
+
+        // Draw unions across the marital row linking adjacent cards
+        let prevCardRect = primaryRect;
+        let prevCardLit = isLit(node.id);
+        (node.spouses || []).forEach((spouse, idx) => {
+          const spouseEntry = spouseCards.get(String(spouse.id));
+          if (!spouseEntry) return;
+          const color = branchColors[idx % branchColors.length];
+          const currLit = isLit(spouse.id);
+          const unionLit = (prevCardLit || isLit(node.id)) && currLit;
+          const union = drawUnionLink(svg, prevCardRect, spouseEntry.rect, color, unionLit);
+          if (union) unions.set(String(spouse.id), union);
+          prevCardRect = spouseEntry.rect;
+          prevCardLit = currLit;
+
+          // Secondary spouses of spouse (if any)
+          if (spouse.spouses && spouse.spouses.length > 0) {
+            let prevSecRect = spouseEntry.rect;
+            spouse.spouses.forEach((secSpouse, sIdx) => {
+              const secEntry = spouseCards.get(String(secSpouse.id));
+              if (!secEntry) return;
+              const secColor = branchColors[(idx + sIdx + 1) % branchColors.length];
+              const secUnion = drawUnionLink(svg, prevSecRect, secEntry.rect, secColor, currLit && isLit(secSpouse.id));
+              if (secUnion) unions.set(String(secSpouse.id), secUnion);
+              prevSecRect = secEntry.rect;
+            });
+          }
+
+          // Connect spouse parents (if present)
+          if (spouse.parents && spouse.parents.length > 0) {
+            const parentRects = spouse.parents
+              .map(p => primaryCards.get(String(p.id))?.rect)
+              .filter(Boolean);
+            if (parentRects.length === 2) {
+              const pUnion = drawUnionLink(svg, parentRects[0], parentRects[1], '#94a3b8');
+              if (pUnion) {
+                const spouseDropD = `M ${pUnion.x} ${pUnion.y + 10} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
+                const halo = createSvgEl('path', {
+                  d: spouseDropD,
+                  fill: 'none',
+                  stroke: 'var(--bg-canvas, #f8fafc)',
+                  'stroke-width': 6.5,
+                  'stroke-linecap': 'round',
+                  class: 'connector-halo'
+                });
+                svg.appendChild(halo);
+                const pDrop = createSvgEl('path', {
+                  d: spouseDropD,
+                  fill: 'none',
+                  stroke: '#94a3b8',
+                  'stroke-width': 2.5,
+                  'stroke-linecap': 'round'
+                });
+                svg.appendChild(pDrop);
+              }
+            } else if (parentRects.length === 1) {
+              const p0 = parentRects[0];
+              const spouseDropD = `M ${Math.round(p0.centerX)} ${Math.round(p0.bottom)} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
               const halo = createSvgEl('path', {
                 d: spouseDropD,
                 fill: 'none',
@@ -1086,58 +1133,87 @@
               });
               svg.appendChild(pDrop);
             }
-          } else if (parentRects.length === 1) {
-            const p0 = parentRects[0];
-            const spouseDropD = `M ${Math.round(p0.centerX)} ${Math.round(p0.bottom)} L ${Math.round(spouseEntry.rect.centerX)} ${Math.round(spouseEntry.rect.top - 2)}`;
-            const halo = createSvgEl('path', {
-              d: spouseDropD,
-              fill: 'none',
-              stroke: 'var(--bg-canvas, #f8fafc)',
-              'stroke-width': 6.5,
-              'stroke-linecap': 'round',
-              class: 'connector-halo'
-            });
-            svg.appendChild(halo);
-            const pDrop = createSvgEl('path', {
-              d: spouseDropD,
-              fill: 'none',
-              stroke: '#94a3b8',
-              'stroke-width': 2.5,
-              'stroke-linecap': 'round'
-            });
-            svg.appendChild(pDrop);
           }
+        });
+
+        const renderedChildren = (node.children || []).filter(c => primaryCards.has(String(c.id)));
+        if (renderedChildren.length) {
+          const groups = new Map();
+          const directSpouseIds = (node.spouses || []).map(s => String(s.id)).filter(id => unions.has(id));
+
+          renderedChildren.forEach(child => {
+            let key = child.linkedSpouseId ? String(child.linkedSpouseId) : '';
+            if (!unions.has(key)) key = directSpouseIds.length === 1 ? directSpouseIds[0] : '__primary__';
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push({ id: String(child.id), rect: primaryCards.get(String(child.id)).rect });
+          });
+
+          groups.forEach((items, key) => {
+            const source = key === '__primary__'
+              ? { x: Math.round(primaryRect.centerX), y: Math.round(primaryRect.bottom), clearanceY: Math.round(primaryRect.bottom + 8), color: '#94a3b8', isUnion: false }
+              : unions.get(key);
+            if (source) {
+              const parentOrSpouseLit = isLit(node.id) || (key !== '__primary__' && isLit(key));
+              const childLit = items.some(it => isLit(it.id));
+              const isPathActive = (parentOrSpouseLit && childLit) || isLit(node.id);
+              drawChildrenBranch(svg, source, items.map(it => it.rect), isPathActive);
+            }
+          });
         }
-      });
 
-      const renderedChildren = (node.children || []).filter(c => primaryCards.has(String(c.id)));
-      if (renderedChildren.length) {
-        const groups = new Map();
-        const directSpouseIds = (node.spouses || []).map(s => String(s.id)).filter(id => unions.has(id));
-
-        renderedChildren.forEach(child => {
-          let key = child.linkedSpouseId ? String(child.linkedSpouseId) : '';
-          if (!unions.has(key)) key = directSpouseIds.length === 1 ? directSpouseIds[0] : '__primary__';
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key).push(primaryCards.get(String(child.id)).rect);
-        });
-
-        groups.forEach((rects, key) => {
-          const source = key === '__primary__'
-            ? { x: Math.round(primaryRect.centerX), y: Math.round(primaryRect.bottom), clearanceY: Math.round(primaryRect.bottom + 8), color: '#94a3b8', isUnion: false }
-            : unions.get(key);
-          if (source) {
-            const isPathActive = highlightedLineage.ancestors.has(node.id) || highlightedLineage.descendants.has(node.id);
-            drawChildrenBranch(svg, source, rects, isPathActive);
-          }
-        });
+        (node.children || []).forEach(walkTree);
       }
 
-      (node.children || []).forEach(walkTree);
+      const rootTree = activePerspectiveMode === 'hourglass' ? activeHourglassDescendantTree : treeData;
+      walkTree(rootTree);
     }
 
-    walkTree(getPerspectiveTreeData());
     updateMinimap();
+  }
+
+  function drawPedigreeConnectors(svg, familyTree, rootRect, sX, sY) {
+    familyTree.querySelectorAll('.pedigree-parents-row[data-parents-of]').forEach(row => {
+      const childId = row.dataset.parentsOf;
+      if (!childId) return;
+
+      const branchContainer = row.parentElement;
+      let childCardEl = branchContainer?.querySelector(`:scope > .pedigree-card-slot [data-person-id="${childId}"]`)
+        || branchContainer?.querySelector(`:scope > .perspective-focal-wrapper [data-person-id="${childId}"]`);
+
+      if (!childCardEl) {
+        const descSection = familyTree.querySelector('.hourglass-descendants-section');
+        if (descSection) {
+          childCardEl = descSection.querySelector(`[data-person-id="${childId}"][data-focal-card="true"]`)
+            || descSection.querySelector(`[data-person-id="${childId}"]`);
+        }
+      }
+      if (!childCardEl) return;
+
+      const childRect = getLocalCardRect(childCardEl, rootRect, sX, sY);
+      const parentCardEls = Array.from(
+        row.querySelectorAll(':scope > .pedigree-couple-unit > .pedigree-branch > .pedigree-card-slot [data-person-id]')
+      );
+      if (!parentCardEls.length) return;
+
+      const parentRects = parentCardEls.map(el => getLocalCardRect(el, rootRect, sX, sY));
+
+      if (parentRects.length >= 2) {
+        const union = drawUnionLink(svg, parentRects[0], parentRects[1], '#0284c7');
+        if (union) {
+          drawChildrenBranch(svg, union, [childRect], false);
+        }
+      } else {
+        const p0 = parentRects[0];
+        const source = {
+          x: Math.round(p0.centerX),
+          y: Math.round(p0.bottom),
+          clearanceY: Math.round(p0.bottom + 8),
+          color: '#64748b',
+          isUnion: false
+        };
+        drawChildrenBranch(svg, source, [childRect], false);
+      }
+    });
   }
 
   function scheduleTreeConnectorRender() {
@@ -1148,9 +1224,16 @@
   // --- TREE RENDERING MASTER ---
   function renderTree() {
     const container = document.getElementById('tree-container');
+    const svg = document.getElementById('tree-connectors');
     if (!container || !treeData) return;
 
-    container.innerHTML = buildNodeHTML(getPerspectiveTreeData(), 1);
+    if (svg) {
+      svg.setAttribute('width', 0);
+      svg.setAttribute('height', 0);
+      svg.replaceChildren();
+    }
+
+    container.innerHTML = renderPerspectiveHTML();
     updateSidebarStats();
     applyLineageStyles();
     scheduleTreeConnectorRender();
@@ -1192,7 +1275,10 @@
     if (!transformDiv) return;
     if (smooth) {
       transformDiv.classList.add('smooth-transform');
-      setTimeout(() => transformDiv.classList.remove('smooth-transform'), 280);
+      setTimeout(() => {
+        transformDiv.classList.remove('smooth-transform');
+        drawTreeConnectors();
+      }, 300);
     }
     if (!isRenderPending) {
       isRenderPending = true;
@@ -1226,21 +1312,30 @@
   window.fitTreeToViewport = function(smooth = true) {
     const mainArea = document.getElementById('view-tree');
     const familyTree = document.querySelector('.family-tree-surface');
+    const svg = document.getElementById('tree-connectors');
     if (!mainArea || !familyTree) return;
 
     const vW = mainArea.clientWidth;
     const vH = mainArea.clientHeight;
     if (vW <= 0 || vH <= 0) return;
 
-    const tW = familyTree.scrollWidth || familyTree.offsetWidth || 1;
-    const tH = familyTree.scrollHeight || familyTree.offsetHeight || 1;
+    const treeListEl = document.getElementById('tree-container');
+    const padOffsetX = 160;
+    const padOffsetY = 240;
+    const tW = treeListEl ? Math.max(treeListEl.scrollWidth + padOffsetX, familyTree.offsetWidth || 1) : (familyTree.scrollWidth || familyTree.offsetWidth || 1);
+    const tH = treeListEl ? Math.max(treeListEl.scrollHeight + padOffsetY, familyTree.offsetHeight || 1) : (familyTree.scrollHeight || familyTree.offsetHeight || 1);
 
-    const padX = 60;
-    const padY = 80;
+    if (svg && (parseInt(svg.getAttribute('width') || '0', 10) > tW + 10)) {
+      svg.setAttribute('width', tW);
+      svg.setAttribute('height', tH);
+    }
+
+    const padX = 24;
+    const padY = 24;
 
     const scaleX = (vW - padX * 2) / tW;
     const scaleY = (vH - padY * 2) / tH;
-    scale = clampScale(Math.min(scaleX, scaleY, 1.05));
+    scale = clampScale(Math.min(scaleX, scaleY, 1.0));
 
     position.x = Math.round((vW - tW * scale) / 2);
     position.y = Math.round((vH - tH * scale) / 2);
@@ -1249,16 +1344,20 @@
     requestTransformUpdate(smooth);
   };
 
-  window.flyToPerson = function(personId) {
-    const card = document.querySelector(`[data-person-id="${personId}"]`);
-    const mainArea = document.getElementById('view-tree');
-    const familyTree = document.querySelector('.family-tree-surface');
-    if (!card || !mainArea || !familyTree) return;
-
-    // Switch to tree view if currently in directory/timeline
+  window.flyToPerson = function(personId, preserveHighlight = false) {
     if (currentActiveView !== 'tree') {
       switchWorkspaceView('tree');
     }
+
+    const card = document.querySelector(`[data-person-id="${personId}"]`);
+    const mainArea = document.getElementById('view-tree');
+    const familyTree = document.querySelector('.family-tree-surface');
+    if (!card && activePerspectiveMode !== 'full') {
+      resetTreePerspective();
+      setTimeout(() => flyToPerson(personId, preserveHighlight), 120);
+      return;
+    }
+    if (!card || !mainArea || !familyTree) return;
 
     const rootRect = familyTree.getBoundingClientRect();
     const sX = rootRect.width && familyTree.offsetWidth ? rootRect.width / familyTree.offsetWidth : 1;
@@ -1273,7 +1372,11 @@
     position.y = Math.round(vH / 2 - rect.centerY * scale);
 
     requestTransformUpdate(true);
-    highlightPerson(personId);
+    if (!preserveHighlight) {
+      highlightPerson(personId);
+    } else {
+      activeInspectorPersonId = personId;
+    }
   };
 
   function highlightPerson(personId) {
@@ -1381,6 +1484,43 @@
       if (isInteractive(e.target)) return;
       fitTreeToViewport(true);
     });
+
+    // Click / Drag Radar Minimap to Pan Viewport
+    const minimapBox = document.getElementById('minimap-canvas-box');
+    if (minimapBox) {
+      let miniDragging = false;
+      const panFromMinimap = (evt) => {
+        const rect = minimapBox.getBoundingClientRect();
+        const familyTree = document.querySelector('.family-tree-surface');
+        if (!rect.width || !familyTree) return;
+        const tW = familyTree.scrollWidth || 1;
+        const tH = familyTree.scrollHeight || 1;
+        const mScale = Math.min(rect.width / tW, rect.height / tH) * 0.92;
+        const offX = (rect.width - tW * mScale) / 2;
+        const offY = (rect.height - tH * mScale) / 2;
+        const localX = evt.clientX - rect.left;
+        const localY = evt.clientY - rect.top;
+        const worldX = (localX - offX) / mScale;
+        const worldY = (localY - offY) / mScale;
+        position.x = Math.round(mainArea.clientWidth / 2 - worldX * scale);
+        position.y = Math.round(mainArea.clientHeight / 2 - worldY * scale);
+        requestTransformUpdate(false);
+      };
+      minimapBox.addEventListener('pointerdown', (evt) => {
+        miniDragging = true;
+        try { minimapBox.setPointerCapture(evt.pointerId); } catch (_) {}
+        panFromMinimap(evt);
+      });
+      minimapBox.addEventListener('pointermove', (evt) => {
+        if (miniDragging) panFromMinimap(evt);
+      });
+      const stopMini = (evt) => {
+        miniDragging = false;
+        try { minimapBox.releasePointerCapture(evt.pointerId); } catch (_) {}
+      };
+      minimapBox.addEventListener('pointerup', stopMini);
+      minimapBox.addEventListener('pointercancel', stopMini);
+    }
   }
 
   // --- RADAR MINIMAP ENGINE ---
@@ -1495,7 +1635,7 @@
     renderInspectorMedia(person);
 
     // Edit permission
-    const isEdit = Boolean(appSettings?.enableEdit);
+    const isEdit = Boolean(appSettings?.enableEdit) && !isGuestMode;
     document.getElementById('inspector-btn-edit').style.display = isEdit ? 'inline-flex' : 'none';
     document.getElementById('inspector-btn-add-child').style.display = isEdit ? 'inline-flex' : 'none';
     document.getElementById('inspector-btn-add-spouse').style.display = isEdit ? 'inline-flex' : 'none';
@@ -1827,13 +1967,18 @@
   // --- MODULE VIEW 2: DIRECTORY ---
   function renderDirectory() {
     const genSelect = document.getElementById('dir-filter-gen');
-    if (genSelect && genSelect.options.length <= 1) {
+    if (genSelect) {
+      const prevVal = genSelect.value;
       const stats = calculateStats(treeData);
+      genSelect.innerHTML = '<option value="">Semua Generasi</option>';
       for (let i = 1; i <= stats.maxDepth; i++) {
         const opt = document.createElement('option');
         opt.value = i;
         opt.textContent = `Generasi ${i}`;
         genSelect.appendChild(opt);
+      }
+      if (prevVal && genSelect.querySelector(`option[value="${prevVal}"]`)) {
+        genSelect.value = prevVal;
       }
     }
     filterDirectory();
@@ -2131,6 +2276,7 @@
   // --- MODULE VIEW 7: LEAFLET MAP ---
   let leafletLoaded = false;
   let leafletMapInstance = null;
+  let leafletMarkersLayer = null;
 
   async function renderMap() {
     const statusEl = document.getElementById('map-loading-status');
@@ -2155,8 +2301,11 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(leafletMapInstance);
+      leafletMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
     } else {
       leafletMapInstance.invalidateSize();
+      if (leafletMarkersLayer) leafletMarkersLayer.clearLayers();
+      else leafletMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
     }
 
     // Geocode or parse locations
@@ -2178,7 +2327,7 @@
       if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0) {
         bounds.push([lat, lng]);
         L.marker([lat, lng])
-          .addTo(leafletMapInstance)
+          .addTo(leafletMarkersLayer)
           .bindPopup(`
             <div style="font-family: 'Inter', sans-serif;">
               <b style="font-size: 13px;">${escapeHTML(person.name)}</b>
@@ -2272,7 +2421,7 @@
                   <h4 style="font-size: 14px; font-weight: 800; color: var(--ink-primary);">${escapeHTML(item.label || 'Snapshot')}</h4>
                   <small style="font-size: 11px; color: var(--ink-muted);">${new Date(item.createdAt).toLocaleString('id-ID')}</small>
                 </div>
-                <button onclick="restoreHistorySnapshot('${item.key}')" class="ui-btn" style="font-size: 12px;">
+                <button onclick="restoreHistorySnapshot('${item.key}')" class="ui-btn history-restore-btn admin-only-action" style="font-size: 12px;">
                   <i class="fa-solid fa-rotate-left"></i>
                   <span>Pulihkan</span>
                 </button>
@@ -2285,6 +2434,10 @@
   }
 
   window.restoreHistorySnapshot = function(key) {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     customConfirm('Pulihkan Versi', 'Pohon silsilah saat ini akan diganti dengan snapshot ini.', () => {
       historyRef.child(key).once('value').then(snap => {
         const data = snap.val();
@@ -2310,6 +2463,10 @@
   ];
 
   window.openEditorModal = function(nodeId, spouseId) {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     selectedNodeId = nodeId;
     selectedSpouseId = spouseId;
     modalMode = spouseId ? 'editSpouse' : 'edit';
@@ -2469,6 +2626,10 @@
   });
 
   window.handleSave = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Perubahan tidak dapat disimpan.', true);
+      return;
+    }
     const targetId = selectedSpouseId || selectedNodeId;
     const person = findNodeById(treeData, targetId);
     if (!person) return;
@@ -2517,6 +2678,10 @@
 
   // --- RELATION ACTION CREATORS ---
   window.actionAddChild = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     if (!selectedNodeId) return;
     const parent = findNodeById(treeData, selectedNodeId);
     if (!parent) return;
@@ -2544,6 +2709,10 @@
   };
 
   window.actionAddPartner = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     if (!selectedNodeId) return;
     const person = findNodeById(treeData, selectedNodeId);
     if (!person) return;
@@ -2566,6 +2735,10 @@
   };
 
   window.handleDelete = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     const targetId = selectedSpouseId || selectedNodeId;
     if (!targetId) return;
     if (targetId === treeData.id) {
@@ -2584,6 +2757,14 @@
         }
       } else {
         deleteNodeRecursive(treeData, selectedNodeId);
+      }
+      if (activePerspectiveRootId === targetId) {
+        activePerspectiveMode = 'full';
+        activePerspectiveRootId = null;
+        document.getElementById('tree-focus-banner')?.classList.add('hidden');
+        ['full', 'pedigree', 'hourglass'].forEach(m => {
+          document.getElementById(`persp-${m}`)?.classList.toggle('active', m === 'full');
+        });
       }
       closeInspectorDrawer();
       renderTree();
@@ -2855,70 +3036,261 @@
   // ==========================================================================
   let activePerspectiveMode = 'full'; // 'full' | 'pedigree' | 'hourglass'
   let activePerspectiveRootId = null;
+  let activeHourglassDescendantTree = null;
 
-  function getPerspectiveTreeData() {
-    if (activePerspectiveMode === 'full' || !activePerspectiveRootId) {
-      return treeData;
+  function pickDefaultFocalPerson(mode, index) {
+    const rows = flattenPeople(treeData);
+    const { parentMap, childrenMap, generationMap } = index;
+
+    if (mode === 'hourglass') {
+      const middleRow = rows.find(r => {
+        const pid = String(r.person.id);
+        return (parentMap.get(pid)?.size || 0) > 0 && (childrenMap.get(pid)?.size || 0) > 0;
+      });
+      if (middleRow) return String(middleRow.person.id);
     }
 
-    const { personMap, parentMap } = buildGenealogyIndex();
-    const focalPerson = personMap.get(String(activePerspectiveRootId));
-    if (!focalPerson) return treeData;
-
-    if (activePerspectiveMode === 'pedigree') {
-      function buildAncestorSubtree(pid, currentDepth = 1, maxDepth = 4) {
-        const p = personMap.get(pid);
-        if (!p) return null;
-        const parents = Array.from(parentMap.get(pid) || []);
-        const copy = JSON.parse(JSON.stringify(p));
-        copy.children = [];
-        copy.spouses = [];
-        if (currentDepth < maxDepth && parents.length > 0) {
-          parents.forEach(parId => {
-            const parNode = buildAncestorSubtree(parId, currentDepth + 1, maxDepth);
-            if (parNode) copy.children.push(parNode);
-          });
-        }
-        return copy;
+    let bestId = null;
+    let bestGen = -1;
+    rows.forEach(({ person }) => {
+      const pid = String(person.id);
+      const gen = generationMap.get(pid) || 1;
+      if ((parentMap.get(pid)?.size || 0) > 0 && gen >= bestGen) {
+        bestGen = gen;
+        bestId = pid;
       }
-      return buildAncestorSubtree(String(activePerspectiveRootId)) || treeData;
-    }
+    });
 
-    if (activePerspectiveMode === 'hourglass') {
-      const copy = JSON.parse(JSON.stringify(focalPerson));
+    return bestId || String(treeData?.id || '');
+  }
+
+  function buildFocalDescendantTree(focalId, index) {
+    const pid = String(focalId);
+    const directNode = findNodeById(treeData, pid);
+    const hostId = index.hostMap.get(pid);
+
+    if (!hostId && directNode && Array.isArray(directNode.children)) {
+      const copy = deepClone(directNode);
+      if (copy) copy.isCollapsed = false;
       return copy;
     }
 
-    return treeData;
+    if (hostId) {
+      const hostNode = findNodeById(treeData, hostId);
+      const focalObj = index.personMap.get(pid);
+      if (hostNode && focalObj) {
+        const copy = deepClone(focalObj);
+        copy.isCollapsed = false;
+        const hostWithoutKids = deepClone(hostNode);
+        delete hostWithoutKids.children;
+        delete hostWithoutKids.spouses;
+        copy.spouses = [hostWithoutKids];
+
+        const hostSpouses = hostNode.spouses || [];
+        const matchedChildren = (hostNode.children || []).filter(c => {
+          if (c.linkedSpouseId) return String(c.linkedSpouseId) === pid;
+          return hostSpouses.length === 1;
+        });
+        copy.children = matchedChildren.map(c => {
+          const childCopy = deepClone(c);
+          childCopy.linkedSpouseId = hostNode.id;
+          return childCopy;
+        });
+        return copy;
+      }
+    }
+
+    const fallback = deepClone(index.personMap.get(pid) || treeData);
+    if (fallback) {
+      fallback.spouses = fallback.spouses || [];
+      fallback.children = fallback.children || [];
+      fallback.isCollapsed = false;
+    }
+    return fallback;
+  }
+
+  function getAncestorRoleLabel(depthAboveFocal, gender) {
+    const isMale = gender === 'L';
+    if (depthAboveFocal === 1) return isMale ? 'Ayah' : 'Ibu';
+    if (depthAboveFocal === 2) return isMale ? 'Kakek' : 'Nenek';
+    if (depthAboveFocal === 3) return isMale ? 'Kakek Buyut' : 'Nenek Buyut';
+    if (depthAboveFocal === 4) return 'Eyang Canggah';
+    return `Leluhur (+${depthAboveFocal})`;
+  }
+
+  function buildAncestorParentsHTML(childId, currentDepth, maxDepth, index, visited) {
+    const cid = String(childId);
+    const rawParents = Array.from(index.parentMap.get(cid) || [])
+      .filter(pid => !visited.has(String(pid)) && index.personMap.has(String(pid)));
+
+    if (!rawParents.length || currentDepth >= maxDepth) return '';
+
+    rawParents.sort((a, b) => {
+      const pA = index.personMap.get(String(a));
+      const pB = index.personMap.get(String(b));
+      return (pA?.gender === 'L' ? 0 : 1) - (pB?.gender === 'L' ? 0 : 1);
+    });
+
+    const parentHtmlBlocks = rawParents.map(parId => {
+      const parentObj = index.personMap.get(String(parId));
+      const trueGen = index.generationMap.get(String(parId)) || 1;
+      const roleLabel = getAncestorRoleLabel(currentDepth + 1, parentObj.gender);
+
+      const nextVisited = new Set(visited);
+      nextVisited.add(String(parId));
+      const grandParentsHTML = buildAncestorParentsHTML(parId, currentDepth + 1, maxDepth, index, nextVisited);
+      const cardHTML = buildPersonCard(parentObj, false, false, false, trueGen, null, null, {});
+
+      return `
+        <div class="pedigree-branch">
+          ${grandParentsHTML}
+          <div class="pedigree-card-slot" data-pedigree-child="${escapeHTML(cid)}">
+            <span class="pedigree-role-tag">${escapeHTML(roleLabel)}</span>
+            ${cardHTML}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="pedigree-parents-row" data-parents-of="${escapeHTML(cid)}">
+        <div class="pedigree-couple-unit" data-couple-for="${escapeHTML(cid)}">
+          ${parentHtmlBlocks}
+        </div>
+      </div>
+    `;
+  }
+
+  function markFocalCardInHtml(html, focalId) {
+    const escapedId = escapeHTML(String(focalId));
+    const targetAttr = `data-person-id="${escapedId}"`;
+    const idx = html.indexOf(targetAttr);
+    if (idx === -1) return html;
+    return html.slice(0, idx) + `data-focal-card="true" ` + html.slice(idx);
+  }
+
+  function renderPerspectiveHTML() {
+    if (activePerspectiveMode === 'full' || !activePerspectiveRootId) {
+      activeHourglassDescendantTree = null;
+      return buildNodeHTML(treeData, 1);
+    }
+
+    const index = buildGenealogyIndex();
+    const focalId = String(activePerspectiveRootId);
+    const focalPerson = index.personMap.get(focalId);
+    if (!focalPerson) {
+      activeHourglassDescendantTree = null;
+      return buildNodeHTML(treeData, 1);
+    }
+
+    const focalGen = index.generationMap.get(focalId) || 1;
+
+    if (activePerspectiveMode === 'pedigree') {
+      activeHourglassDescendantTree = null;
+      const ancestorsHTML = buildAncestorParentsHTML(focalId, 0, 5, index, new Set([focalId]));
+      const focalCardRaw = buildPersonCard(focalPerson, false, false, false, focalGen, null, null, {});
+      const focalCardMarked = markFocalCardInHtml(focalCardRaw, focalId);
+
+      return `
+        <li class="perspective-root-li perspective-mode-pedigree">
+          <div class="pedigree-branch">
+            ${ancestorsHTML}
+            <div class="perspective-focal-wrapper">
+              <span class="pedigree-role-tag focal">Fokus Leluhur</span>
+              ${focalCardMarked}
+            </div>
+          </div>
+        </li>
+      `;
+    }
+
+    if (activePerspectiveMode === 'hourglass') {
+      const ancestorsHTML = buildAncestorParentsHTML(focalId, 0, 4, index, new Set([focalId]));
+      activeHourglassDescendantTree = buildFocalDescendantTree(focalId, index);
+      const descRawHTML = buildNodeHTML(activeHourglassDescendantTree, focalGen);
+      const descMarkedHTML = markFocalCardInHtml(descRawHTML, focalId);
+
+      return `
+        <li class="perspective-root-li perspective-mode-hourglass">
+          <div class="hourglass-layout">
+            ${ancestorsHTML ? `<div class="hourglass-ancestors-section">${ancestorsHTML}</div>` : ''}
+            <div class="hourglass-descendants-section">
+              <ul class="hourglass-root-ul">
+                ${descMarkedHTML}
+              </ul>
+            </div>
+          </div>
+        </li>
+      `;
+    }
+
+    activeHourglassDescendantTree = null;
+    return buildNodeHTML(treeData, 1);
+  }
+
+  function populateFocusPersonSelect(selectedId) {
+    const sel = document.getElementById('focus-person-select');
+    if (!sel || !treeData) return;
+
+    const rows = flattenPeople(treeData).sort((a, b) => {
+      if (a.generation !== b.generation) return b.generation - a.generation;
+      return (a.person.name || '').localeCompare(b.person.name || '');
+    });
+
+    sel.innerHTML = '';
+    rows.forEach(({ person, generation }) => {
+      const opt = document.createElement('option');
+      opt.value = person.id;
+      opt.textContent = `${person.name} (Gen ${generation})`;
+      sel.appendChild(opt);
+    });
+
+    if (selectedId && sel.querySelector(`option[value="${selectedId}"]`)) {
+      sel.value = selectedId;
+    }
   }
 
   window.setTreePerspective = function(mode, rootId = null) {
-    activePerspectiveMode = mode;
-    if (mode === 'full') {
+    const nextMode = mode || activePerspectiveMode || 'full';
+    activePerspectiveMode = nextMode;
+
+    if (nextMode === 'full') {
       activePerspectiveRootId = null;
+      activeHourglassDescendantTree = null;
     } else {
-      activePerspectiveRootId = rootId || activeInspectorPersonId || treeData?.id;
+      const index = buildGenealogyIndex();
+      let candidate = rootId || activeInspectorPersonId || activePerspectiveRootId;
+      if (!rootId) {
+        const hasParents = candidate && (index.parentMap.get(String(candidate))?.size || 0) > 0;
+        if (!hasParents) {
+          candidate = pickDefaultFocalPerson(nextMode, index);
+        }
+      }
+      activePerspectiveRootId = candidate || treeData?.id;
+      populateFocusPersonSelect(activePerspectiveRootId);
     }
 
     ['full', 'pedigree', 'hourglass'].forEach(m => {
       const btn = document.getElementById(`persp-${m}`);
-      if (btn) btn.classList.toggle('active', m === mode);
+      if (btn) btn.classList.toggle('active', m === nextMode);
     });
 
     const banner = document.getElementById('tree-focus-banner');
     if (banner) {
-      if (mode !== 'full' && activePerspectiveRootId) {
-        const p = findNodeById(treeData, activePerspectiveRootId);
-        document.getElementById('focus-person-name').textContent = p ? p.name : 'Anggota';
-        document.getElementById('focus-mode-tag').textContent = mode === 'pedigree' ? 'Leluhur' : 'Jam Pasir';
+      if (nextMode !== 'full' && activePerspectiveRootId) {
+        document.getElementById('focus-mode-tag').textContent = nextMode === 'pedigree' ? 'Leluhur' : 'Jam Pasir';
         banner.classList.remove('hidden');
       } else {
         banner.classList.add('hidden');
       }
     }
 
+    if (currentActiveView !== 'tree') {
+      switchWorkspaceView('tree');
+    }
+
     renderTree();
-    fitTreeToViewport(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => fitTreeToViewport(true)));
   };
 
   window.resetTreePerspective = function() {
@@ -2927,8 +3299,9 @@
 
   window.actionFocusPerspective = function() {
     if (!activeInspectorPersonId) return;
+    const targetId = activeInspectorPersonId;
     closeInspectorDrawer();
-    window.setTreePerspective('pedigree', activeInspectorPersonId);
+    window.setTreePerspective('pedigree', targetId);
   };
 
   // ==========================================================================
@@ -2941,28 +3314,39 @@
     const parentMap = new Map();
     const childrenMap = new Map();
     const spouseMap = new Map();
+    const generationMap = new Map();
+    const hostMap = new Map();
 
-    function indexNode(node, parentId = null) {
+    function ensureSet(map, key) {
+      if (!map.has(key)) map.set(key, new Set());
+      return map.get(key);
+    }
+
+    function indexNode(node, parentId = null, generation = 1) {
       if (!node) return;
       const pid = String(node.id);
       personMap.set(pid, node);
+      generationMap.set(pid, generation);
 
-      if (!parentMap.has(pid)) parentMap.set(pid, new Set());
-      if (!childrenMap.has(pid)) childrenMap.set(pid, new Set());
-      if (!spouseMap.has(pid)) spouseMap.set(pid, new Set());
+      ensureSet(parentMap, pid);
+      ensureSet(childrenMap, pid);
+      ensureSet(spouseMap, pid);
 
       if (parentId) {
-        parentMap.get(pid).add(parentId);
-        if (!childrenMap.has(parentId)) childrenMap.set(parentId, new Set());
-        childrenMap.get(parentId).add(pid);
+        parentMap.get(pid).add(String(parentId));
+        ensureSet(childrenMap, String(parentId)).add(pid);
       }
 
-      (node.spouses || []).forEach(sp => {
+      const spousesList = node.spouses || [];
+      spousesList.forEach(sp => {
         const sid = String(sp.id);
         personMap.set(sid, sp);
-        if (!parentMap.has(sid)) parentMap.set(sid, new Set());
-        if (!childrenMap.has(sid)) childrenMap.set(sid, new Set());
-        if (!spouseMap.has(sid)) spouseMap.set(sid, new Set());
+        generationMap.set(sid, generation);
+        hostMap.set(sid, pid);
+
+        ensureSet(parentMap, sid);
+        ensureSet(childrenMap, sid);
+        ensureSet(spouseMap, sid);
 
         spouseMap.get(pid).add(sid);
         spouseMap.get(sid).add(pid);
@@ -2971,26 +3355,47 @@
           sp.parents.forEach(pParent => {
             const ppid = String(pParent.id);
             personMap.set(ppid, pParent);
-            if (!parentMap.has(sid)) parentMap.set(sid, new Set());
+            generationMap.set(ppid, Math.max(0, generation - 1));
             parentMap.get(sid).add(ppid);
-            if (!childrenMap.has(ppid)) childrenMap.set(ppid, new Set());
-            childrenMap.get(ppid).add(sid);
+            ensureSet(childrenMap, ppid).add(sid);
+            ensureSet(parentMap, ppid);
+            ensureSet(spouseMap, ppid);
+          });
+        }
+
+        if (sp.spouses && sp.spouses.length > 0) {
+          sp.spouses.forEach(secSp => {
+            const ssid = String(secSp.id);
+            personMap.set(ssid, secSp);
+            generationMap.set(ssid, generation);
+            hostMap.set(ssid, sid);
+            ensureSet(parentMap, ssid);
+            ensureSet(childrenMap, ssid);
+            ensureSet(spouseMap, ssid).add(sid);
+            spouseMap.get(sid).add(ssid);
           });
         }
       });
 
       (node.children || []).forEach(child => {
-        indexNode(child, pid);
+        const cid = String(child.id);
+        indexNode(child, pid, generation + 1);
         if (child.linkedSpouseId) {
           const lsid = String(child.linkedSpouseId);
-          parentMap.get(String(child.id)).add(lsid);
-          if (childrenMap.has(lsid)) childrenMap.get(lsid).add(String(child.id));
+          if (personMap.has(lsid)) {
+            parentMap.get(cid).add(lsid);
+            ensureSet(childrenMap, lsid).add(cid);
+          }
+        } else if (spousesList.length === 1) {
+          const onlySpouseId = String(spousesList[0].id);
+          parentMap.get(cid).add(onlySpouseId);
+          ensureSet(childrenMap, onlySpouseId).add(cid);
         }
       });
     }
 
-    indexNode(treeData);
-    return { personMap, parentMap, childrenMap, spouseMap };
+    indexNode(treeData, null, 1);
+    return { personMap, parentMap, childrenMap, spouseMap, generationMap, hostMap };
   }
 
   function getAncestorsWithDepth(personId, parentMap) {
@@ -3012,6 +3417,95 @@
       }
     }
     return visited;
+  }
+
+  function findInLawRelation(idA, idB, index) {
+    const { personMap, parentMap, childrenMap, spouseMap } = index;
+    const pA = personMap.get(idA);
+    const pB = personMap.get(idB);
+    const isMaleA = pA?.gender === 'L';
+
+    // 1. A adalah Mertua B (A adalah orang tua dari pasangan B)
+    const spousesOfB = Array.from(spouseMap.get(idB) || []);
+    for (const spB of spousesOfB) {
+      if (parentMap.get(spB)?.has(idA)) {
+        const spName = personMap.get(spB)?.name || '';
+        return {
+          title: isMaleA ? 'Mertua (Ayah Mertua)' : 'Mertua (Ibu Mertua)',
+          degree: 'Hubungan Semenda',
+          desc: `${pA.name} adalah orang tua dari pasangan ${pB.name} (${spName}).`,
+          path: [idA, spB, idB]
+        };
+      }
+    }
+
+    // 2. A adalah Menantu B (B adalah orang tua dari pasangan A)
+    const spousesOfA = Array.from(spouseMap.get(idA) || []);
+    for (const spA of spousesOfA) {
+      if (parentMap.get(spA)?.has(idB)) {
+        const spName = personMap.get(spA)?.name || '';
+        return {
+          title: isMaleA ? 'Menantu (Putra)' : 'Menantu (Putri)',
+          degree: 'Hubungan Semenda',
+          desc: `${pA.name} adalah pasangan dari anak ${pB.name} (${spName}).`,
+          path: [idA, spA, idB]
+        };
+      }
+    }
+
+    // Helper: check if two people share a parent (siblings)
+    const areSiblings = (u, v) => {
+      if (u === v) return false;
+      const pU = parentMap.get(u);
+      const pV = parentMap.get(v);
+      if (!pU || !pV) return false;
+      for (const par of pU) {
+        if (pV.has(par)) return par;
+      }
+      return false;
+    };
+
+    // 3. Saudara Ipar (pasangan dari saudara B, atau saudara dari pasangan B)
+    for (const spA of spousesOfA) {
+      const sharedPar = areSiblings(spA, idB);
+      if (sharedPar) {
+        return {
+          title: 'Saudara Ipar',
+          degree: 'Hubungan Semenda',
+          desc: `${pA.name} adalah pasangan dari saudara kandung ${pB.name} (${personMap.get(spA)?.name || ''}).`,
+          path: [idA, spA, sharedPar, idB]
+        };
+      }
+    }
+    for (const spB of spousesOfB) {
+      const sharedPar = areSiblings(idA, spB);
+      if (sharedPar) {
+        return {
+          title: 'Saudara Ipar',
+          degree: 'Hubungan Semenda',
+          desc: `${pA.name} adalah saudara kandung dari pasangan ${pB.name} (${personMap.get(spB)?.name || ''}).`,
+          path: [idA, sharedPar, spB, idB]
+        };
+      }
+    }
+
+    // 4. Besan (anak A menikah dengan anak B)
+    const kidsA = Array.from(childrenMap.get(idA) || []);
+    const kidsB = Array.from(childrenMap.get(idB) || []);
+    for (const kA of kidsA) {
+      for (const kB of kidsB) {
+        if (spouseMap.get(kA)?.has(kB)) {
+          return {
+            title: 'Besan',
+            degree: 'Hubungan Semenda',
+            desc: `Anak ${pA.name} (${personMap.get(kA)?.name || ''}) menikah dengan anak ${pB.name} (${personMap.get(kB)?.name || ''}).`,
+            path: [idA, kA, kB, idB]
+          };
+        }
+      }
+    }
+
+    return null;
   }
 
   function getKinshipTerm(dA, dB, personA, personB, lcaPerson) {
@@ -3147,7 +3641,8 @@
     const highlightBtn = document.getElementById('btn-highlight-kinship');
     if (!container || !idA || !idB) return;
 
-    const { personMap, parentMap, spouseMap } = buildGenealogyIndex();
+    const index = buildGenealogyIndex();
+    const { personMap, parentMap, spouseMap } = index;
     const personA = personMap.get(idA);
     const personB = personMap.get(idB);
     if (!personA || !personB) return;
@@ -3167,7 +3662,7 @@
       container.innerHTML = `
         <div class="kinship-title-badge">${isMaleA ? 'Suami' : 'Istri'} (Pasangan Hidup)</div>
         <div class="kinship-degree-tag">Tali Pernikahan</div>
-        <p style="font-size: 13px; color: var(--ink-secondary);">${personA.name} adalah pasangan hidup sah dari ${personB.name}.</p>
+        <p style="font-size: 13px; color: var(--ink-secondary);">${escapeHTML(personA.name)} adalah pasangan hidup sah dari ${escapeHTML(personB.name)}.</p>
       `;
       kinshipHighlightPath = [idA, idB];
       if (highlightBtn) highlightBtn.classList.remove('hidden');
@@ -3192,10 +3687,29 @@
     }
 
     if (!lca) {
+      const inLaw = findInLawRelation(idA, idB, index);
+      if (inLaw) {
+        kinshipHighlightPath = inLaw.path;
+        const pathHtml = inLaw.path.map((nodeId, idx) => {
+          const p = personMap.get(nodeId);
+          const isEdge = idx === 0 || idx === inLaw.path.length - 1;
+          return `<span class="kinship-node-chip" style="${isEdge ? 'font-weight: 800; border: 1.5px solid var(--accent-cyan);' : ''}">${escapeHTML(p ? p.name.split(' ')[0] : nodeId)}</span>`;
+        }).join(' <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: #94a3b8;"></i> ');
+
+        container.innerHTML = `
+          <div class="kinship-title-badge">${escapeHTML(inLaw.title)}</div>
+          <div class="kinship-degree-tag">${escapeHTML(inLaw.degree)}</div>
+          <p style="font-size: 13px; color: var(--ink-secondary); max-width: 460px; margin: 0 auto 10px;">${escapeHTML(inLaw.desc)}</p>
+          <div class="kinship-path-trail">${pathHtml}</div>
+        `;
+        if (highlightBtn) highlightBtn.classList.remove('hidden');
+        return;
+      }
+
       container.innerHTML = `
         <div class="kinship-title-badge">Belum Terhubung Langsung</div>
         <div class="kinship-degree-tag" style="background: #f1f5f9; color: #64748b;">Garis Terpisah</div>
-        <p style="font-size: 13px; color: var(--ink-secondary);">Tidak ditemukan leluhur kandung bersama di dalam pohon silsilah aktif saat ini.</p>
+        <p style="font-size: 13px; color: var(--ink-secondary);">Tidak ditemukan leluhur bersama atau ikatan semenda langsung dalam silsilah aktif.</p>
       `;
       if (highlightBtn) highlightBtn.classList.add('hidden');
       return;
@@ -3209,18 +3723,18 @@
     const fullPath = [...pathA, ...pathB.slice(1)];
     kinshipHighlightPath = fullPath;
 
-    let pathHtml = fullPath.map((nodeId, idx) => {
+    const pathHtml = fullPath.map((nodeId, idx) => {
       const p = personMap.get(nodeId);
       const isLca = nodeId === lca.id;
       const isEdge = idx === 0 || idx === fullPath.length - 1;
-      return `<span class="kinship-node-chip ${isLca ? 'lca' : ''}" style="${isEdge ? 'font-weight: 800; border: 1.5px solid var(--accent-cyan);' : ''}">${p ? p.name.split(' ')[0] : nodeId}</span>`;
+      return `<span class="kinship-node-chip ${isLca ? 'lca' : ''}" style="${isEdge ? 'font-weight: 800; border: 1.5px solid var(--accent-cyan);' : ''}">${escapeHTML(p ? p.name.split(' ')[0] : nodeId)}</span>`;
     }).join(' <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: #94a3b8;"></i> ');
 
     container.innerHTML = `
-      <div class="kinship-title-badge">${result.title}</div>
-      <div class="kinship-degree-tag">${result.degree} • Selisih ${Math.abs(lca.depthA - lca.depthB)} Generasi</div>
-      <p style="font-size: 13px; color: var(--ink-secondary); max-width: 460px; margin: 0 auto 10px;">${result.desc}</p>
-      <div style="font-size: 11px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; margin-top: 6px;">Jalur Nasab (Leluhur Bersama: ${lcaPerson ? lcaPerson.name : ''})</div>
+      <div class="kinship-title-badge">${escapeHTML(result.title)}</div>
+      <div class="kinship-degree-tag">${escapeHTML(result.degree)} • Selisih ${Math.abs(lca.depthA - lca.depthB)} Generasi</div>
+      <p style="font-size: 13px; color: var(--ink-secondary); max-width: 460px; margin: 0 auto 10px;">${escapeHTML(result.desc)}</p>
+      <div style="font-size: 11px; font-weight: 700; color: var(--ink-muted); text-transform: uppercase; margin-top: 6px;">Jalur Nasab (Leluhur Bersama: ${escapeHTML(lcaPerson ? lcaPerson.name : '')})</div>
       <div class="kinship-path-trail">${pathHtml}</div>
     `;
 
@@ -3229,14 +3743,30 @@
 
   window.highlightKinshipInTree = function() {
     closeKinshipModal();
+    if (activePerspectiveMode !== 'full') {
+      activePerspectiveMode = 'full';
+      activePerspectiveRootId = null;
+      activeHourglassDescendantTree = null;
+      document.getElementById('tree-focus-banner')?.classList.add('hidden');
+      ['full', 'pedigree', 'hourglass'].forEach(m => {
+        document.getElementById(`persp-${m}`)?.classList.toggle('active', m === 'full');
+      });
+      renderTree();
+    }
     if (currentActiveView !== 'tree') {
       switchWorkspaceView('tree');
     }
     if (kinshipHighlightPath && kinshipHighlightPath.length > 0) {
-      highlightedLineage.ancestors = new Set(kinshipHighlightPath);
-      applyLineageStyles();
-      scheduleTreeConnectorRender();
-      flyToPerson(kinshipHighlightPath[0]);
+      setTimeout(() => {
+        highlightedLineage = { ancestors: new Set(kinshipHighlightPath), descendants: new Set() };
+        flyToPerson(kinshipHighlightPath[0], true);
+        applyLineageStyles();
+        scheduleTreeConnectorRender();
+        setTimeout(() => {
+          applyLineageStyles();
+          drawTreeConnectors();
+        }, 320);
+      }, 60);
     }
   };
 
@@ -3246,6 +3776,11 @@
   let fanChartRootId = null;
   let fanChartAngle = 180;
   let fanChartType = 'descendant';
+
+  window.setFanRoot = function(personId) {
+    fanChartRootId = personId || null;
+    renderFanChart();
+  };
 
   window.setFanAngle = function(angle) {
     fanChartAngle = angle;
@@ -3258,6 +3793,13 @@
     fanChartType = type;
     document.getElementById('fan-type-descendant')?.classList.toggle('active', type === 'descendant');
     document.getElementById('fan-type-ancestor')?.classList.toggle('active', type === 'ancestor');
+    if (type === 'ancestor') {
+      const index = buildGenealogyIndex();
+      const curId = String(fanChartRootId || treeData?.id || '');
+      if ((index.parentMap.get(curId)?.size || 0) === 0) {
+        fanChartRootId = pickDefaultFocalPerson('pedigree', index);
+      }
+    }
     renderFanChart();
   };
 
@@ -3273,6 +3815,28 @@
     switchWorkspaceView('fan');
   };
 
+  function populateFanRootSelect(selectedId) {
+    const sel = document.getElementById('fan-root-select');
+    if (!sel || !treeData) return;
+
+    const rows = flattenPeople(treeData).sort((a, b) => {
+      if (a.generation !== b.generation) return a.generation - b.generation;
+      return (a.person.name || '').localeCompare(b.person.name || '');
+    });
+
+    sel.innerHTML = '';
+    rows.forEach(({ person, generation }) => {
+      const opt = document.createElement('option');
+      opt.value = person.id;
+      opt.textContent = `${person.name} (Gen ${generation})`;
+      sel.appendChild(opt);
+    });
+
+    if (selectedId && sel.querySelector(`option[value="${selectedId}"]`)) {
+      sel.value = selectedId;
+    }
+  }
+
   function polarToCartesian(cx, cy, r, angleInDeg) {
     const rad = ((angleInDeg - 90) * Math.PI) / 180.0;
     return {
@@ -3282,36 +3846,114 @@
   }
 
   function describeArc(cx, cy, rInner, rOuter, startAngle, endAngle) {
+    const safeEnd = endAngle - startAngle >= 359.99 ? startAngle + 359.98 : endAngle;
     const p1 = polarToCartesian(cx, cy, rOuter, startAngle);
-    const p2 = polarToCartesian(cx, cy, rOuter, endAngle);
-    const p3 = polarToCartesian(cx, cy, rInner, endAngle);
+    const p2 = polarToCartesian(cx, cy, rOuter, safeEnd);
+    const p3 = polarToCartesian(cx, cy, rInner, safeEnd);
     const p4 = polarToCartesian(cx, cy, rInner, startAngle);
 
-    const arcSweep = endAngle - startAngle <= 180 ? '0' : '1';
+    const arcSweep = safeEnd - startAngle <= 180 ? '0' : '1';
 
     return [
-      `M ${p1.x} ${p1.y}`,
-      `A ${rOuter} ${rOuter} 0 ${arcSweep} 1 ${p2.x} ${p2.y}`,
-      `L ${p3.x} ${p3.y}`,
-      `A ${rInner} ${rInner} 0 ${arcSweep} 0 ${p4.x} ${p4.y}`,
+      `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`,
+      `A ${rOuter} ${rOuter} 0 ${arcSweep} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
+      `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}`,
+      `A ${rInner} ${rInner} 0 ${arcSweep} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}`,
       'Z'
     ].join(' ');
+  }
+
+  function bindFanWedgeEvents(g, person, genLabel) {
+    const tooltip = document.getElementById('fan-tooltip');
+    const wrapper = document.getElementById('fan-chart-wrapper');
+
+    g.addEventListener('click', () => openInspectorDrawer(person.id));
+    g.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      setFanRoot(person.id);
+    });
+
+    if (tooltip && wrapper) {
+      g.addEventListener('mouseenter', () => {
+        const life = `${person.birthYear || (person.birthDate || '').slice(0, 4) || '?'} - ${person.deathYear || (person.deathDate || '').slice(0, 4) || 'Sekarang'}`;
+        tooltip.innerHTML = `<strong>${escapeHTML(person.name || 'Tanpa Nama')}</strong><br><small>${escapeHTML(genLabel)} • ${escapeHTML(life)}</small><br><small style="color:#38bdf8;">Klik: Detail | Klik 2x: Jadikan Pusat</small>`;
+        tooltip.classList.remove('hidden');
+      });
+      g.addEventListener('mousemove', (e) => {
+        const wr = wrapper.getBoundingClientRect();
+        tooltip.style.left = `${e.clientX - wr.left + wrapper.scrollLeft}px`;
+        tooltip.style.top = `${e.clientY - wr.top + wrapper.scrollTop}px`;
+      });
+      g.addEventListener('mouseleave', () => {
+        tooltip.classList.add('hidden');
+      });
+    }
+  }
+
+  function renderFanWedgeLabel(g, cx, cy, rMid, midAngle, spanDeg, label, subLabel) {
+    if (spanDeg < 6) return;
+    const pos = polarToCartesian(cx, cy, rMid, midAngle);
+    const normAngle = ((midAngle % 360) + 360) % 360;
+
+    let rotDeg;
+    if (spanDeg < 16) {
+      // Radial alignment for narrow outer wedges so longer names fit along the spoke
+      rotDeg = normAngle > 180 ? normAngle + 90 : normAngle - 90;
+    } else {
+      // Tangential alignment for wider inner wedges
+      rotDeg = (normAngle > 90 && normAngle < 270) ? normAngle + 180 : normAngle;
+    }
+
+    const textGroup = createSvgEl('g', {
+      transform: `translate(${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}) rotate(${rotDeg.toFixed(1)})`
+    });
+
+    const maxChars = spanDeg > 45 ? 18 : spanDeg < 16 ? 11 : spanDeg > 20 ? 12 : 9;
+    const shortName = (label || '').slice(0, maxChars);
+
+    const text = createSvgEl('text', {
+      x: 0,
+      y: subLabel && spanDeg >= 16 ? -2 : 3.5,
+      'text-anchor': 'middle',
+      fill: '#ffffff',
+      'font-size': spanDeg > 22 ? 10.5 : spanDeg < 10 ? 7.5 : 8.5,
+      'font-weight': 700
+    });
+    text.textContent = shortName;
+    textGroup.appendChild(text);
+
+    if (subLabel && spanDeg >= 16) {
+      const sub = createSvgEl('text', {
+        x: 0,
+        y: 10,
+        'text-anchor': 'middle',
+        fill: 'rgba(255,255,255,0.85)',
+        'font-size': 8
+      });
+      sub.textContent = subLabel;
+      textGroup.appendChild(sub);
+    }
+
+    g.appendChild(textGroup);
   }
 
   function renderFanChart() {
     const svg = document.getElementById('fan-chart-svg');
     if (!svg || !treeData) return;
 
-    const { personMap } = buildGenealogyIndex();
-    const rootId = fanChartRootId || treeData.id;
-    const rootPerson = personMap.get(String(rootId)) || treeData;
+    const index = buildGenealogyIndex();
+    const { personMap, parentMap } = index;
+    const rootId = String(fanChartRootId || treeData.id);
+    const rootPerson = personMap.get(rootId) || treeData;
+
+    populateFanRootSelect(String(rootPerson.id));
 
     const is180 = fanChartAngle === 180;
-    const width = 940;
-    const height = is180 ? 540 : 940;
+    const width = 960;
+    const height = is180 ? 540 : 960;
     const cx = width / 2;
-    const cy = is180 ? 470 : height / 2;
-    const baseR = 64;
+    const cy = is180 ? 468 : height / 2;
+    const baseR = 66;
     const ringW = 72;
 
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -3339,10 +3981,10 @@
       y: is180 ? cy - 14 : cy - 6,
       'text-anchor': 'middle',
       fill: '#ffffff',
-      'font-size': 11,
+      'font-size': 11.5,
       'font-weight': 800
     });
-    centerText.textContent = (rootPerson.name || '').slice(0, 16);
+    centerText.textContent = (rootPerson.name || '').slice(0, 17);
     centerGroup.appendChild(centerText);
 
     const centerSub = createSvgEl('text', {
@@ -3350,33 +3992,130 @@
       y: is180 ? cy + 4 : cy + 12,
       'text-anchor': 'middle',
       fill: '#94a3b8',
-      'font-size': 9
+      'font-size': 9.5
     });
-    centerSub.textContent = rootPerson.birthYear ? `Lhr: ${rootPerson.birthYear}` : 'Pusat Bagan';
+    const yr = rootPerson.birthYear || (rootPerson.birthDate || '').slice(0, 4);
+    centerSub.textContent = yr ? `Lahir ${yr}` : 'Pusat Bagan';
     centerGroup.appendChild(centerSub);
 
-    centerGroup.onclick = () => openInspectorDrawer(rootPerson.id);
+    bindFanWedgeEvents(centerGroup, rootPerson, fanChartType === 'ancestor' ? 'Pusat Leluhur' : 'Pusat Keturunan');
     svg.appendChild(centerGroup);
+
+    if (fanChartType === 'ancestor') {
+      const maxGen = 4;
+
+      function renderAncestorArcs(personId, gen, angleStart, angleSpan, sideColorIdx = 0) {
+        if (gen > maxGen) return;
+        const rInner = baseR + (gen - 1) * ringW + 4;
+        const rOuter = rInner + ringW - 4;
+        const rMid = (rInner + rOuter) / 2;
+
+        const parentIds = personId ? Array.from(parentMap.get(String(personId)) || []) : [];
+        let fatherId = null;
+        let motherId = null;
+        parentIds.forEach(pid => {
+          const p = personMap.get(String(pid));
+          if (p?.gender === 'P' && !motherId) motherId = pid;
+          else if (!fatherId) fatherId = pid;
+          else if (!motherId) motherId = pid;
+        });
+
+        const slots = [
+          { pid: fatherId, role: gen === 1 ? 'Ayah' : `Leluhur L`, colorIdx: sideColorIdx === 0 ? 0 : sideColorIdx },
+          { pid: motherId, role: gen === 1 ? 'Ibu' : `Leluhur P`, colorIdx: sideColorIdx === 0 ? 4 : sideColorIdx }
+        ];
+
+        const slotSpan = angleSpan / 2;
+        slots.forEach((slot, sIdx) => {
+          const aStart = angleStart + sIdx * slotSpan;
+          const aEnd = aStart + slotSpan;
+          const midA = aStart + slotSpan / 2;
+          const pathD = describeArc(cx, cy, rInner, rOuter, aStart, aEnd);
+
+          if (slot.pid && personMap.has(String(slot.pid))) {
+            const pObj = personMap.get(String(slot.pid));
+            const color = branchColors[(gen - 1 + slot.colorIdx) % branchColors.length];
+            const g = createSvgEl('g', { class: 'fan-chart-wedge', 'data-id': pObj.id });
+            const path = createSvgEl('path', {
+              d: pathD,
+              fill: color,
+              stroke: '#ffffff',
+              'stroke-width': 1.6,
+              opacity: Math.max(0.68, 0.96 - (gen - 1) * 0.08)
+            });
+            g.appendChild(path);
+
+            const pYear = pObj.birthYear || (pObj.birthDate || '').slice(0, 4) || '';
+            renderFanWedgeLabel(g, cx, cy, rMid, midA, slotSpan, (pObj.name || '').split(' ').slice(0, 2).join(' '), pYear);
+            bindFanWedgeEvents(g, pObj, `${slot.role} (Lapisan ${gen})`);
+            svg.appendChild(g);
+
+            renderAncestorArcs(pObj.id, gen + 1, aStart, slotSpan, slot.colorIdx || (sIdx === 0 ? 0 : 4));
+          } else if (gen <= 3) {
+            const g = createSvgEl('g', { opacity: 0.55 });
+            const path = createSvgEl('path', {
+              d: pathD,
+              fill: '#f1f5f9',
+              stroke: '#cbd5e1',
+              'stroke-width': 1.2,
+              'stroke-dasharray': '4 3'
+            });
+            g.appendChild(path);
+            const pos = polarToCartesian(cx, cy, rMid, midA);
+            const qText = createSvgEl('text', {
+              x: pos.x,
+              y: pos.y + 4,
+              'text-anchor': 'middle',
+              fill: '#94a3b8',
+              'font-size': 11,
+              'font-weight': 700
+            });
+            qText.textContent = '?';
+            g.appendChild(qText);
+            svg.appendChild(g);
+          }
+        });
+      }
+
+      renderAncestorArcs(rootPerson.id, 1, startDeg, totalDeg, 0);
+      return;
+    }
+
+    // Descendant Fan
+    const descRoot = buildFocalDescendantTree(rootPerson.id, index) || rootPerson;
 
     function countLeaves(node) {
       if (!node.children || node.children.length === 0) return 1;
       return node.children.reduce((acc, c) => acc + countLeaves(c), 0);
     }
 
-    const totalLeaves = countLeaves(rootPerson);
+    const totalLeaves = countLeaves(descRoot);
+    if (!descRoot.children || !descRoot.children.length) {
+      const emptyNote = createSvgEl('text', {
+        x: cx,
+        y: is180 ? cy - 115 : cy - 115,
+        'text-anchor': 'middle',
+        fill: '#64748b',
+        'font-size': 12
+      });
+      emptyNote.textContent = 'Belum ada keturunan tercatat untuk pusat ini. Coba ganti ke mode Leluhur.';
+      svg.appendChild(emptyNote);
+      return;
+    }
 
-    function renderDescendantArcs(node, currentGen, angleStart, angleSpan) {
+    function renderDescendantArcs(node, currentGen, angleStart) {
       if (!node.children || node.children.length === 0 || currentGen > 5) return;
 
       const rInner = baseR + (currentGen - 1) * ringW + 4;
       const rOuter = rInner + ringW - 4;
+      const rMid = (rInner + rOuter) / 2;
       let curAngle = angleStart;
 
       node.children.forEach((child, idx) => {
         const leaves = countLeaves(child);
         const childSpan = (leaves / totalLeaves) * totalDeg;
         const arcEnd = curAngle + childSpan;
-        const color = branchColors[(currentGen + idx) % branchColors.length];
+        const color = branchColors[(currentGen - 1 + idx) % branchColors.length];
 
         const pathD = describeArc(cx, cy, rInner, rOuter, curAngle, arcEnd);
         const g = createSvgEl('g', { class: 'fan-chart-wedge', 'data-id': child.id });
@@ -3385,36 +4124,23 @@
           d: pathD,
           fill: color,
           stroke: '#ffffff',
-          'stroke-width': 1.5,
-          opacity: 0.88
+          'stroke-width': 1.6,
+          opacity: 0.9
         });
         g.appendChild(path);
 
         const midAngle = curAngle + childSpan / 2;
-        const textPos = polarToCartesian(cx, cy, (rInner + rOuter) / 2, midAngle);
-
-        if (childSpan >= 8) {
-          const text = createSvgEl('text', {
-            x: textPos.x,
-            y: textPos.y + 3,
-            'text-anchor': 'middle',
-            fill: '#ffffff',
-            'font-size': childSpan > 15 ? 10 : 8,
-            'font-weight': 700
-          });
-          text.textContent = (child.name || '').split(' ')[0].slice(0, 10);
-          g.appendChild(text);
-        }
-
-        g.onclick = () => openInspectorDrawer(child.id);
+        const cYear = child.birthYear || (child.birthDate || '').slice(0, 4) || '';
+        renderFanWedgeLabel(g, cx, cy, rMid, midAngle, childSpan, (child.name || '').split(' ')[0], cYear);
+        bindFanWedgeEvents(g, child, `Keturunan Lapisan ${currentGen}`);
         svg.appendChild(g);
 
-        renderDescendantArcs(child, currentGen + 1, curAngle, childSpan);
+        renderDescendantArcs(child, currentGen + 1, curAngle);
         curAngle = arcEnd;
       });
     }
 
-    renderDescendantArcs(rootPerson, 1, startDeg, totalDeg);
+    renderDescendantArcs(descRoot, 1, startDeg);
   }
 
   window.exportFanChart = function(format = 'png') {
@@ -3429,8 +4155,8 @@
       const ctx = canvas.getContext('2d');
       const img = new Image();
 
-      canvas.width = 1880;
-      canvas.height = fanChartAngle === 180 ? 1080 : 1880;
+      canvas.width = 1920;
+      canvas.height = fanChartAngle === 180 ? 1080 : 1920;
 
       const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(svgBlob);
@@ -3442,7 +4168,7 @@
         URL.revokeObjectURL(url);
 
         const a = document.createElement('a');
-        a.download = `Bagan_Kipas_Silsilah_${new Date().toISOString().slice(0, 10)}.png`;
+        a.download = `Bagan_Kipas_${fanChartType}_${new Date().toISOString().slice(0, 10)}.png`;
         a.href = canvas.toDataURL('image/png');
         a.click();
         showToast('Bagan kipas berhasil diunduh!');
@@ -3458,7 +4184,80 @@
   // ==========================================================================
   window.exportGEDCOM = function() {
     const rows = flattenPeople(treeData);
-    const idMap = new Map(rows.map((r, i) => [r.person.id, `I${i + 1}`]));
+    const idMap = new Map(rows.map((r, i) => [String(r.person.id), `I${i + 1}`]));
+    const personFams = new Map();
+    const personFamc = new Map();
+    const families = [];
+    let famIndex = 1;
+
+    function addFamsLink(gid, famId) {
+      if (!gid) return;
+      if (!personFams.has(gid)) personFams.set(gid, new Set());
+      personFams.get(gid).add(famId);
+    }
+
+    function collectFamilies(node) {
+      if (!node) return;
+      const pGid = idMap.get(String(node.id));
+      const spouses = node.spouses || [];
+      const kids = node.children || [];
+
+      if (spouses.length > 0) {
+        spouses.forEach((sp, sIdx) => {
+          const spGid = idMap.get(String(sp.id));
+          const famId = `F${famIndex++}`;
+          const matchedKids = kids.filter(c => {
+            if (c.linkedSpouseId) return String(c.linkedSpouseId) === String(sp.id);
+            return spouses.length === 1 && sIdx === 0;
+          });
+          const childGids = matchedKids.map(c => idMap.get(String(c.id))).filter(Boolean);
+
+          addFamsLink(pGid, famId);
+          addFamsLink(spGid, famId);
+          childGids.forEach(cGid => personFamc.set(cGid, famId));
+
+          families.push({
+            famId,
+            husb: node.gender === 'P' ? spGid : pGid,
+            wife: node.gender === 'P' ? pGid : spGid,
+            children: childGids,
+            hasMarriage: true
+          });
+        });
+
+        const unlinkedKids = kids.filter(c => !c.linkedSpouseId && spouses.length > 1);
+        if (unlinkedKids.length > 0) {
+          const famId = `F${famIndex++}`;
+          const childGids = unlinkedKids.map(c => idMap.get(String(c.id))).filter(Boolean);
+          addFamsLink(pGid, famId);
+          childGids.forEach(cGid => personFamc.set(cGid, famId));
+          families.push({
+            famId,
+            husb: node.gender === 'P' ? '' : pGid,
+            wife: node.gender === 'P' ? pGid : '',
+            children: childGids,
+            hasMarriage: false
+          });
+        }
+      } else if (kids.length > 0) {
+        const famId = `F${famIndex++}`;
+        const childGids = kids.map(c => idMap.get(String(c.id))).filter(Boolean);
+        addFamsLink(pGid, famId);
+        childGids.forEach(cGid => personFamc.set(cGid, famId));
+        families.push({
+          famId,
+          husb: node.gender === 'P' ? '' : pGid,
+          wife: node.gender === 'P' ? pGid : '',
+          children: childGids,
+          hasMarriage: false
+        });
+      }
+
+      kids.forEach(collectFamilies);
+    }
+
+    collectFamilies(treeData);
+
     const lines = [
       '0 HEAD',
       '1 SOUR SILSILAH-PRO-MAX',
@@ -3468,50 +4267,43 @@
       '2 FORM LINEAGE-LINKED'
     ];
 
-    const families = [];
-    let famIndex = 1;
-
     rows.forEach(({ person }) => {
-      const gid = idMap.get(person.id);
-      const nameParts = (person.name || 'Tanpa Nama').split(' ');
-      const givenName = nameParts[0];
+      const gid = idMap.get(String(person.id));
+      const nameParts = (person.name || 'Tanpa Nama').trim().split(/\s+/);
+      const givenName = nameParts[0] || '';
       const surname = person.surname || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : '');
 
       lines.push(`0 @${gid}@ INDI`, `1 NAME ${givenName} /${surname}/`);
       if (surname) lines.push(`2 SURN ${surname}`);
       lines.push(`1 SEX ${person.gender === 'P' ? 'F' : 'M'}`);
 
-      if (person.birthDate || person.birthYear) {
-        lines.push('1 BIRT', `2 DATE ${person.birthDate || person.birthYear}`);
+      if (person.birthDate || person.birthYear || person.birthPlace) {
+        lines.push('1 BIRT');
+        if (person.birthDate || person.birthYear) lines.push(`2 DATE ${person.birthDate || person.birthYear}`);
         if (person.birthPlace) lines.push(`2 PLAC ${person.birthPlace}`);
       }
       if (person.deathDate || person.deathYear) {
         lines.push('1 DEAT', `2 DATE ${person.deathDate || person.deathYear}`);
       }
       if (person.occupation) lines.push(`1 OCCU ${person.occupation}`);
-      if (person.biography) lines.push(`1 NOTE ${person.biography.replace(/\n/g, ' ')}`);
+      if (person.biography) lines.push(`1 NOTE ${person.biography.replace(/\r?\n/g, ' ')}`);
 
-      (person.spouses || []).forEach(spouse => {
-        const spouseGid = idMap.get(spouse.id);
-        const famId = `F${famIndex++}`;
-        lines.push(`1 FAMS @${famId}@`);
-        families.push({
-          famId,
-          husb: person.gender === 'L' ? gid : spouseGid,
-          wife: person.gender === 'P' ? gid : spouseGid,
-          children: (person.children || []).map(c => idMap.get(c.id)).filter(Boolean)
-        });
-      });
+      const famsSet = personFams.get(gid);
+      if (famsSet) {
+        famsSet.forEach(famId => lines.push(`1 FAMS @${famId}@`));
+      }
+      const famcId = personFamc.get(gid);
+      if (famcId) {
+        lines.push(`1 FAMC @${famcId}@`);
+      }
     });
 
     families.forEach(f => {
       lines.push(`0 @${f.famId}@ FAM`);
       if (f.husb) lines.push(`1 HUSB @${f.husb}@`);
       if (f.wife) lines.push(`1 WIFE @${f.wife}@`);
-      (f.children || []).forEach(chGid => {
-        lines.push(`1 CHIL @${chGid}@`);
-      });
-      lines.push('1 MARR');
+      (f.children || []).forEach(chGid => lines.push(`1 CHIL @${chGid}@`));
+      if (f.hasMarriage) lines.push('1 MARR');
     });
 
     lines.push('0 TRLR');
@@ -3526,6 +4318,10 @@
   };
 
   window.importGEDCOM = function(fileText) {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin untuk mengimpor file GEDCOM.', true);
+      return;
+    }
     if (!fileText || !fileText.includes('INDI')) {
       return showToast('Format file GEDCOM tidak valid.', true);
     }
@@ -3536,6 +4332,7 @@
       const fams = new Map();
       let curr = null;
       let currType = null;
+      let currSubTag = '';
 
       lines.forEach(line => {
         line = line.trim();
@@ -3548,9 +4345,10 @@
         const rest = (m[4] || '').trim();
 
         if (level === 0) {
+          currSubTag = '';
           if (rest === 'INDI' || tag === 'INDI') {
             currType = 'INDI';
-            curr = { id: id || tag, name: '', gender: 'L', birthDate: '', birthPlace: '', deathDate: '', occupation: '', biography: '', famc: [], fams: [] };
+            curr = { id: id || tag, name: '', surname: '', gender: 'L', birthDate: '', birthPlace: '', deathDate: '', occupation: '', biography: '', famc: new Set(), fams: new Set() };
             indis.set(curr.id, curr);
           } else if (rest === 'FAM' || tag === 'FAM') {
             currType = 'FAM';
@@ -3561,16 +4359,23 @@
             currType = null;
           }
         } else if (curr && currType === 'INDI') {
-          if (tag === 'NAME') curr.name = rest.replace(/\//g, '').trim();
-          else if (tag === 'SEX') curr.gender = rest.toUpperCase().startsWith('F') || rest.toUpperCase().startsWith('P') ? 'P' : 'L';
-          else if (tag === 'DATE') {
-            if (!curr.birthDate) curr.birthDate = rest;
-            else curr.deathDate = rest;
-          } else if (tag === 'PLAC') curr.birthPlace = rest;
-          else if (tag === 'OCCU') curr.occupation = rest;
-          else if (tag === 'NOTE') curr.biography = rest;
-          else if (tag === 'FAMC') curr.famc.push(rest);
-          else if (tag === 'FAMS') curr.fams.push(rest);
+          if (level === 1) {
+            currSubTag = tag;
+            if (tag === 'NAME') curr.name = rest.replace(/\//g, ' ').replace(/\s+/g, ' ').trim();
+            else if (tag === 'SEX') curr.gender = rest.toUpperCase().startsWith('F') || rest.toUpperCase().startsWith('P') ? 'P' : 'L';
+            else if (tag === 'OCCU') curr.occupation = rest;
+            else if (tag === 'NOTE') curr.biography = rest;
+            else if (tag === 'FAMC') curr.famc.add(rest);
+            else if (tag === 'FAMS') curr.fams.add(rest);
+          } else if (level >= 2) {
+            if (tag === 'SURN') curr.surname = rest;
+            else if (tag === 'DATE') {
+              if (currSubTag === 'DEAT') curr.deathDate = rest;
+              else if (currSubTag === 'BIRT' || !curr.birthDate) curr.birthDate = rest;
+            } else if (tag === 'PLAC') {
+              if (currSubTag === 'BIRT' || !curr.birthPlace) curr.birthPlace = rest;
+            }
+          }
         } else if (curr && currType === 'FAM') {
           if (tag === 'HUSB') curr.husb = rest;
           else if (tag === 'WIFE') curr.wife = rest;
@@ -3578,22 +4383,41 @@
         }
       });
 
+      // Symmetrically populate fams & famc from FAM records in case INDI omitted tags
+      fams.forEach((fam, fId) => {
+        if (fam.husb && indis.has(fam.husb)) indis.get(fam.husb).fams.add(fId);
+        if (fam.wife && indis.has(fam.wife)) indis.get(fam.wife).fams.add(fId);
+        fam.children.forEach(chId => {
+          if (indis.has(chId)) indis.get(chId).famc.add(fId);
+        });
+      });
+
       if (indis.size === 0) {
         return showToast('Tidak ada data anggota individu ditemukan di GEDCOM.', true);
       }
 
-      let rootCandidate = Array.from(indis.values()).find(i => i.famc.length === 0) || Array.from(indis.values())[0];
+      const rootCandidate = Array.from(indis.values()).find(i => i.famc.size === 0) || Array.from(indis.values())[0];
+      const visited = new Set();
 
       function buildTreeNode(indi) {
+        if (!indi || visited.has(indi.id)) return null;
+        visited.add(indi.id);
+
+        const extractYear = (dStr) => {
+          const ym = String(dStr || '').match(/\b(1[6-9]\d{2}|20\d{2})\b/);
+          return ym ? ym[1] : '';
+        };
+
         const node = {
-          id: `ged-${Math.random().toString(36).substr(2, 7)}`,
+          id: `ged-${Math.random().toString(36).slice(2, 9)}`,
           name: indi.name || 'Tanpa Nama',
+          surname: indi.surname || '',
           gender: indi.gender || 'L',
-          birthDate: indi.birthDate || '',
-          birthYear: indi.birthDate ? indi.birthDate.slice(0, 4) : '',
+          birthDate: /^\d{4}-\d{2}-\d{2}$/.test(indi.birthDate) ? indi.birthDate : '',
+          birthYear: extractYear(indi.birthDate),
           birthPlace: indi.birthPlace || '',
-          deathDate: indi.deathDate || '',
-          deathYear: indi.deathDate ? indi.deathDate.slice(0, 4) : '',
+          deathDate: /^\d{4}-\d{2}-\d{2}$/.test(indi.deathDate) ? indi.deathDate : '',
+          deathYear: extractYear(indi.deathDate),
           occupation: indi.occupation || '',
           biography: indi.biography || '',
           spouses: [],
@@ -3601,27 +4425,36 @@
           isCollapsed: false
         };
 
-        (indi.fams || []).forEach(fId => {
+        indi.fams.forEach(fId => {
           const fam = fams.get(fId);
           if (!fam) return;
           const spouseGid = fam.husb === indi.id ? fam.wife : fam.husb;
-          const spouseIndi = indis.get(spouseGid);
+          const spouseIndi = spouseGid ? indis.get(spouseGid) : null;
+          let spouseNodeId = '';
+
           if (spouseIndi) {
+            visited.add(spouseIndi.id);
+            spouseNodeId = `ged-${Math.random().toString(36).slice(2, 9)}`;
             node.spouses.push({
-              id: `ged-${Math.random().toString(36).substr(2, 7)}`,
+              id: spouseNodeId,
               name: spouseIndi.name || 'Pasangan',
+              surname: spouseIndi.surname || '',
               gender: spouseIndi.gender || 'P',
-              birthDate: spouseIndi.birthDate || '',
+              birthDate: /^\d{4}-\d{2}-\d{2}$/.test(spouseIndi.birthDate) ? spouseIndi.birthDate : '',
+              birthYear: extractYear(spouseIndi.birthDate),
               birthPlace: spouseIndi.birthPlace || '',
-              deathDate: spouseIndi.deathDate || '',
+              deathDate: /^\d{4}-\d{2}-\d{2}$/.test(spouseIndi.deathDate) ? spouseIndi.deathDate : '',
+              deathYear: extractYear(spouseIndi.deathDate),
               occupation: spouseIndi.occupation || ''
             });
           }
 
-          (fam.children || []).forEach(chGid => {
+          fam.children.forEach(chGid => {
             const chIndi = indis.get(chGid);
-            if (chIndi) {
-              node.children.push(buildTreeNode(chIndi));
+            const chNode = buildTreeNode(chIndi);
+            if (chNode) {
+              if (spouseNodeId) chNode.linkedSpouseId = spouseNodeId;
+              node.children.push(chNode);
             }
           });
         });
@@ -3630,11 +4463,23 @@
       }
 
       const importedTree = buildTreeNode(rootCandidate);
-      treeData = importedTree;
-      ensureFamilyNumbers();
-      renderTree();
-      simpanKeFirebase(`Impor GEDCOM (${indis.size} anggota)`);
-      showToast(`Sukses mengimpor ${indis.size} anggota dari file GEDCOM!`);
+      if (!importedTree) {
+        return showToast('Gagal membangun struktur pohon dari GEDCOM.', true);
+      }
+
+      customConfirm(
+        'Impor File GEDCOM',
+        `Ditemukan ${indis.size} anggota dan ${fams.size} ikatan keluarga. Ganti pohon silsilah saat ini dengan data GEDCOM tersebut?`,
+        () => {
+          treeData = importedTree;
+          cameraInitialized = false;
+          ensureFamilyNumbers();
+          resetTreePerspective();
+          simpanKeFirebase(`Impor GEDCOM (${indis.size} anggota)`);
+          closeExportModal();
+          showToast(`Sukses mengimpor ${indis.size} anggota dari file GEDCOM!`);
+        }
+      );
     } catch (err) {
       console.error(err);
       showToast('Gagal memproses file GEDCOM.', true);
@@ -3654,6 +4499,7 @@
       const rows = flattenPeople(treeData);
       const stats = calculateStats(treeData);
       const W = 210, H = 297, M = 18;
+      const valMaxW = W - M * 2 - 42;
 
       // PAGE 1: LUXURY OBSIDIAN COVER
       pdf.setFillColor(7, 13, 24);
@@ -3672,12 +4518,13 @@
 
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(26);
-      pdf.text(appSettings?.appTitle || 'Silsilah Keluarga', W / 2, 85, { align: 'center' });
+      const coverTitleLines = pdf.splitTextToSize(appSettings?.appTitle || 'Silsilah Keluarga', W - 44);
+      pdf.text(coverTitleLines, W / 2, 85, { align: 'center' });
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(13);
       pdf.setTextColor(148, 163, 184);
-      pdf.text(appSettings?.appSubtitle || 'Family Heritage Workspace', W / 2, 96, { align: 'center' });
+      pdf.text(appSettings?.appSubtitle || 'Family Heritage Workspace', W / 2, 102, { align: 'center' });
 
       pdf.setFillColor(15, 23, 42);
       pdf.roundedRect(W / 2 - 60, 160, 120, 36, 6, 6, 'F');
@@ -3738,33 +4585,50 @@
         p2Y += 8;
       });
 
-      // PROFILES PAGES
-      rows.forEach(({ person, generation }) => {
+      function drawProfileHeader(name, generation, familyNumber) {
         pdf.addPage();
         pdf.setFillColor(248, 250, 252);
         pdf.rect(0, 0, W, 22, 'F');
         pdf.setTextColor(15, 23, 42);
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(13);
-        pdf.text(person.name || 'Tanpa Nama', M, 14);
+        pdf.text(name || 'Tanpa Nama', M, 14);
         pdf.setFontSize(8);
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(100, 116, 139);
-        pdf.text(`Generasi ${generation} • ${person.familyNumber || ''}`, W - M, 14, { align: 'right' });
+        pdf.text(`Generasi ${generation} | ${familyNumber || ''}`, W - M, 14, { align: 'right' });
+      }
+
+      // PROFILES PAGES
+      rows.forEach(({ person, generation }) => {
+        drawProfileHeader(person.name, generation, person.familyNumber);
+
+        const astro = getAstrologyProfile(person);
+        const astroText = [
+          astro.sun ? `Zodiak ${astro.sun.name}` : '',
+          astro.chinese ? `Shio ${astro.chinese.name} (${astro.chinese.element})` : ''
+        ].filter(Boolean).join(', ');
 
         let y = 36;
         const meta = [
           ['Nama Lengkap', person.name],
           ['Marga / Trah', person.surname],
-          ['Kelahiran', `${person.birthPlace || ''} ${person.birthDate || person.birthYear || ''}`],
-          ['Status Wafat', person.deathDate || person.deathYear ? `Wafat (${person.deathDate || person.deathYear})` : 'Masih Hidup'],
+          ['Kelahiran', `${person.birthPlace || ''} ${person.birthDate || person.birthYear || ''}`.trim()],
+          ['Status', person.deathDate || person.deathYear ? `Wafat (${person.deathDate || person.deathYear})` : 'Masih Hidup'],
+          ['Astrologi & Shio', astroText],
           ['Profesi', person.occupation],
           ['Gol. Darah', person.bloodType],
           ['No. HP', person.phone],
-          ['Alamat', person.address]
+          ['Alamat', person.address],
+          ['Pasangan', (person.spouses || []).length ? person.spouses.map(s => s.name).join(', ') : '']
         ].filter(r => r[1]);
 
         meta.forEach(([k, v]) => {
+          const valLines = pdf.splitTextToSize(String(v), valMaxW);
+          if (y + valLines.length * 6 > H - 25) {
+            drawProfileHeader(`${person.name} (Lanjutan)`, generation, person.familyNumber);
+            y = 36;
+          }
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(8);
           pdf.setTextColor(100, 116, 139);
@@ -3772,61 +4636,70 @@
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(10);
           pdf.setTextColor(15, 23, 42);
-          pdf.text(String(v), M + 40, y);
-          y += 9;
+          pdf.text(valLines, M + 42, y);
+          y += Math.max(9, valLines.length * 5.5 + 3.5);
         });
 
-        if (person.spouses && person.spouses.length > 0) {
-          y += 4;
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(8);
-          pdf.setTextColor(100, 116, 139);
-          pdf.text('PASANGAN', M, y);
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(10);
-          pdf.setTextColor(15, 23, 42);
-          pdf.text(person.spouses.map(s => s.name).join(', '), M + 40, y);
-          y += 9;
-        }
-
         if (person.children && person.children.length > 0) {
-          y += 4;
+          const childNames = person.children.map((c, i) => `${i + 1}. ${c.name}`).join('   ');
+          const childLines = pdf.splitTextToSize(childNames, valMaxW);
+          if (y + childLines.length * 6 > H - 25) {
+            drawProfileHeader(`${person.name} (Lanjutan)`, generation, person.familyNumber);
+            y = 36;
+          }
+          y += 3;
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(8);
           pdf.setTextColor(100, 116, 139);
           pdf.text('DAFTAR ANAK', M, y);
           pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(9);
+          pdf.setFontSize(9.5);
           pdf.setTextColor(15, 23, 42);
-          const childNames = person.children.map((c, i) => `${i + 1}. ${c.name}`).join('   ');
-          const childLines = pdf.splitTextToSize(childNames, W - M * 2 - 40);
-          pdf.text(childLines, M + 40, y);
-          y += childLines.length * 7;
+          pdf.text(childLines, M + 42, y);
+          y += Math.max(9, childLines.length * 5.5 + 4);
         }
 
         if (person.biography) {
-          y += 6;
+          y += 5;
+          if (y > H - 35) {
+            drawProfileHeader(`${person.name} (Biografi)`, generation, person.familyNumber);
+            y = 36;
+          }
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(9);
           pdf.setTextColor(15, 23, 42);
           pdf.text('BIOGRAFI & KISAH HIDUP', M, y);
+          y += 6;
           pdf.setFont('helvetica', 'normal');
           pdf.setFontSize(9);
           pdf.setTextColor(51, 65, 85);
-          const lines = pdf.splitTextToSize(person.biography, W - M * 2);
-          pdf.text(lines, M, y + 6);
+          const bioLines = pdf.splitTextToSize(person.biography, W - M * 2);
+          bioLines.forEach(line => {
+            if (y > H - 22) {
+              drawProfileHeader(`${person.name} (Biografi)`, generation, person.familyNumber);
+              y = 36;
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(9);
+              pdf.setTextColor(51, 65, 85);
+            }
+            pdf.text(line, M, y);
+            y += 5.2;
+          });
         }
       });
 
-      // FINAL PAGE: INDEKS NAMA
-      pdf.addPage();
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(0, 0, W, 22, 'F');
-      pdf.setTextColor(15, 23, 42);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(13);
-      pdf.text('INDEKS ANGGOTA KELUARGA', M, 14);
+      // FINAL SECTION: INDEKS NAMA (Multi-page safe)
+      function drawIndexHeader(isContinuation = false) {
+        pdf.addPage();
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(0, 0, W, 22, 'F');
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(13);
+        pdf.text(isContinuation ? 'INDEKS ANGGOTA KELUARGA (LANJUTAN)' : 'INDEKS ANGGOTA KELUARGA', M, 14);
+      }
 
+      drawIndexHeader(false);
       let idxY = 34;
       let colX = M;
       const sortedNames = [...rows].sort((a, b) => (a.person.name || '').localeCompare(b.person.name || ''));
@@ -3835,13 +4708,29 @@
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(8);
         pdf.setTextColor(15, 23, 42);
-        pdf.text(`${person.name} (Gen ${generation})`, colX, idxY);
+        const entryText = `${(person.name || '').slice(0, 24)} (G${generation})`;
+        pdf.text(entryText, colX, idxY);
         idxY += 6;
-        if (idxY > H - 20) {
+        if (idxY > H - 22) {
           idxY = 34;
           colX += 60;
+          if (colX > W - M - 40) {
+            drawIndexHeader(true);
+            colX = M;
+            idxY = 34;
+          }
         }
       });
+
+      // Add subtle page numbering on pages 2..N
+      const totalPages = pdf.getNumberOfPages();
+      for (let p = 2; p <= totalPages; p++) {
+        pdf.setPage(p);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(`Halaman ${p - 1} dari ${totalPages - 1}`, W / 2, H - 10, { align: 'center' });
+      }
 
       pdf.save(`Buku_Silsilah_Keluarga_${new Date().toISOString().slice(0, 10)}.pdf`);
       showToast('Buku silsilah PDF berhasil dibuat!');
@@ -3852,10 +4741,11 @@
   };
 
   // ==========================================================================
-  // FITUR 7: RBAC, GUEST READ-ONLY SHARE & WHATSAPP ENGINE
+  // FITUR 7: RBAC, GUEST READ-ONLY SHARE, JSON IMPORT & WHATSAPP ENGINE
   // ==========================================================================
   let isGuestMode = false;
   let shareQrInstance = null;
+  let rbacInitialized = false;
 
   function initRbacAndShare() {
     const params = new URLSearchParams(window.location.search);
@@ -3872,6 +4762,9 @@
       if (loginScreen) loginScreen.classList.add('hidden');
     }
 
+    if (rbacInitialized) return;
+    rbacInitialized = true;
+
     const gedcomInput = document.getElementById('gedcom-input');
     if (gedcomInput) {
       gedcomInput.addEventListener('change', (e) => {
@@ -3881,6 +4774,52 @@
         reader.onload = (evt) => importGEDCOM(evt.target.result);
         reader.readAsText(file);
         gedcomInput.value = '';
+      });
+    }
+
+    const importJsonInput = document.getElementById('import-input');
+    if (importJsonInput) {
+      importJsonInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (isGuestMode) {
+          showToast('Mode Baca Saja aktif. Buka kunci Admin untuk memuat JSON.', true);
+          importJsonInput.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const parsed = JSON.parse(evt.target.result);
+            const nextTree = parsed?.tree ? parsed.tree : (parsed?.id && parsed?.name ? parsed : null);
+            if (!nextTree) {
+              return showToast('Format file JSON silsilah tidak valid.', true);
+            }
+            const nextRows = flattenPeople(nextTree);
+            customConfirm(
+              'Muat Data JSON',
+              `Ditemukan ${nextRows.length} anggota dalam file JSON. Ganti data silsilah saat ini dengan data dari file?`,
+              () => {
+                treeData = nextTree;
+                if (parsed?.settings) appSettings = { ...initialAppSettings, ...parsed.settings };
+                if (Array.isArray(parsed?.familyEvents)) familyEvents = parsed.familyEvents;
+                cameraInitialized = false;
+                ensureFamilyNumbers();
+                document.getElementById('app-main-title').textContent = appSettings.appTitle;
+                document.getElementById('app-sub-title').textContent = appSettings.appSubtitle;
+                resetTreePerspective();
+                simpanKeFirebase(`Muat JSON (${nextRows.length} anggota)`);
+                closeExportModal();
+                showToast(`Data JSON (${nextRows.length} anggota) berhasil dimuat!`);
+              }
+            );
+          } catch (err) {
+            console.error(err);
+            showToast('Gagal membaca file JSON. Pastikan format JSON benar.', true);
+          }
+        };
+        reader.readAsText(file);
+        importJsonInput.value = '';
       });
     }
   }
@@ -3963,7 +4902,7 @@
     const input = document.getElementById('admin-pin-input');
     const errorMsg = document.getElementById('admin-unlock-error');
     const entered = (input?.value || '').trim();
-    const correctPin = appSettings?.accessCode || '1234';
+    const correctPin = String(appSettings?.accessCode || '12345').trim();
 
     if (entered === correctPin) {
       isGuestMode = false;
@@ -4024,6 +4963,10 @@
 
   // --- SETTINGS MODAL ---
   window.openSettingsModal = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin untuk mengubah pengaturan.', true);
+      return;
+    }
     document.getElementById('set-title').value = appSettings?.appTitle || 'Silsilah Keluarga';
     document.getElementById('set-subtitle').value = appSettings?.appSubtitle || 'Family Heritage Workspace';
     document.getElementById('set-password').value = appSettings?.accessCode || '';
@@ -4040,6 +4983,10 @@
   };
 
   window.saveSettings = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Pengaturan tidak dapat disimpan.', true);
+      return;
+    }
     appSettings.appTitle = document.getElementById('set-title').value.trim() || 'Silsilah Keluarga';
     appSettings.appSubtitle = document.getElementById('set-subtitle').value.trim() || 'Family Heritage Workspace';
     appSettings.accessCode = document.getElementById('set-password').value.trim();
@@ -4057,6 +5004,10 @@
 
   // --- FAMILY EVENTS MODAL ---
   window.openFamilyEventModal = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
     const personSel = document.getElementById('event-person');
     if (personSel) {
       personSel.innerHTML = '<option value="">- Tidak terkait person tertentu -</option>';
@@ -4077,6 +5028,10 @@
   };
 
   window.saveFamilyEvent = function() {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Acara tidak dapat disimpan.', true);
+      return;
+    }
     const title = document.getElementById('event-title').value.trim();
     const date = document.getElementById('event-date').value;
     const type = document.getElementById('event-type').value;
@@ -4219,6 +5174,12 @@
     const screen = document.getElementById('login-screen');
     const btnLogout = document.getElementById('btn-logout');
 
+    if (isGuestMode) {
+      screen?.classList.add('hidden');
+      if (btnLogout) btnLogout.style.display = 'none';
+      return;
+    }
+
     if (!force && (!hasPassword || hasActiveSession())) {
       screen?.classList.add('hidden');
       if (btnLogout) btnLogout.style.display = hasPassword ? 'flex' : 'none';
@@ -4353,8 +5314,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     initCanvasGestures();
     initGlobalSearch();
-    bootApplication();
     initRbacAndShare();
+    bootApplication();
 
     window.addEventListener('resize', () => {
       scheduleTreeConnectorRender();

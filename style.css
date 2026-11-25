@@ -2003,11 +2003,11 @@ a {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Guest Read-Only Mode Banner */
+/* Guest Read-Only Mode Banner (Positioned bottom-left so it never overlaps center Focus Banner) */
 .guest-readonly-banner {
   position: absolute;
-  top: 14px;
-  left: 20px;
+  bottom: 18px;
+  left: 18px;
   z-index: 40;
   display: flex;
   align-items: center;
@@ -2051,6 +2051,7 @@ a {
 
 /* Guest Mode Body Enforcement */
 body.guest-mode .admin-only-action,
+body.guest-mode .history-restore-btn,
 body.guest-mode #inspector-btn-edit,
 body.guest-mode #inspector-btn-add-child,
 body.guest-mode #inspector-btn-add-spouse,
@@ -2195,4 +2196,192 @@ body.guest-mode .node-quick-add {
   color: var(--ink-muted);
   line-height: 1.4;
   margin: 0;
+}
+
+/* 5. True Pedigree & Hourglass Layout */
+.perspective-root-li {
+  padding-top: 0 !important;
+}
+
+.pedigree-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.pedigree-parents-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 44px;
+  margin-bottom: 84px;
+  position: relative;
+}
+
+.pedigree-couple-unit {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 28px;
+  position: relative;
+}
+
+.pedigree-card-slot {
+  position: relative;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pedigree-role-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(2, 132, 199, 0.12);
+  color: var(--accent-cyan);
+  margin-bottom: 6px;
+}
+
+.pedigree-role-tag.focal {
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.perspective-focal-wrapper {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.person-card-node[data-focal-card="true"] {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.2), var(--shadow-md);
+}
+
+.hourglass-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.hourglass-ancestors-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hourglass-descendants-section > ul.hourglass-root-ul {
+  padding-top: 0 !important;
+}
+
+.hourglass-descendants-section > ul.hourglass-root-ul > li {
+  padding-top: 0 !important;
+}
+
+.focus-person-select {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  max-width: 190px;
+  outline: none;
+  cursor: pointer;
+}
+
+.focus-person-select option {
+  background: #0f172a;
+  color: #fff;
+}
+
+/* 6. Responsive Topbar & Perspective Controls */
+@media (max-width: 1280px) {
+  .persp-label {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace-topbar {
+    padding: 0 10px;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .topbar-left {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+  }
+  .topbar-breadcrumbs {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 5px;
+    flex: 1;
+    justify-content: flex-start;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .topbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+  .perspective-toggle-group,
+  .density-toggle-group {
+    padding: 2px;
+    flex-shrink: 0;
+  }
+  .persp-btn,
+  .density-btn {
+    padding: 4px 7px;
+    font-size: 10.5px;
+  }
+  .topbar-actions .ui-btn {
+    padding: 6px 9px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+  .topbar-actions .ui-btn-icon-only {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .topbar-actions .ui-btn-primary span {
+    display: none;
+  }
+  .topbar-actions .ui-btn-primary {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .tree-focus-banner {
+    width: calc(100% - 24px);
+    max-width: 440px;
+    justify-content: space-between;
+    padding: 7px 12px;
+    gap: 8px;
+  }
+  .focus-person-select {
+    max-width: 130px;
+  }
+  .guest-readonly-banner {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    justify-content: space-between;
+    padding: 7px 12px;
+    font-size: 11px;
+  }
 }

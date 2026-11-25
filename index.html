@@ -216,7 +216,7 @@
       </div>
 
       <div class="sidebar-footer">
-        <button onclick="openSettingsModal()" class="sidebar-action-btn" type="button">
+        <button onclick="openSettingsModal()" class="sidebar-action-btn admin-only-action" type="button">
           <i class="fa-solid fa-sliders"></i>
           <span>Pengaturan</span>
         </button>
@@ -290,7 +290,7 @@
             <i class="fa-solid fa-arrow-up-from-bracket"></i>
             <span style="font-size: 12px;">Ekspor & Cetak</span>
           </button>
-          <button onclick="openSettingsModal()" class="ui-btn ui-btn-icon-only" title="Pengaturan">
+          <button onclick="openSettingsModal()" class="ui-btn ui-btn-icon-only admin-only-action" title="Pengaturan">
             <i class="fa-solid fa-gear"></i>
           </button>
         </div>
@@ -304,7 +304,9 @@
         <div id="tree-focus-banner" class="tree-focus-banner hidden" data-no-pan>
           <div class="focus-banner-info">
             <i class="fa-solid fa-crosshairs" style="color: var(--accent-cyan);"></i>
-            <span>Fokus Pandang: <strong id="focus-person-name">Nama Anggota</strong> <span id="focus-mode-tag" class="focus-tag">Leluhur</span></span>
+            <span>Fokus:</span>
+            <select id="focus-person-select" class="focus-person-select" onchange="setTreePerspective(null, this.value)" aria-label="Pilih fokus anggota"></select>
+            <span id="focus-mode-tag" class="focus-tag">Leluhur</span>
           </div>
           <button onclick="resetTreePerspective()" class="focus-reset-action-btn" title="Kembalikan ke Leluhur Puncak">
             <i class="fa-solid fa-rotate-left"></i>
@@ -433,7 +435,7 @@
             <h1 class="module-title-h1">Kalender & Agenda Keluarga</h1>
             <p class="module-title-sub">Pengingat ulang tahun, haul atau peringatan wafat, serta agenda reuni keluarga.</p>
           </div>
-          <button onclick="openFamilyEventModal()" class="ui-btn ui-btn-primary">
+          <button onclick="openFamilyEventModal()" class="ui-btn ui-btn-primary admin-only-action">
             <i class="fa-solid fa-plus"></i>
             <span>Tambah Acara</span>
           </button>
@@ -510,6 +512,7 @@
             <h2 class="module-title" style="margin: 0;">Bagan Kipas Silsilah (Fan Chart)</h2>
           </div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <select id="fan-root-select" class="form-select" style="width: auto; max-width: 200px; padding: 6px 10px; font-size: 12px;" onchange="setFanRoot(this.value)" aria-label="Pilih pusat bagan kipas"></select>
             <div class="density-toggle-group">
               <button id="fan-angle-180" onclick="setFanAngle(180)" class="density-btn active">180° Setengah</button>
               <button id="fan-angle-360" onclick="setFanAngle(360)" class="density-btn">360° Penuh</button>
@@ -952,7 +955,7 @@
               <i class="fa-solid fa-file-arrow-down"></i>
               <span>Simpan JSON</span>
             </button>
-            <label class="ui-btn" style="font-size: 12px; cursor: pointer;">
+            <label class="ui-btn admin-only-action" style="font-size: 12px; cursor: pointer;">
               <i class="fa-solid fa-file-arrow-up"></i>
               <span>Muat JSON</span>
               <input type="file" id="import-input" accept=".json" class="hidden">
@@ -964,7 +967,7 @@
               <i class="fa-solid fa-file-export"></i>
               <span>Ekspor GEDCOM</span>
             </button>
-            <label class="ui-btn" style="font-size: 12px; cursor: pointer;">
+            <label class="ui-btn admin-only-action" style="font-size: 12px; cursor: pointer;">
               <i class="fa-solid fa-file-import"></i>
               <span>Impor GEDCOM</span>
               <input type="file" id="gedcom-input" accept=".ged,.gedcom,text/plain" class="hidden">
