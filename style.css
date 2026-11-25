@@ -2055,6 +2055,7 @@ body.guest-mode .history-restore-btn,
 body.guest-mode #inspector-btn-edit,
 body.guest-mode #inspector-btn-add-child,
 body.guest-mode #inspector-btn-add-spouse,
+body.guest-mode #inspector-btn-add-parent,
 body.guest-mode #inspector-btn-delete,
 body.guest-mode .node-quick-add {
   display: none !important;
@@ -2303,6 +2304,60 @@ body.guest-mode .node-quick-add {
 .focus-person-select option {
   background: #0f172a;
   color: #fff;
+}
+
+/* Clickable Upward Lineage Pill on Spouse / Menantu Cards */
+.spouse-card-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.spouse-upward-pill {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border: 1px solid rgba(2, 132, 199, 0.28);
+  background: rgba(224, 242, 254, 0.94);
+  color: #0369a1;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  z-index: 30;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
+}
+
+.spouse-upward-pill:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.spouse-upward-pill.add-parent {
+  background: rgba(248, 250, 252, 0.94);
+  color: var(--ink-muted);
+  border: 1px dashed var(--border-strong);
+  box-shadow: none;
+  opacity: 0.72;
+}
+
+.spouse-card-stack:hover .spouse-upward-pill.add-parent,
+.spouse-upward-pill.add-parent:focus-visible {
+  opacity: 1;
+  color: #0369a1;
+  border-color: #0284c7;
+  border-style: solid;
+  background: #f0f9ff;
 }
 
 /* 6. Responsive Topbar & Perspective Controls */

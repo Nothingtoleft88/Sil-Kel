@@ -441,13 +441,19 @@
     if (!node) return [];
     let list = [{ person: node, generation, parentId: parent ? parent.id : null, relation: 'utama' }];
 
+    function pushParents(owner, ownerGen) {
+      (owner.parents || []).forEach(spParent => {
+        list.push({ person: spParent, generation: ownerGen - 1, parentId: owner.id, relation: 'mertua' });
+        pushParents(spParent, ownerGen - 1);
+      });
+    }
+
     (node.spouses || []).forEach(spouse => {
       list.push({ person: spouse, generation, hostId: node.id, parentId: node.id, relation: 'pasangan' });
-      (spouse.parents || []).forEach(spParent => {
-        list.push({ person: spParent, generation: generation - 1, parentId: spouse.id, relation: 'mertua' });
-      });
+      pushParents(spouse, generation);
       (spouse.spouses || []).forEach(secSpouse => {
         list.push({ person: secSpouse, generation, parentId: spouse.id, relation: 'pasangan-lain' });
+        pushParents(secSpouse, generation);
       });
     });
 
@@ -462,17 +468,26 @@
     if (!current || !id) return null;
     if (current.id === id) return current;
 
+    function searchParents(parentsArr) {
+      if (!parentsArr) return null;
+      for (const p of parentsArr) {
+        if (p.id === id) return p;
+        const deeper = searchParents(p.parents);
+        if (deeper) return deeper;
+      }
+      return null;
+    }
+
     if (current.spouses) {
       for (const spouse of current.spouses) {
         if (spouse.id === id) return spouse;
-        if (spouse.parents) {
-          for (const p of spouse.parents) {
-            if (p.id === id) return p;
-          }
-        }
+        const foundInSpouseParents = searchParents(spouse.parents);
+        if (foundInSpouseParents) return foundInSpouseParents;
         if (spouse.spouses) {
           for (const s of spouse.spouses) {
             if (s.id === id) return s;
+            const foundInSecParents = searchParents(s.parents);
+            if (foundInSecParents) return foundInSecParents;
           }
         }
       }
@@ -706,23 +721,20 @@
 
     if (node.spouses && node.spouses.length > 0) {
       node.spouses.forEach(spouse => {
-        html += `<div style="display: flex; align-items: center; position: relative; margin-left: 28px;">`;
-
-        if (spouse.parents && spouse.parents.length > 0) {
-          html += `
-          <div style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding-bottom: 8px; z-index: 20; pointer-events: none;">
-            <div style="display: flex; justify-content: center; align-items: flex-end; width: max-content;">
-              ${spouse.parents.map(p => `
-                <div style="position: relative; display: flex; flex-direction: column; align-items: center; padding: 0 16px;">
-                  ${buildPersonCard(p, false, false, false, level - 1, spouse.id)}
-                </div>
-              `).join('')}
-            </div>
-          </div>`;
+        const parentCount = (spouse.parents || []).length;
+        const showUpwardPill = activePerspectiveMode === 'full';
+        let upwardPillHtml = '';
+        if (showUpwardPill) {
+          if (parentCount > 0) {
+            upwardPillHtml = `<button type="button" onclick="event.stopPropagation(); openUpwardLineage('${escapeHTML(spouse.id)}')" class="spouse-upward-pill has-parents" title="Buka jalur orang tua dan leluhur ${escapeHTML(spouse.name)} (Mode Jam Pasir)" data-html2canvas-ignore><i class="fa-solid fa-arrow-up"></i><span>Orang Tua (${parentCount})</span></button>`;
+          } else {
+            upwardPillHtml = `<button type="button" onclick="event.stopPropagation(); openUpwardLineage('${escapeHTML(spouse.id)}')" class="spouse-upward-pill add-parent admin-only-action" title="Tambah atau buka jalur orang tua ${escapeHTML(spouse.name)}" data-html2canvas-ignore><i class="fa-solid fa-arrow-up"></i><span>+ Orang Tua</span></button>`;
+          }
         }
 
+        html += `<div style="display: flex; align-items: center; position: relative; margin-left: 28px;">`;
         html += `<div style="position: relative; z-index: 10; display: flex; align-items: center;">`;
-        html += buildPersonCard(spouse, true, false, false, level, node.id, null, {});
+        html += `<div class="spouse-card-stack">${upwardPillHtml}${buildPersonCard(spouse, true, false, false, level, node.id, null, {})}</div>`;
 
         if (spouse.spouses && spouse.spouses.length > 0) {
           spouse.spouses.forEach(secSpouse => {
@@ -1634,11 +1646,20 @@
     // Render Tab 3: Media
     renderInspectorMedia(person);
 
-    // Edit permission
+    // Edit & Upward Lineage permission
     const isEdit = Boolean(appSettings?.enableEdit) && !isGuestMode;
+    const index = buildGenealogyIndex();
+    const pid = String(personId);
+    const isUpwardAnc = index.upwardAncestorSet.has(pid);
+    const isSpouseOrHost = index.hostMap.has(pid);
+    const isRootPerson = pid === String(treeData?.id);
+    const canAddParent = isEdit && (isRootPerson || ((isSpouseOrHost || isUpwardAnc) && (person.parents?.length || 0) < 2));
+
     document.getElementById('inspector-btn-edit').style.display = isEdit ? 'inline-flex' : 'none';
-    document.getElementById('inspector-btn-add-child').style.display = isEdit ? 'inline-flex' : 'none';
-    document.getElementById('inspector-btn-add-spouse').style.display = isEdit ? 'inline-flex' : 'none';
+    document.getElementById('inspector-btn-add-child').style.display = (isEdit && !isUpwardAnc) ? 'inline-flex' : 'none';
+    document.getElementById('inspector-btn-add-spouse').style.display = (isEdit && !isUpwardAnc) ? 'inline-flex' : 'none';
+    const addParentBtn = document.getElementById('inspector-btn-add-parent');
+    if (addParentBtn) addParentBtn.style.display = canAddParent ? 'inline-flex' : 'none';
     document.getElementById('inspector-btn-delete').style.display = isEdit ? 'inline-flex' : 'none';
 
     drawer.classList.add('open');
@@ -1657,32 +1678,47 @@
     const chipsContainer = document.getElementById('inspector-relations-chips');
     if (!chipsContainer) return;
 
-    const parent = findParent(treeData, person.id);
-    const spouses = person.spouses || [];
-    const children = person.children || [];
+    const index = buildGenealogyIndex();
+    const pid = String(person.id);
+    const parentIds = Array.from(index.parentMap.get(pid) || []);
+    const spouseIds = Array.from(index.spouseMap.get(pid) || []);
+    const childIds = Array.from(index.childrenMap.get(pid) || []);
 
     let chipsHTML = '';
 
-    if (parent) {
-      chipsHTML += `<button onclick="flyToPerson('${parent.id}')" class="relation-jump-chip">
+    const chipAction = (targetId) => {
+      if (index.upwardAncestorSet.has(String(targetId))) {
+        return `setTreePerspective('hourglass', '${escapeHTML(targetId)}'); openInspectorDrawer('${escapeHTML(targetId)}');`;
+      }
+      return `flyToPerson('${escapeHTML(targetId)}')`;
+    };
+
+    parentIds.forEach(parId => {
+      const p = index.personMap.get(String(parId));
+      if (!p) return;
+      chipsHTML += `<button onclick="${chipAction(parId)}" class="relation-jump-chip">
         <i class="fa-solid fa-arrow-up"></i>
-        <span>${escapeHTML(parent.name.split(' ')[0])}</span>
+        <span>${escapeHTML((p.name || '').split(' ')[0])}</span>
         <span class="badge-role">Orang Tua</span>
       </button>`;
-    }
+    });
 
-    spouses.forEach(s => {
-      chipsHTML += `<button onclick="flyToPerson('${s.id}')" class="relation-jump-chip">
+    spouseIds.forEach(sId => {
+      const s = index.personMap.get(String(sId));
+      if (!s) return;
+      chipsHTML += `<button onclick="${chipAction(sId)}" class="relation-jump-chip">
         <i class="fa-solid fa-heart" style="color: #e11d48;"></i>
-        <span>${escapeHTML(s.name.split(' ')[0])}</span>
+        <span>${escapeHTML((s.name || '').split(' ')[0])}</span>
         <span class="badge-role">Pasangan</span>
       </button>`;
     });
 
-    children.forEach(c => {
-      chipsHTML += `<button onclick="flyToPerson('${c.id}')" class="relation-jump-chip">
+    childIds.forEach(cId => {
+      const c = index.personMap.get(String(cId));
+      if (!c) return;
+      chipsHTML += `<button onclick="${chipAction(cId)}" class="relation-jump-chip">
         <i class="fa-solid fa-child"></i>
-        <span>${escapeHTML(c.name.split(' ')[0])}</span>
+        <span>${escapeHTML((c.name || '').split(' ')[0])}</span>
         <span class="badge-role">Anak</span>
       </button>`;
     });
@@ -2505,9 +2541,9 @@
 
     // Child relation selectors
     const containerChildRel = document.getElementById('container-childrelations');
-    if (!spouseId && nodeId !== treeData.id) {
-      const parent = findParent(treeData, nodeId);
-      populateSpouseDropdown(parent);
+    const directParent = (!spouseId && nodeId !== treeData.id) ? findParent(treeData, nodeId) : null;
+    if (directParent) {
+      populateSpouseDropdown(directParent);
       document.getElementById('input-linkedspouse').value = person.linkedSpouseId || '';
       document.getElementById('input-childstatus').value = person.childStatus || 'kandung';
       containerChildRel.classList.remove('hidden');
@@ -2661,7 +2697,7 @@
     person.birthLatitude = document.getElementById('input-birthlatitude').value;
     person.birthLongitude = document.getElementById('input-birthlongitude').value;
 
-    if (!selectedSpouseId && selectedNodeId !== treeData.id) {
+    if (!selectedSpouseId && selectedNodeId !== treeData.id && findParent(treeData, selectedNodeId)) {
       person.linkedSpouseId = document.getElementById('input-linkedspouse').value;
       person.childStatus = document.getElementById('input-childstatus').value;
     }
@@ -2734,6 +2770,88 @@
     openEditorModal(selectedNodeId, newSpouse.id);
   };
 
+  window.openUpwardLineage = function(personId) {
+    const person = findNodeById(treeData, personId);
+    if (!person) return;
+    if ((person.parents && person.parents.length > 0) || isGuestMode) {
+      setTreePerspective('hourglass', personId);
+      return;
+    }
+    actionAddParent(personId);
+  };
+
+  window.actionAddParent = function(explicitTargetId = null) {
+    if (isGuestMode) {
+      showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
+      return;
+    }
+    const targetId = String(explicitTargetId || activeInspectorPersonId || selectedSpouseId || selectedNodeId || '');
+    if (!targetId) return;
+    const target = findNodeById(treeData, targetId);
+    if (!target) return;
+
+    // Case 1: Adding parent above root ancestor
+    if (targetId === String(treeData.id)) {
+      const newRoot = {
+        id: generateId(),
+        name: `Orang Tua ${(treeData.name || '').split(' ')[0]}`,
+        gender: 'L',
+        spouses: [],
+        children: [treeData],
+        isCollapsed: false
+      };
+      treeData = newRoot;
+      ensureFamilyNumbers();
+      closeInspectorDrawer();
+      renderTree();
+      simpanKeFirebase(`Tambah orang tua puncak untuk ${target.name}`);
+      showToast('Orang tua puncak berhasil ditambahkan.');
+      openEditorModal(newRoot.id, null);
+      return;
+    }
+
+    // Case 2: Spouse / In-Law / Upward ancestor
+    const index = buildGenealogyIndex();
+    const isAllowed = index.hostMap.has(targetId) || index.upwardAncestorSet.has(targetId);
+    if (!isAllowed) {
+      showToast('Orang tua anggota ini sudah tercatat pada pohon utama.');
+      return;
+    }
+
+    if (!Array.isArray(target.parents)) target.parents = [];
+    if (target.parents.length >= 2) {
+      showToast('Maksimal 2 orang tua (Ayah dan Ibu) sudah tercatat.');
+      setTreePerspective('hourglass', targetId);
+      return;
+    }
+
+    const firstGender = target.parents[0]?.gender;
+    const gender = target.parents.length === 0 ? 'L' : (firstGender === 'L' ? 'P' : 'L');
+    const prefix = gender === 'L' ? 'Ayah' : 'Ibu';
+    const newParent = {
+      id: generateId(),
+      name: `${prefix} ${(target.name || '').split(' ')[0]}`,
+      gender,
+      notes: prefix,
+      parents: []
+    };
+    target.parents.push(newParent);
+
+    ensureFamilyNumbers();
+    closeInspectorDrawer();
+    simpanKeFirebase(`Tambah ${prefix} untuk ${target.name}`);
+
+    if (activePerspectiveMode === 'full') {
+      setTreePerspective('hourglass', targetId);
+    } else {
+      renderTree();
+      requestAnimationFrame(() => requestAnimationFrame(() => fitTreeToViewport(true)));
+    }
+
+    showToast(`${prefix} untuk ${target.name} berhasil ditambahkan.`);
+    openEditorModal(newParent.id, null);
+  };
+
   window.handleDelete = function() {
     if (isGuestMode) {
       showToast('Mode Baca Saja aktif. Buka kunci Admin terlebih dahulu.', true);
@@ -2774,7 +2892,23 @@
   };
 
   function deleteNodeRecursive(current, idToDelete) {
-    if (!current || !current.children) return;
+    if (!current) return;
+    function pruneParents(owner) {
+      if (!owner || !Array.isArray(owner.parents)) return;
+      owner.parents = owner.parents.filter(p => p.id !== idToDelete);
+      owner.parents.forEach(pruneParents);
+    }
+    if (Array.isArray(current.spouses)) {
+      current.spouses = current.spouses.filter(sp => sp.id !== idToDelete);
+      current.spouses.forEach(sp => {
+        pruneParents(sp);
+        if (Array.isArray(sp.spouses)) {
+          sp.spouses = sp.spouses.filter(ss => ss.id !== idToDelete);
+          sp.spouses.forEach(pruneParents);
+        }
+      });
+    }
+    if (!current.children) return;
     current.children = current.children.filter(c => c.id !== idToDelete);
     current.children.forEach(c => deleteNodeRecursive(c, idToDelete));
   }
@@ -3316,10 +3450,35 @@
     const spouseMap = new Map();
     const generationMap = new Map();
     const hostMap = new Map();
+    const upwardAncestorSet = new Set();
 
     function ensureSet(map, key) {
       if (!map.has(key)) map.set(key, new Set());
       return map.get(key);
+    }
+
+    function indexUpwardParents(owner, ownerGen) {
+      const ownerId = String(owner.id);
+      const pList = owner.parents || [];
+      pList.forEach(pParent => {
+        const ppid = String(pParent.id);
+        personMap.set(ppid, pParent);
+        generationMap.set(ppid, Math.max(0, ownerGen - 1));
+        upwardAncestorSet.add(ppid);
+
+        ensureSet(parentMap, ownerId).add(ppid);
+        ensureSet(childrenMap, ppid).add(ownerId);
+        ensureSet(parentMap, ppid);
+        ensureSet(spouseMap, ppid);
+
+        indexUpwardParents(pParent, ownerGen - 1);
+      });
+      if (pList.length === 2) {
+        const p1 = String(pList[0].id);
+        const p2 = String(pList[1].id);
+        ensureSet(spouseMap, p1).add(p2);
+        ensureSet(spouseMap, p2).add(p1);
+      }
     }
 
     function indexNode(node, parentId = null, generation = 1) {
@@ -3351,17 +3510,7 @@
         spouseMap.get(pid).add(sid);
         spouseMap.get(sid).add(pid);
 
-        if (sp.parents && sp.parents.length > 0) {
-          sp.parents.forEach(pParent => {
-            const ppid = String(pParent.id);
-            personMap.set(ppid, pParent);
-            generationMap.set(ppid, Math.max(0, generation - 1));
-            parentMap.get(sid).add(ppid);
-            ensureSet(childrenMap, ppid).add(sid);
-            ensureSet(parentMap, ppid);
-            ensureSet(spouseMap, ppid);
-          });
-        }
+        indexUpwardParents(sp, generation);
 
         if (sp.spouses && sp.spouses.length > 0) {
           sp.spouses.forEach(secSp => {
@@ -3373,6 +3522,7 @@
             ensureSet(childrenMap, ssid);
             ensureSet(spouseMap, ssid).add(sid);
             spouseMap.get(sid).add(ssid);
+            indexUpwardParents(secSp, generation);
           });
         }
       });
@@ -3395,7 +3545,7 @@
     }
 
     indexNode(treeData, null, 1);
-    return { personMap, parentMap, childrenMap, spouseMap, generationMap, hostMap };
+    return { personMap, parentMap, childrenMap, spouseMap, generationMap, hostMap, upwardAncestorSet };
   }
 
   function getAncestorsWithDepth(personId, parentMap) {
